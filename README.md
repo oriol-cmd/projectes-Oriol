@@ -1,12 +1,15 @@
 # Reunions: resums automàtics de reunions des de l'iPhone
 
-App web per a l'iPhone (s'instal·la a la pantalla d'inici com una app normal), **sense cap clau de pagament**. Fa això:
+App web per a l'iPhone (s'instal·la a la pantalla d'inici com una app normal) que **escolta la conversa, en mostra la transcripció en directe i, en acabar, en fa un resum ordenat**. Sense cap clau de pagament.
 
-1. **Grava** la reunió amb el micròfon de l'iPhone.
-2. **Transcriu** l'àudio mentre graves, en trams de 5 minuts, amb **Gemini de Google** (nivell gratuït). Entén català i castellà, encara que es barregin.
-3. En acabar, Gemini en fa un **resum estructurat**: resum, punts tractats, decisions, tasques amb responsable i termini, temes oberts i dades clau.
-4. **T'envia el resum per correu automàticament** a `oriol@esportec.cat`, amb la transcripció completa adjunta.
-5. **Ho desa tot en un full de Google Sheets**: a la pestanya *Reunions* hi ha cada reunió amb el seu resum i la transcripció, i a la pestanya *Tasques* hi ha totes les tasques, amb una casella per marcar-les com a fetes.
+1. **Escolta** la reunió amb el micròfon de l'iPhone.
+2. **Transcripció en directe:** el text apareix a la pantalla mentre parleu.
+   - **Gemini** (recomanat): text nou cada ~20 segons, molt precís, en català i castellà encara que es barregin. L'app talla l'àudio aprofitant les pauses, per no partir paraules, i no envia els trams en silenci.
+   - **Dictat de l'iPhone**: paraula a paraula a l'instant, però menys precís.
+3. En acabar, en fa un **resum ordenat**: resum, punts tractats, decisions, tasques amb responsable i termini, temes oberts i dades clau.
+4. *(Opcional)* **T'envia el resum per correu** a `oriol@esportec.cat` i **el desa en un Google Sheets**, amb una pestanya de tasques per fer-ne el seguiment.
+
+Per començar **només cal una clau gratuïta de Gemini**. El correu i el Sheets es poden afegir més endavant.
 
 Altres funcions:
 - Pots posar el títol i els assistents de la reunió, i el resum en surt més precís.
@@ -24,7 +27,7 @@ Altres funcions:
 | Correu i registre | Google Sheets + Apps Script, amb el teu compte | Gratuït |
 | Allotjament de l'app | Netlify o GitHub Pages | Gratuït |
 
-El nivell gratuït de Gemini té un límit de peticions diàries. Cada hora de reunió en fa unes 13, de manera que dona per a moltes reunions cada dia. Si algun dia s'esgota, l'app ho avisa i ho reprèn sola l'endemà.
+El nivell gratuït de Gemini té un límit de peticions diàries. En mode directe, una hora de conversa en fa unes 150–180 (menys si hi ha silencis), de manera que dona per a diverses reunions cada dia. Si en fas moltes, a *Configuració > Avançat* pots allargar l'interval de 20 s, i així es gasten menys peticions. Si algun dia s'esgota, l'app ho avisa i ho reprèn sola l'endemà.
 
 > ⚠️ **Privadesa:** al nivell gratuït, Google pot fer servir el contingut que s'hi envia (l'àudio i les transcripcions) per millorar els seus productes, i el pot revisar personal humà. Per a reunions amb informació confidencial, tens dues opcions:
 > - Activar la facturació al projecte d'AI Studio. Llavors Google deixa de fer-ho servir, i el cost seria de cèntims per reunió.
@@ -39,7 +42,7 @@ El nivell gratuït de Gemini té un límit de peticions diàries. Cada hora de r
 
 > Si el compte d'esportec.cat no hi pot entrar perquè l'administrador de Workspace ho té desactivat, fes servir un compte de Gmail personal: funciona igual.
 
-### 2. Full de Google Sheets (correu + registre)
+### 2. *(Opcional)* Full de Google Sheets (correu + registre)
 
 1. Crea un full de càlcul nou a https://sheets.new i anomena'l, per exemple, **Reunions**.
 2. Menú **Extensions > Apps Script**. Esborra el que hi hagi i enganxa-hi el fitxer [`apps-script/Code.gs`](apps-script/Code.gs).
@@ -72,15 +75,15 @@ Aquest repositori ja inclou l'automatització (`.github/workflows/pages.yml`). C
 1. Obre l'adreça amb **Safari**.
 2. Botó **Compartir > Afegeix a la pantalla d'inici**.
 3. Obre l'app des de la icona **Reunions**, ves a ⚙️ **Configuració** i omple:
-   - URL i clau secreta de l'script del full
-   - Clau de Gemini
-4. Prem **Envia un correu de prova** i **Comprova la clau**. Si tot surt amb ✓, ja la pots fer servir.
+   - Clau de Gemini (i prem **Comprova la clau**)
+   - *(Opcional)* URL i clau secreta de l'script del full (i prem **Envia un correu de prova**) Si tot surt amb ✓, ja la pots fer servir.
 
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.
 2. Deixa l'iPhone damunt la taula **amb l'app oberta i la pantalla encesa**.
-3. En acabar, toca **Acaba la reunió**. En un minut o dos tindràs el resum a la pantalla, al correu i al full de càlcul.
+3. Mentre parleu, veuràs la transcripció a la pantalla.
+4. En acabar, toca **Acaba la reunió**. En pocs segons tindràs el resum ordenat a la pantalla (i, si ho has configurat, al correu i al full de càlcul).
 
 ### Important a l'iPhone
 - **No bloquegis el mòbil ni canviïs d'app mentre grava.** L'iPhone talla el micròfon de les apps web quan passen a segon pla. L'app es manté la pantalla encesa sola. Si mai es talla, en tornar-hi reconnecta el micròfon i continua, però el tros que no s'ha gravat es perd.

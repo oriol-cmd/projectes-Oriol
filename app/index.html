@@ -30,7 +30,7 @@
     <!-- INICI -->
     <section id="view-home" class="view">
       <div id="setup-banner" class="banner warn" hidden>
-        Falta configurar l'app. <button class="link" data-goto="settings">Obre la configuració</button>
+        Falta posar la clau gratuïta de Gemini. <button class="link" data-goto="settings">Obre la configuració</button>
       </div>
       <div id="pending-banner" class="banner" hidden></div>
 
@@ -57,7 +57,8 @@
       <p class="rec-title" id="rec-title"></p>
       <div class="timer" id="timer">00:00</div>
       <div class="rec-state"><span class="pulse"></span><span id="rec-state-text">Gravant</span></div>
-      <canvas id="meter" width="600" height="120" aria-hidden="true"></canvas>
+      <canvas id="meter" width="600" height="60" aria-hidden="true"></canvas>
+      <div id="live-text" class="live" aria-live="polite"></div>
       <p class="rec-progress" id="rec-progress"></p>
       <div class="rec-actions">
         <button id="btn-pause" class="btn secondary">Pausa</button>
@@ -106,7 +107,8 @@
       <h2>Configuració</h2>
       <p class="fineprint">Tot es desa només en aquest iPhone.</p>
 
-      <h3>Correu</h3>
+      <h3>Correu i Google Sheets <em style="text-transform:none;letter-spacing:0">(opcional)</em></h3>
+      <p class="fineprint" style="text-align:left;margin-top:0">Si ho omples, cada resum t'arribarà per correu i es desarà en un full de càlcul. Instruccions al README.</p>
       <label class="field"><span>Enviar el resum a</span>
         <input id="set-email" type="email" autocomplete="off"></label>
       <label class="field"><span>URL de l'script del full de Google</span>
@@ -124,8 +126,8 @@
       <h3>Transcripció</h3>
       <label class="field"><span>Com es transcriu</span>
         <select id="set-engine">
-          <option value="audio">Gemini escolta l'àudio (recomanat, molt més precís)</option>
-          <option value="device">Dictat de l'iPhone (no envia l'àudio, menys precís)</option>
+          <option value="audio">Gemini (text cada ~20 s, molt precís)</option>
+          <option value="device">Dictat de l'iPhone (paraula a paraula a l'instant, menys precís)</option>
         </select></label>
       <label class="field"><span>Idioma principal</span>
         <select id="set-lang">
@@ -143,8 +145,8 @@
         <summary>Avançat</summary>
         <label class="field"><span>Model de Gemini</span>
           <input id="set-gemini-model" type="text" autocomplete="off"></label>
-        <label class="field"><span>Durada de cada tram d'àudio (minuts)</span>
-          <input id="set-segment" type="number" min="1" max="10" step="1"></label>
+        <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
+          <input id="set-segment" type="number" min="10" max="120" step="5"></label>
         <label class="check"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
       </details>
 

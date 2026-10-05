@@ -13,7 +13,7 @@ const DEFAULTS = {
   lang: 'auto',
   extra: '',
   geminiModel: 'gemini-flash-latest',
-  segmentMin: 5,
+  liveSec: 20, // cada quants segons apareix text nou en directe
   keepAudio: false,
 };
 
@@ -29,9 +29,9 @@ function saveSettings(s) {
   settings = { ...settings, ...s };
   localStorage.setItem('settings', JSON.stringify(settings));
 }
+const emailEnabled = () => !!(settings.scriptUrl && settings.scriptSecret);
 function missingSetup() {
   const miss = [];
-  if (!settings.scriptUrl || !settings.scriptSecret) miss.push('correu');
   if (!settings.geminiKey) miss.push('clau de Gemini');
   return miss;
 }
@@ -325,7 +325,7 @@ function kickQueue(meetingId) {
           if (e instanceof FatalError) { updateRecProgress(); throw e; }
         }
         await saveMeeting(m);
-        updateRecProgress();
+        if (rec.meeting === m) updateRecProgress();
         updateProcView(m);
       }
     } finally {
@@ -374,8 +374,16 @@ function buildTranscript(m) {
     .slice()
     .sort((a, b) => a.idx - b.idx)
     .filter((s) => s.status === 'done' && s.text)
-    .map((s) => `[${fmtClock(s.startMs || 0)}] ${s.text}`)
-    .join('\n\n');
+    .reduce((acc, s) => {
+      const t = s.startMs || 0;
+      if (acc.lastMark === null || t - acc.lastMark >= 300000) {
+        acc.lastMark = t;
+        acc.out.push(`\n[${fmtClock(t)}]`);
+      }
+      acc.out.push(s.text);
+      return acc;
+    }, { out: [], lastMark: null }).out
+    .join('\n').trim();
 }
 
 async function summarize(m) {
@@ -522,7 +530,9 @@ function runPipeline(id, { redoSummary = false } = {}) {
         await saveMeeting(m);
       }
       // 3. Correu
-      if (m.email.status !== 'sent') {
+      if (!emailEnabled()) {
+        if (m.email.status !== 'sent') m.email = { status: 'off' };
+      } else if (m.email.status !== 'sent') {
         m.stage = 'email'; updateProcView(m);
         try {
           const r = await sendEmail(buildEmail(m));
@@ -609,20 +619,27 @@ function startSegment() {
   const chunks = [];
   const segStart = rec.activeMs;
   r.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-  r.onstop = () => finishSegment(r, chunks, segStart);
+  r.onstop = () => finishSegment(r, chunks, segStart, rec.segPeak);
   r.onerror = () => { if (!rec.stopping) recoverMic(); };
   rec.recorder = r;
   rec.segStartMs = segStart;
+  rec.segPeak = rec.analyser ? 0 : 1; // sense mesurador, suposem que hi ha veu
+  rec.quietMs = 0;
   r.start();
 }
 
 let segmentChain = Promise.resolve();
-function finishSegment(r, chunks, startMs) {
+const SILENCE_PEAK = 0.03;
+function finishSegment(r, chunks, startMs, peak) {
   const m = rec.meeting;
   const type = r.mimeType || rec.mime || 'audio/mp4';
   segmentChain = segmentChain.then(async () => {
     const blob = new Blob(chunks, { type });
-    if (blob.size > 2000 && m) {
+    if (m && peak < SILENCE_PEAK) {
+      // Tram en silenci: no cal enviar-lo.
+      m.segments.push({ idx: m.segments.length, startMs, status: 'done', text: '', silent: true });
+      await saveMeeting(m);
+    } else if (blob.size > 2000 && m) {
       const idx = m.segments.length;
       await db.put('audio', blob, audioKey(m.id, idx));
       m.segments.push({ idx, startMs, status: 'pending', text: '' });
@@ -674,14 +691,13 @@ function startSpeech() {
         saveMeeting(rec.meeting);
       } else interim += r[0].transcript;
     }
-    $('#rec-progress').textContent = interim || lastWords(rec.meeting.liveText);
+    renderLive(interim);
   };
   sr.onerror = (e) => { if (e.error === 'not-allowed') toast('Cal permetre el micròfon i el reconeixement de veu', 5000); };
   sr.onend = () => { if (rec.meeting && !rec.stopping && !rec.paused) { try { sr.start(); } catch { /* ja actiu */ } } };
   sr.start();
   rec.speech = sr;
 }
-const lastWords = (t) => (t || '').split(/\s+/).slice(-12).join(' ');
 
 async function startRecording() {
   const miss = missingSetup();
@@ -724,20 +740,39 @@ async function startRecording() {
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
   showView('rec');
+  renderLive();
   rec.lastTick = performance.now();
   rec.tickTimer = setInterval(tick, 250);
   requestAnimationFrame(drawMeter);
 }
 
+function readLevel() {
+  if (!rec.analyser) return 0;
+  const buf = new Float32Array(rec.analyser.fftSize);
+  rec.analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (const v of buf) sum += v * v;
+  return Math.min(1, Math.sqrt(sum / buf.length) * 6);
+}
+
 function tick() {
   const now = performance.now();
-  if (!rec.paused) rec.activeMs += now - rec.lastTick;
+  const dt = now - rec.lastTick;
+  if (!rec.paused) rec.activeMs += dt;
   rec.lastTick = now;
   $('#timer').textContent = fmtClock(rec.activeMs);
-  const segMs = Math.max(1, Number(settings.segmentMin) || 5) * 60000;
-  if (rec.meeting.engine !== 'device' && !rec.paused && rec.activeMs - rec.segStartMs >= segMs) {
-    rec.segStartMs = rec.activeMs; // evita rotacions repetides mentre s'atura
-    rotateSegment();
+  if (rec.meeting.engine !== 'device' && !rec.paused) {
+    // Talla el tram en una pausa de la conversa, perquè no es parteixin paraules.
+    const level = readLevel();
+    rec.segPeak = Math.max(rec.segPeak || 0, level);
+    rec.avgLevel = rec.avgLevel == null ? level : rec.avgLevel * 0.97 + level * 0.03;
+    rec.quietMs = level < Math.max(0.02, rec.avgLevel * 0.5) ? (rec.quietMs || 0) + dt : 0;
+    const minMs = Math.max(10, Number(settings.liveSec) || DEFAULTS.liveSec) * 1000;
+    const elapsed = rec.activeMs - rec.segStartMs;
+    if (elapsed >= minMs * 2 || (elapsed >= minMs && rec.quietMs >= 600)) {
+      rec.segStartMs = rec.activeMs; // evita rotacions repetides mentre s'atura
+      rotateSegment();
+    }
   }
   // Desa la durada de tant en tant per si es talla.
   if (Math.floor(rec.activeMs / 10000) !== Math.floor((rec.activeMs - 250) / 10000)) {
@@ -813,26 +848,42 @@ function addMark() {
 function updateRecProgress() {
   const m = rec.meeting;
   if (!m || m.engine === 'device') return;
-  const done = m.segments.filter((s) => s.status === 'done').length;
   const err = m.segments.find((s) => s.status === 'error');
-  $('#rec-progress').textContent = err
-    ? `⚠ ${err.error}`
-    : done ? `Transcrits ${done} de ${m.segments.length} trams mentre graves` : '';
+  $('#rec-progress').textContent = err ? `⚠ ${err.error}` : '';
+  renderLive();
+}
+
+// Transcripció en directe a la pantalla de gravació.
+function renderLive(interim = '') {
+  const m = rec.meeting;
+  const box = $('#live-text');
+  if (!m) return;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.textContent = '';
+  const add = (text, cls) => {
+    const p = document.createElement('p');
+    if (cls) p.className = cls;
+    p.textContent = text;
+    box.appendChild(p);
+  };
+  if (m.engine === 'device') {
+    if (m.liveText) add(m.liveText);
+    if (interim) add(interim, 'interim');
+  } else {
+    m.segments.slice().sort((a, b) => a.idx - b.idx).forEach((s) => {
+      if (s.status === 'done' && s.text) s.text.split('\n').filter(Boolean).forEach((l) => add(l));
+    });
+    if (m.segments.some((s) => s.status === 'pending')) add('Transcrivint…', 'interim');
+  }
+  if (!box.firstChild) add('El text apareixerà aquí mentre parleu.', 'placeholder');
+  if (atBottom) box.scrollTop = box.scrollHeight;
 }
 
 function drawMeter() {
   const c = $('#meter');
   if (!rec.meeting || currentView !== 'rec') return;
   const ctx = c.getContext('2d');
-  let level = 0;
-  if (rec.analyser && !rec.paused) {
-    const buf = new Float32Array(rec.analyser.fftSize);
-    rec.analyser.getFloatTimeDomainData(buf);
-    let sum = 0;
-    for (const v of buf) sum += v * v;
-    level = Math.min(1, Math.sqrt(sum / buf.length) * 6);
-  }
-  rec.levels.push(level);
+  rec.levels.push(rec.paused ? 0 : readLevel());
   const bars = 60;
   if (rec.levels.length > bars) rec.levels.shift();
   ctx.clearRect(0, 0, c.width, c.height);
@@ -897,6 +948,7 @@ function updateProcView(m) {
   else if (m.stage === 'summary') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? m.error : 'Escrivint el resum…');
   else setStep('step-summary', '', '');
 
+  $('#step-email').hidden = m.email.status === 'off' || (!emailEnabled() && m.email.status !== 'sent');
   if (m.email.status === 'sent') setStep('step-email', 'done', settings.email);
   else if (m.email.status === 'error') setStep('step-email', 'error', m.email.error);
   else if (m.stage === 'email') setStep('step-email', 'active', `Enviant a ${settings.email}…`);
@@ -914,6 +966,9 @@ async function showResult(id) {
     st.className = 'banner err';
     st.innerHTML = `No s'ha pogut completar: ${escapeHtml(m.error)} <button class="link" id="btn-retry">Reintenta</button>`;
     $('#btn-retry').onclick = () => { showView('proc'); updateProcView(m); runPipeline(id); };
+  } else if (m.email.status === 'off') {
+    st.className = 'banner ok';
+    st.textContent = '✓ Resum llest';
   } else if (m.email.status === 'sent') {
     st.className = 'banner ok';
     st.textContent = m.email.confirmed === false
@@ -940,7 +995,7 @@ async function renderHistory() {
     if (pipelines.has(m.id) || m.status === 'processing') badge = '<span class="badge warn">Processant</span>';
     else if (m.status === 'error') badge = '<span class="badge err">Error</span>';
     else if (m.email && m.email.status === 'sent') badge = '<span class="badge ok">Enviat</span>';
-    else if (m.status === 'done') badge = '<span class="badge warn">No enviat</span>';
+    else if (m.status === 'done' && m.email && m.email.status === 'error') badge = '<span class="badge warn">No enviat</span>';
     li.innerHTML = `<button class="item"><div class="t">${escapeHtml(m.summary ? summaryTitle(m) : (m.title || 'Reunió'))}${badge}</div>
       <div class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}</div></button>
       <div class="row-actions"><button class="btn ghost small" data-del>Esborra</button></div>`;
@@ -960,7 +1015,7 @@ async function refreshHomeBanners() {
   const miss = missingSetup();
   $('#setup-banner').hidden = miss.length === 0;
   const all = await db.all('meetings');
-  const pending = all.filter((m) => m.status === 'error' || (m.status === 'done' && m.email.status !== 'sent'));
+  const pending = all.filter((m) => m.status === 'error' || (m.status === 'done' && m.email.status === 'error'));
   const working = all.filter((m) => pipelines.has(m.id));
   const b = $('#pending-banner');
   if (working.length) {
@@ -968,7 +1023,7 @@ async function refreshHomeBanners() {
     b.textContent = `Processant ${working.length} reunió${working.length > 1 ? 'ns' : ''} en segon pla…`;
   } else if (pending.length) {
     b.hidden = false; b.className = 'banner warn';
-    b.innerHTML = `${pending.length} reunió${pending.length > 1 ? 'ns' : ''} sense enviar. <button class="link" data-goto="history">Revisa-les</button>`;
+    b.innerHTML = `${pending.length} reunió${pending.length > 1 ? 'ns' : ''} amb problemes. <button class="link" data-goto="history">Revisa-les</button>`;
   } else b.hidden = true;
 }
 
@@ -1005,7 +1060,7 @@ function fillSettings() {
   $('#set-lang').value = settings.lang;
   $('#set-extra').value = settings.extra;
   $('#set-gemini-model').value = settings.geminiModel;
-  $('#set-segment').value = settings.segmentMin;
+  $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   syncEngineFields();
   $('#settings-msg').textContent = '';
@@ -1020,7 +1075,7 @@ function readSettingsForm() {
     lang: $('#set-lang').value,
     extra: $('#set-extra').value.trim(),
     geminiModel: $('#set-gemini-model').value.trim() || DEFAULTS.geminiModel,
-    segmentMin: Math.min(10, Math.max(1, Number($('#set-segment').value) || DEFAULTS.segmentMin)),
+    liveSec: Math.min(120, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
     keepAudio: $('#set-keep-audio').checked,
   };
 }
