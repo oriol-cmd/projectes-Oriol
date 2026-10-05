@@ -8,20 +8,21 @@ const DEFAULTS = {
   email: 'oriol@esportec.cat',
   scriptUrl: '',
   scriptSecret: '',
-  engine: 'openai',
-  openaiKey: '',
+  engine: 'audio', // 'audio' = Gemini escolta l'àudio · 'device' = dictat de l'iPhone
+  geminiKey: '',
   lang: 'auto',
-  anthropicKey: '',
   extra: '',
-  sttModel: 'gpt-4o-transcribe',
-  claudeModel: 'claude-opus-5-5',
+  geminiModel: 'gemini-flash-latest',
   segmentMin: 5,
   keepAudio: false,
 };
 
 function loadSettings() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('settings') || '{}') }; }
-  catch { return { ...DEFAULTS }; }
+  let s;
+  try { s = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('settings') || '{}') }; }
+  catch { s = { ...DEFAULTS }; }
+  if (s.engine !== 'device') s.engine = 'audio';
+  return s;
 }
 let settings = loadSettings();
 function saveSettings(s) {
@@ -31,8 +32,7 @@ function saveSettings(s) {
 function missingSetup() {
   const miss = [];
   if (!settings.scriptUrl || !settings.scriptSecret) miss.push('correu');
-  if (settings.engine === 'openai' && !settings.openaiKey) miss.push('OpenAI');
-  if (!settings.anthropicKey) miss.push('Claude');
+  if (!settings.geminiKey) miss.push('clau de Gemini');
   return miss;
 }
 
@@ -173,43 +173,132 @@ const audioKey = (id, idx) => `${id}:${idx}`;
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 // ---------------------------------------------------------------------------
-// Transcripció amb OpenAI (per trams, mentre es grava)
+// Gemini (Google AI Studio, nivell gratuït): transcripció i resum
 // ---------------------------------------------------------------------------
-async function transcribeBlob(blob, idx, prevText, context) {
-  const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'wav';
-  const promptParts = [];
-  if (context) promptParts.push(context);
-  if (prevText) promptParts.push(prevText.slice(-400));
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const fd = new FormData();
-    fd.append('file', blob, `tram-${idx}.${ext}`);
-    fd.append('model', settings.sttModel);
-    fd.append('response_format', 'json');
-    if (settings.lang !== 'auto') fd.append('language', settings.lang);
-    if (promptParts.length) fd.append('prompt', promptParts.join('\n'));
-    let res;
-    try {
-      res = await fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${settings.openaiKey}` },
-        body: fd,
-      }, 180000);
-    } catch (e) {
-      if (attempt === 3) throw new Error('Sense connexió amb OpenAI');
-      await sleep(2000 * 2 ** attempt);
-      continue;
+class UnsupportedAudioError extends Error {}
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
+const missingModels = new Set();
+
+async function gemini(parts, { system, maxTokens = 16384 } = {}) {
+  let models = [...new Set([settings.geminiModel || DEFAULTS.geminiModel, GEMINI_FALLBACK_MODEL])];
+  if (models.some((x) => !missingModels.has(x))) models = models.filter((x) => !missingModels.has(x));
+  const body = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: { maxOutputTokens: maxTokens },
+  };
+  if (system) body.systemInstruction = { parts: [{ text: system }] };
+  let lastErr;
+  for (const model of models) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      let res;
+      try {
+        res = await fetchWithTimeout(`${GEMINI_URL}${encodeURIComponent(model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.geminiKey },
+          body: JSON.stringify(body),
+        }, 300000);
+      } catch (e) {
+        lastErr = new Error('Sense connexió amb Gemini');
+        await sleep(3000 * 2 ** attempt);
+        continue;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.promptFeedback && data.promptFeedback.blockReason) throw new Error(`Gemini ha bloquejat la petició (${data.promptFeedback.blockReason})`);
+        const cand = (data.candidates || [])[0];
+        const text = ((cand && cand.content && cand.content.parts) || [])
+          .filter((pt) => pt.text && !pt.thought).map((pt) => pt.text).join('').trim();
+        if (!text && cand && cand.finishReason && cand.finishReason !== 'STOP') throw new Error(`Gemini no ha respost (${cand.finishReason})`);
+        return text;
+      }
+      const errText = await res.text();
+      if (res.status === 404) { missingModels.add(model); lastErr = new Error(`Model ${model} no disponible`); break; }
+      if (/API_KEY_INVALID|API key not valid/i.test(errText)) throw new FatalError('La clau de Gemini no és vàlida');
+      if (res.status === 403) throw new FatalError(`Gemini ha denegat l'accés: ${errText.slice(0, 160)}`);
+      if (res.status === 400 && /mime|unsupported|audio|inline/i.test(errText) && parts.some((pt) => pt.inlineData)) {
+        throw new UnsupportedAudioError(errText.slice(0, 160));
+      }
+      if (res.status === 429) {
+        if (/PerDay|per day/i.test(errText)) throw new FatalError("S'ha esgotat la quota gratuïta de Gemini d'avui. Torna-ho a provar demà (es reprendrà sol).");
+        const m = errText.match(/"retryDelay":\s*"(\d+)/);
+        lastErr = new Error('Gemini: massa peticions seguides');
+        await sleep(Math.min(90, m ? Number(m[1]) + 2 : 10 * 2 ** attempt) * 1000);
+        continue;
+      }
+      if (res.status >= 500) { lastErr = new Error(`Gemini ${res.status}`); await sleep(4000 * 2 ** attempt); continue; }
+      throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
     }
-    if (res.ok) {
-      const data = await res.json();
-      return (data.text || '').trim();
-    }
-    const body = await res.text();
-    if (res.status === 401) throw new FatalError("La clau d'OpenAI no és vàlida");
-    if (res.status === 400 && /model/i.test(body)) throw new FatalError(`Model de transcripció no vàlid: ${body.slice(0, 160)}`);
-    if (res.status === 429 && /quota|billing/i.test(body)) throw new FatalError("Compte d'OpenAI sense saldo");
-    if (attempt === 3 || (res.status < 500 && res.status !== 429)) throw new Error(`OpenAI ${res.status}: ${body.slice(0, 160)}`);
-    await sleep(2000 * 2 ** attempt);
   }
+  throw lastErr || new Error('Gemini no respon');
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+// Converteix l'àudio a WAV mono 16 kHz, per si Gemini no accepta el format original.
+async function toWav(blob) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+  ctx.close && ctx.close();
+  const rate = 16000;
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
+  const src = off.createBufferSource();
+  src.buffer = decoded;
+  src.connect(off.destination);
+  src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const buf = new ArrayBuffer(44 + pcm.length * 2);
+  const v = new DataView(buf);
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + pcm.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) {
+    const x = Math.max(-1, Math.min(1, pcm[i]));
+    v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+const LANG_NAMES = { ca: 'català', es: 'castellà', en: 'anglès' };
+let forceWav = false;
+
+async function transcribeBlob(blob, idx, prevText, context) {
+  const prompt = [
+    "Transcriu literalment aquest àudio, que és un tram d'una reunió gravada amb un mòbil damunt la taula.",
+    settings.lang === 'auto'
+      ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
+      : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
+    'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
+    "Si no hi ha veu o no s'entén res, respon només: [silenci]",
+    context ? `Context de la reunió (per escriure bé noms i termes): ${context}` : '',
+    prevText ? `Final del tram anterior (només per continuïtat, no el repeteixis): «${prevText.slice(-300)}»` : '',
+  ].filter(Boolean).join('\n');
+
+  const send = async (b) => gemini([
+    { inlineData: { mimeType: (b.type || 'audio/mp4').split(';')[0], data: await blobToBase64(b) } },
+    { text: prompt },
+  ]);
+  let text;
+  if (!forceWav) {
+    try { text = await send(blob); }
+    catch (e) {
+      if (!(e instanceof UnsupportedAudioError)) throw e;
+      forceWav = true;
+    }
+  }
+  if (text === undefined) text = await send(await toWav(blob));
+  text = text.trim();
+  return /^\[silenci\]$/i.test(text) ? '' : text;
 }
 
 const queueRunning = new Map(); // meetingId -> Promise
@@ -249,7 +338,7 @@ function kickQueue(meetingId) {
 }
 
 // ---------------------------------------------------------------------------
-// Resum amb Claude
+// Resum
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `Ets un secretari de reunions excel·lent. Reps la transcripció automàtica d'una reunió (gravada amb un mòbil damunt la taula) i n'has de fer l'acta-resum.
 
@@ -289,39 +378,6 @@ function buildTranscript(m) {
     .join('\n\n');
 }
 
-async function callClaude(body, useFallbacks = true) {
-  const headers = {
-    'content-type': 'application/json',
-    'x-api-key': settings.anthropicKey,
-    'anthropic-version': '2023-06-01',
-    'anthropic-dangerous-direct-browser-access': 'true',
-  };
-  const payload = { ...body };
-  if (useFallbacks) {
-    headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
-    payload.fallbacks = 'default';
-  }
-  for (let attempt = 0; attempt < 4; attempt++) {
-    let res;
-    try {
-      res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-        method: 'POST', headers, body: JSON.stringify(payload),
-      }, 600000);
-    } catch (e) {
-      if (attempt === 3) throw new Error('Sense connexió amb Claude');
-      await sleep(3000 * 2 ** attempt);
-      continue;
-    }
-    if (res.ok) return res.json();
-    const text = await res.text();
-    if (res.status === 401) throw new FatalError("La clau d'Anthropic no és vàlida");
-    if (res.status === 400 && useFallbacks && /fallback|beta/i.test(text)) return callClaude(body, false);
-    if (res.status === 400 && /credit balance/i.test(text)) throw new FatalError("Compte d'Anthropic sense crèdit");
-    if (attempt === 3 || (res.status < 500 && res.status !== 429)) throw new Error(`Claude ${res.status}: ${text.slice(0, 200)}`);
-    await sleep(3000 * 2 ** attempt);
-  }
-}
-
 async function summarize(m) {
   const transcript = buildTranscript(m);
   if (!transcript) throw new FatalError("No s'ha captat cap paraula a la gravació");
@@ -334,20 +390,13 @@ async function summarize(m) {
   if (m.marks && m.marks.length) info.push(`L'usuari ha marcat com a moments importants (temps de gravació): ${m.marks.map(fmtClock).join(', ')}. Dona-hi especial atenció.`);
   if (settings.extra) info.push(`Instruccions addicionals de l'usuari: ${settings.extra}`);
 
-  const data = await callClaude({
-    model: settings.claudeModel,
-    max_tokens: 16000,
-    output_config: { effort: 'medium' },
-    system: SYSTEM_PROMPT,
-    messages: [{
-      role: 'user',
-      content: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>`,
-    }],
-  });
-  if (data.stop_reason === 'refusal') throw new Error("Claude no ha pogut resumir aquesta reunió");
-  const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-  if (!text) throw new Error('Claude ha retornat un resum buit');
-  return text;
+  const text = await gemini(
+    [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }],
+    { system: SYSTEM_PROMPT, maxTokens: 16384 },
+  );
+  const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
+  if (!clean) throw new Error('Gemini ha retornat un resum buit');
+  return clean;
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +417,27 @@ function summaryTitle(m) {
   return first ? first.replace(/^#\s+/, '').trim() : (m.title || 'Reunió');
 }
 
+// Extreu les tasques de la secció «Tasques» del resum, per a la pestanya del full de càlcul.
+function parseTasks(md) {
+  const tasks = [];
+  let inTasks = false;
+  for (const line of (md || '').split('\n')) {
+    if (/^##\s+/.test(line)) { inTasks = /^##\s+Tasques/i.test(line); continue; }
+    if (!inTasks) continue;
+    const m = line.match(/^\s*[-*]\s+(?:\[[ xX]?\]\s*)?(.+)$/);
+    if (!m || /^cap\.?$/i.test(m[1].trim())) continue;
+    let rest = m[1].trim();
+    let who = '';
+    const w = rest.match(/^\*\*(.+?)\*\*\s*:?\s*(.*)$/);
+    if (w) { who = w[1].replace(/:$/, '').trim(); rest = w[2]; }
+    let due = '';
+    const d = rest.split(/\s+[—–]\s+/);
+    if (d.length > 1) { due = d.pop().trim(); rest = d.join(' — '); }
+    tasks.push({ who, task: rest.replace(/\*\*/g, '').trim(), due });
+  }
+  return tasks;
+}
+
 function buildEmail(m) {
   const title = summaryTitle(m);
   const when = fmtDate(m.startedAt);
@@ -382,6 +452,13 @@ ${mdToHtml(m.summary, EMAIL_STYLE)}
     text: m.summary,
     transcript: buildTranscript(m),
     filename: `transcripcio-${new Date(m.startedAt).toISOString().slice(0, 10)}.txt`,
+    // Per al full de càlcul
+    id: m.id,
+    date: new Date(m.startedAt).toISOString(),
+    title,
+    durationMin: Math.round((m.durationMs || 0) / 60000),
+    summary: m.summary,
+    tasks: parseTasks(m.summary),
   };
 }
 
@@ -582,7 +659,7 @@ async function recoverMic() {
 
 function startSpeech() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) throw new Error("Aquest navegador no té dictat. Fes servir el motor d'OpenAI.");
+  if (!SR) throw new Error("Aquest navegador no té dictat. Tria el motor «Gemini escolta l'àudio».");
   const langMap = { auto: 'ca-ES', ca: 'ca-ES', es: 'es-ES', en: 'en-US' };
   const sr = new SR();
   sr.lang = langMap[settings.lang] || 'ca-ES';
@@ -625,14 +702,14 @@ async function startRecording() {
   };
 
   try {
-    if (m.engine === 'openai') {
+    if (m.engine !== 'device') {
       rec.mime = pickMime();
       if (rec.mime === null) throw new Error('Aquest navegador no pot gravar àudio');
       await openMic();
     }
     Object.assign(rec, { meeting: m, activeMs: 0, paused: false, stopping: false, levels: [] });
     await saveMeeting(m);
-    if (m.engine === 'openai') startSegment(); else startSpeech();
+    if (m.engine !== 'device') startSegment(); else startSpeech();
   } catch (e) {
     rec.meeting = null;
     const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
@@ -658,7 +735,7 @@ function tick() {
   rec.lastTick = now;
   $('#timer').textContent = fmtClock(rec.activeMs);
   const segMs = Math.max(1, Number(settings.segmentMin) || 5) * 60000;
-  if (rec.meeting.engine === 'openai' && !rec.paused && rec.activeMs - rec.segStartMs >= segMs) {
+  if (rec.meeting.engine !== 'device' && !rec.paused && rec.activeMs - rec.segStartMs >= segMs) {
     rec.segStartMs = rec.activeMs; // evita rotacions repetides mentre s'atura
     rotateSegment();
   }
@@ -678,7 +755,7 @@ function setRecStateUi() {
 function togglePause() {
   if (!rec.meeting) return;
   rec.paused = !rec.paused;
-  if (rec.meeting.engine === 'openai') {
+  if (rec.meeting.engine !== 'device') {
     const r = rec.recorder;
     if (rec.paused && r && r.state === 'recording') r.pause();
     else if (!rec.paused && r && r.state === 'paused') r.resume();
@@ -697,7 +774,7 @@ async function stopRecording() {
   clearInterval(rec.tickTimer);
   $('#btn-stop').disabled = true;
   try {
-    if (m.engine === 'openai') {
+    if (m.engine !== 'device') {
       if (rec.recorder && rec.recorder.state !== 'inactive') {
         if (rec.recorder.state === 'paused') rec.recorder.resume();
         rec.recorder.stop();
@@ -735,7 +812,7 @@ function addMark() {
 
 function updateRecProgress() {
   const m = rec.meeting;
-  if (!m || m.engine !== 'openai') return;
+  if (!m || m.engine === 'device') return;
   const done = m.segments.filter((s) => s.status === 'done').length;
   const err = m.segments.find((s) => s.status === 'error');
   $('#rec-progress').textContent = err
@@ -775,7 +852,7 @@ document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible' || !rec.meeting) return;
   if (!rec.wakeLock || rec.wakeLock.released) await requestWakeLock();
   if (rec.audioCtx && rec.audioCtx.state !== 'running') rec.audioCtx.resume().catch(() => {});
-  if (rec.meeting.engine === 'openai' && !rec.paused) {
+  if (rec.meeting.engine !== 'device' && !rec.paused) {
     const trackDead = !rec.stream || rec.stream.getAudioTracks().some((t) => t.readyState === 'ended');
     const recDead = !rec.recorder || rec.recorder.state === 'inactive';
     if (trackDead || recDead) recoverMic();
@@ -924,12 +1001,10 @@ function fillSettings() {
   $('#set-script-url').value = settings.scriptUrl;
   $('#set-script-secret').value = settings.scriptSecret;
   $('#set-engine').value = settings.engine;
-  $('#set-openai-key').value = settings.openaiKey;
+  $('#set-gemini-key').value = settings.geminiKey;
   $('#set-lang').value = settings.lang;
-  $('#set-anthropic-key').value = settings.anthropicKey;
   $('#set-extra').value = settings.extra;
-  $('#set-stt-model').value = settings.sttModel;
-  $('#set-claude-model').value = settings.claudeModel;
+  $('#set-gemini-model').value = settings.geminiModel;
   $('#set-segment').value = settings.segmentMin;
   $('#set-keep-audio').checked = settings.keepAudio;
   syncEngineFields();
@@ -941,12 +1016,10 @@ function readSettingsForm() {
     scriptUrl: $('#set-script-url').value.trim(),
     scriptSecret: $('#set-script-secret').value.trim(),
     engine: $('#set-engine').value,
-    openaiKey: $('#set-openai-key').value.trim(),
+    geminiKey: $('#set-gemini-key').value.trim(),
     lang: $('#set-lang').value,
-    anthropicKey: $('#set-anthropic-key').value.trim(),
     extra: $('#set-extra').value.trim(),
-    sttModel: $('#set-stt-model').value.trim() || DEFAULTS.sttModel,
-    claudeModel: $('#set-claude-model').value.trim() || DEFAULTS.claudeModel,
+    geminiModel: $('#set-gemini-model').value.trim() || DEFAULTS.geminiModel,
     segmentMin: Math.min(10, Math.max(1, Number($('#set-segment').value) || DEFAULTS.segmentMin)),
     keepAudio: $('#set-keep-audio').checked,
   };
@@ -960,24 +1033,12 @@ async function testKeys() {
   saveSettings(readSettingsForm());
   const msg = $('#settings-msg');
   msg.textContent = 'Comprovant…';
-  const results = [];
-  if (settings.engine === 'openai') {
-    try {
-      const r = await fetchWithTimeout('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${settings.openaiKey}` } }, 20000);
-      results.push(r.ok ? 'OpenAI ✓' : `OpenAI ✗ (${r.status})`);
-    } catch { results.push('OpenAI ✗ (sense connexió)'); }
-  }
   try {
-    const r = await fetchWithTimeout('https://api.anthropic.com/v1/models?limit=1', {
-      headers: {
-        'x-api-key': settings.anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-    }, 20000);
-    results.push(r.ok ? 'Claude ✓' : `Claude ✗ (${r.status})`);
-  } catch { results.push('Claude ✗ (sense connexió)'); }
-  msg.textContent = results.join(' · ');
+    const t = await gemini([{ text: 'Respon només: OK' }], { maxTokens: 2048 });
+    msg.textContent = t ? '✓ La clau de Gemini funciona' : '✗ Gemini no ha respost';
+  } catch (e) {
+    msg.textContent = `✗ ${e.message}`;
+  }
 }
 
 async function testEmail() {

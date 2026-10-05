@@ -72,8 +72,8 @@
       <h2 id="proc-title">Processant la reunió…</h2>
       <ol class="steps">
         <li id="step-transcribe"><span class="st"></span><div><b>Transcripció</b><small id="step-transcribe-info"></small></div></li>
-        <li id="step-summary"><span class="st"></span><div><b>Resum amb Claude</b><small id="step-summary-info"></small></div></li>
-        <li id="step-email"><span class="st"></span><div><b>Enviament per correu</b><small id="step-email-info"></small></div></li>
+        <li id="step-summary"><span class="st"></span><div><b>Resum</b><small id="step-summary-info"></small></div></li>
+        <li id="step-email"><span class="st"></span><div><b>Correu i full de càlcul</b><small id="step-email-info"></small></div></li>
       </ol>
       <p class="fineprint">Pots tancar l'app: si es talla, ho reprendrà en tornar a obrir-la.</p>
     </section>
@@ -109,20 +109,24 @@
       <h3>Correu</h3>
       <label class="field"><span>Enviar el resum a</span>
         <input id="set-email" type="email" autocomplete="off"></label>
-      <label class="field"><span>URL de l'Apps Script (enviament)</span>
+      <label class="field"><span>URL de l'script del full de Google</span>
         <input id="set-script-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
-      <label class="field"><span>Clau secreta de l'Apps Script</span>
+      <label class="field"><span>Clau secreta de l'script</span>
         <input id="set-script-secret" type="password" autocomplete="off"></label>
       <button class="btn secondary small" id="btn-test-email">Envia un correu de prova</button>
 
+      <h3>Intel·ligència artificial (Gemini, gratuït)</h3>
+      <label class="field"><span>Clau de Gemini</span>
+        <input id="set-gemini-key" type="password" placeholder="AIza…" autocomplete="off"></label>
+      <p class="fineprint" style="text-align:left;margin-top:-6px">Gratuïta i sense targeta a <b>aistudio.google.com/apikey</b></p>
+      <button class="btn secondary small" id="btn-test-keys">Comprova la clau</button>
+
       <h3>Transcripció</h3>
-      <label class="field"><span>Motor</span>
+      <label class="field"><span>Com es transcriu</span>
         <select id="set-engine">
-          <option value="openai">OpenAI (recomanat, molt precís)</option>
-          <option value="device">Dictat de l'iPhone (gratuït, menys precís)</option>
+          <option value="audio">Gemini escolta l'àudio (recomanat, molt més precís)</option>
+          <option value="device">Dictat de l'iPhone (no envia l'àudio, menys precís)</option>
         </select></label>
-      <label class="field" data-engine="openai"><span>Clau API d'OpenAI</span>
-        <input id="set-openai-key" type="password" placeholder="sk-…" autocomplete="off"></label>
       <label class="field"><span>Idioma principal</span>
         <select id="set-lang">
           <option value="auto">Automàtic (català / castellà barrejats)</option>
@@ -132,18 +136,13 @@
         </select></label>
 
       <h3>Resum</h3>
-      <label class="field"><span>Clau API d'Anthropic (Claude)</span>
-        <input id="set-anthropic-key" type="password" placeholder="sk-ant-…" autocomplete="off"></label>
       <label class="field"><span>Instruccions extra per als resums <em>(opcional)</em></span>
         <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
-      <button class="btn secondary small" id="btn-test-keys">Comprova les claus</button>
 
       <details class="advanced">
         <summary>Avançat</summary>
-        <label class="field"><span>Model de transcripció (OpenAI)</span>
-          <input id="set-stt-model" type="text" autocomplete="off"></label>
-        <label class="field"><span>Model de Claude</span>
-          <input id="set-claude-model" type="text" autocomplete="off"></label>
+        <label class="field"><span>Model de Gemini</span>
+          <input id="set-gemini-model" type="text" autocomplete="off"></label>
         <label class="field"><span>Durada de cada tram d'àudio (minuts)</span>
           <input id="set-segment" type="number" min="1" max="10" step="1"></label>
         <label class="check"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
