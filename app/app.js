@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -160,6 +160,27 @@ function mdToHtml(md, style = {}) {
 }
 
 // El mateix resum en text pla ben ordenat (per a l'app de correu del mòbil).
+// El resum amb el format de WhatsApp (*negreta*, _cursiva_).
+function mdToWhatsApp(md) {
+  const out = [];
+  const bold = (t) => t.replace(/\*\*(.+?)\*\*/g, '*$1*');
+  for (const raw of md.split('\n')) {
+    const line = raw.trimEnd();
+    let m;
+    if (!line.trim()) continue;
+    if ((m = line.match(/^#\s+(.*)$/))) out.push(`*${m[1].replace(/\*\*/g, '')}*`, '');
+    else if ((m = line.match(/^#{2,3}\s+(.*)$/))) { if (out.length && out[out.length - 1] !== '') out.push(''); out.push(`*${m[1].replace(/\*\*/g, '').toUpperCase()}*`); }
+    else if ((m = line.match(/^(\s*)[-*•]\s+(\[( |x|X)\]\s+)?(.*)$/))) {
+      const nested = m[1].length >= 2;
+      const mark = m[2] ? (m[3].trim() ? '☑' : '☐') : nested ? '◦' : '•';
+      out.push(`${nested ? '    ' : ''}${mark} ${bold(m[4])}`);
+    } else if ((m = line.match(/^(\s*)(\d+[.)])\s+(.*)$/))) out.push(`${m[2]} ${bold(m[3])}`);
+    else out.push(bold(line));
+  }
+  out.push('', '_Resum fet amb Xiu-xiu_');
+  return out.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
 function mdToPlain(md) {
   const out = [];
   for (const raw of md.split('\n')) {
@@ -1286,7 +1307,7 @@ async function showResult(id) {
   $('#btn-pdf').disabled = !m.summary;
   $('#lang-switch').hidden = !m.summary;
   // Sense resum, només té sentit fer-ne un de nou: amaga la resta de botons.
-  ['#btn-mail', '#btn-share', '#btn-pdf', '#btn-copy', '#btn-resend'].forEach((sel) => { $(sel).hidden = !m.summary; });
+  ['#btn-mail', '#btn-share', '#btn-wa', '#btn-pdf', '#btn-copy', '#btn-resend'].forEach((sel) => { $(sel).hidden = !m.summary; });
 }
 
 async function renderHistory() {
@@ -1837,12 +1858,28 @@ async function makePdf(m, lang) {
   }
   return doc.output('blob');
 }
+// Obre WhatsApp amb el resum ja escrit (només cal triar el contacte o el grup).
+$('#btn-wa').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m || !m.summary) return;
+  const text = mdToWhatsApp(getSummary(m, resultLang));
+  const enc = encodeURIComponent(text);
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || IS_IOS;
+  if (mobile) {
+    location.href = `whatsapp://send?text=${enc}`;
+    // Si WhatsApp no s'ha obert (no instal·lat), prova la versió web.
+    setTimeout(() => { if (document.visibilityState === 'visible') window.open(`https://wa.me/?text=${enc}`, '_blank'); }, 1800);
+  } else {
+    window.open(`https://wa.me/?text=${enc}`, '_blank');
+  }
+};
+
 $('#btn-pdf').onclick = async () => {
   const m = await getMeeting(viewingId);
   if (!m || !m.summary) return;
   const btn = $('#btn-pdf');
-  const label = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Preparant…';
+  const label = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Preparant l\'acta…';
   try {
     const blob = await makePdf(m, resultLang);
     const name = `${summaryTitle(m, getSummary(m, resultLang)).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'Acta'} - ${new Date(m.startedAt).toISOString().slice(0, 10)}.pdf`;
@@ -1850,7 +1887,7 @@ $('#btn-pdf').onclick = async () => {
   } catch (e) {
     toast(`No s'ha pogut fer el PDF: ${e.message}`, 5000);
   } finally {
-    btn.disabled = false; btn.textContent = label;
+    btn.disabled = false; btn.innerHTML = label;
   }
 };
 

@@ -247,3 +247,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 /* Còpia de seguretat */
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .share-panel[hidden], .result-actions [hidden] { display: none; }
+
+.btn.wa { background: #25d366; color: #0b2e13; }
+#btn-pdf small { display: block; font-weight: 500; font-size: 13px; color: var(--muted); }
