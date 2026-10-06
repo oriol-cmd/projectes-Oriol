@@ -322,3 +322,7 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .ask-box { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 8px; align-items: end; }
 .ask-box textarea { min-height: 50px; }
 .ask-box .btn { min-height: 50px; }
+
+.call-note { max-width: 380px; margin: 12px 0 0; padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--muted); background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); text-align: left; }
+.call-note b { color: var(--text); }
+#source-switch small { font-weight: 500; opacity: .75; }

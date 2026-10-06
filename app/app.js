@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -2027,6 +2027,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // ---------------------------------------------------------------------------
 function renderSourceSwitch() {
   $('#source-switch').hidden = !CAN_CAPTURE_CALL;
+  $('#call-mobile-note').hidden = CAN_CAPTURE_CALL;
   const src = CAN_CAPTURE_CALL && settings.source === 'call' ? 'call' : 'mic';
   document.querySelectorAll('#source-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.source === src)));
   $('#source-hint').hidden = src !== 'call';
