@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1365,12 +1365,15 @@ async function checkGeminiKey(key) {
   return { ok: false, msg: `Google ha respost ${res.status}. Torna-ho a provar d'aquí a un moment.` };
 }
 
+// Claus de Google: format clàssic (AIza…) i format nou (AQ.…). La validesa real la decideix Google.
+const KEY_RE = /^(AIza[\w-]{20,}|AQ\.[\w.-]{20,}|[\w.-]{30,})$/;
+
 // Assistent de la pantalla de benvinguda: enganxa, comprova i desa la clau.
 async function useWelcomeKey(raw) {
   const msg = $('#welcome-msg');
   const key = (raw || '').trim().replace(/^["']|["']$/g, '');
-  if (!/^AIza[\w-]{20,}$/.test(key)) {
-    msg.textContent = key ? 'Això no sembla una clau de Google (ha de començar per «AIza»).' : 'Primer copia la clau a la pàgina de Google.';
+  if (!KEY_RE.test(key)) {
+    msg.textContent = key ? 'Això no sembla una clau de Google. Torna a copiar-la amb el botó de copiar de la pàgina de Google.' : 'Primer copia la clau a la pàgina de Google.';
     return;
   }
   msg.textContent = 'Comprovant la clau…';
@@ -1393,7 +1396,7 @@ $('#btn-paste-key').onclick = async () => {
     $('#welcome-key').focus();
   }
 };
-$('#welcome-key').oninput = (e) => { if (/^\s*AIza[\w-]{20,}\s*$/.test(e.target.value)) useWelcomeKey(e.target.value); };
+$('#welcome-key').oninput = (e) => { if (KEY_RE.test(e.target.value.trim())) useWelcomeKey(e.target.value); };
 
 async function testKeys() {
   resetQuota();
