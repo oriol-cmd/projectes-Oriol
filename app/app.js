@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -33,9 +33,12 @@ function loadSettings() {
   return s;
 }
 let settings = loadSettings();
-function saveSettings(s) {
+// silent: no marca canvis per sincronitzar (p. ex. quan venen del Drive)
+function saveSettings(s, { silent = false } = {}) {
   settings = { ...settings, ...s };
+  if (!silent) settings.updatedAt = Date.now();
   localStorage.setItem('settings', JSON.stringify(settings));
+  if (!silent && typeof syncSoon === 'function') syncSoon();
 }
 const emailEnabled = () => !!(settings.scriptUrl && settings.scriptSecret);
 function missingSetup() {
@@ -250,6 +253,7 @@ async function getMeeting(id) {
   return m;
 }
 async function saveMeeting(m) {
+  m.updatedAt = Date.now();
   meetingCache.set(m.id, m);
   await db.put('meetings', m);
 }
@@ -864,6 +868,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
     updateProcView(m);
     if (currentView === 'proc' && viewingId === id) showResult(id);
     refreshHomeBanners();
+    syncSoon(1500);
     return m;
   })();
   pipelines.set(id, p);
@@ -1410,6 +1415,7 @@ async function deleteMeeting(m) {
   await db.del('audio', `${m.id}:import`);
   await db.del('meetings', m.id);
   meetingCache.delete(m.id);
+  addTombstone(m.id);
   return true;
 }
 async function renderHistory() {
@@ -2058,6 +2064,7 @@ $('#btn-set-group').onclick = async () => {
   if (v === null) return;
   m.group = v.trim();
   await saveMeeting(m);
+  syncSoon();
   $('#group-current').textContent = m.group || 'cap';
   toast(m.group ? `🏷 Reunió classificada a «${m.group}»` : 'Grup tret');
 };
@@ -2312,6 +2319,248 @@ document.querySelectorAll('#ask-suggest .chip').forEach((c) => { c.onclick = () 
 $('#btn-ask-clear').onclick = () => { askHistory = []; renderAskLog(); };
 
 // ---------------------------------------------------------------------------
+// Compte de Google: inici de sessió i sincronització amb el Drive de cada persona
+// ---------------------------------------------------------------------------
+// Identificador públic de l'app a Google Cloud (OAuth). Buit = funció amagada.
+const GOOGLE_CLIENT_ID = '';
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata openid email profile';
+const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
+const DRIVE = 'https://www.googleapis.com/drive/v3';
+const DRIVE_UP = 'https://www.googleapis.com/upload/drive/v3';
+class AuthError extends Error {}
+
+function loadAuth() { try { return JSON.parse(localStorage.getItem('gauth') || '{}'); } catch { return {}; } }
+let gauth = loadAuth();
+function saveAuth(a) { gauth = { ...gauth, ...a }; try { localStorage.setItem('gauth', JSON.stringify(gauth)); } catch { /* res */ } }
+const googleEnabled = () => !!GOOGLE_CLIENT_ID;
+const signedIn = () => googleEnabled() && !!gauth.email;
+const tokenValid = () => !!(gauth.token && gauth.exp && gauth.exp - Date.now() > 60000);
+
+function tombstones() { try { return JSON.parse(localStorage.getItem('tombstones') || '[]'); } catch { return []; } }
+function addTombstone(id) {
+  const t = tombstones(); if (!t.includes(id)) t.push(id);
+  try { localStorage.setItem('tombstones', JSON.stringify(t)); } catch { /* res */ }
+  syncSoon();
+}
+
+// Inici de sessió per redirecció (funciona també a l'iPhone amb l'app a la pantalla d'inici).
+function googleSignIn({ silent = false } = {}) {
+  if (!googleEnabled()) return;
+  if (rec.meeting) { toast('Acaba la reunió abans de connectar amb Google'); return; }
+  const state = uid();
+  try { localStorage.setItem('oauthState', JSON.stringify({ state, silent, at: Date.now() })); } catch { /* res */ }
+  const q = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID, redirect_uri: APP_URL, response_type: 'token',
+    scope: GOOGLE_SCOPES, include_granted_scopes: 'true', state,
+    prompt: silent ? 'none' : 'select_account',
+  });
+  if (gauth.email) q.set('login_hint', gauth.email);
+  location.href = `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
+}
+// En tornar de Google, la resposta arriba al final de l'adreça (#access_token=…).
+function handleOAuthRedirect() {
+  if (!/(access_token|error)=/.test(location.hash)) return null;
+  const h = new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null, '', APP_URL);
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('oauthState') || '{}'); localStorage.removeItem('oauthState'); } catch { /* res */ }
+  if (!saved.state || h.get('state') !== saved.state) return 'state';
+  if (h.get('error')) { if (saved.silent) saveAuth({ needsLogin: true }); return h.get('error'); }
+  saveAuth({ token: h.get('access_token'), exp: Date.now() + Number(h.get('expires_in') || 3600) * 1000, needsLogin: false });
+  return 'ok';
+}
+async function gfetch(url, opts = {}, ms = 60000) {
+  if (!tokenValid()) throw new AuthError('Sessió de Google caducada');
+  const res = await fetchWithTimeout(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: `Bearer ${gauth.token}` } }, ms);
+  if (res.status === 401) { saveAuth({ token: null, exp: 0 }); throw new AuthError('Sessió de Google caducada'); }
+  if (!res.ok) throw new Error(`Google Drive ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  return res;
+}
+async function loadGoogleProfile() {
+  const r = await gfetch('https://openidconnect.googleapis.com/v1/userinfo');
+  const u = await r.json();
+  saveAuth({ email: u.email, name: u.name || u.email, picture: u.picture || '' });
+}
+async function driveList() {
+  const files = {};
+  let pageToken = '';
+  do {
+    const q = new URLSearchParams({ spaces: 'appDataFolder', fields: 'nextPageToken,files(id,name,appProperties)', pageSize: '1000' });
+    if (pageToken) q.set('pageToken', pageToken);
+    const data = await (await gfetch(`${DRIVE}/files?${q}`)).json();
+    for (const f of data.files || []) files[f.name] = f;
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return files;
+}
+async function driveUpload({ id, name, blob, updatedAt }) {
+  const meta = id ? { appProperties: { updatedAt: String(updatedAt || Date.now()) } }
+    : { name, parents: ['appDataFolder'], appProperties: { updatedAt: String(updatedAt || Date.now()) } };
+  const b = `xiuxiu${uid()}`;
+  const body = new Blob([
+    `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${blob.type || 'application/octet-stream'}\r\n\r\n`,
+    blob, `\r\n--${b}--`,
+  ]);
+  const url = id ? `${DRIVE_UP}/files/${id}?uploadType=multipart&fields=id` : `${DRIVE_UP}/files?uploadType=multipart&fields=id`;
+  return (await gfetch(url, { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': `multipart/related; boundary=${b}` }, body }, 180000)).json();
+}
+const driveGet = (id) => gfetch(`${DRIVE}/files/${id}?alt=media`, {}, 180000);
+const driveDelete = (id) => gfetch(`${DRIVE}/files/${id}`, { method: 'DELETE' }).catch(() => {});
+const photoFileName = (key) => `photo-${key.replace(/[^\w-]/g, '_')}.jpg`;
+
+function syncableSettings() {
+  const { source, v, lastBackup, ...rest } = settings;
+  if (!settings.syncKeys && settings.syncKeys !== undefined) { delete rest.geminiKey; delete rest.scriptSecret; }
+  return rest;
+}
+let syncing = null;
+let syncTimer = null;
+function syncSoon(delay = 2500) {
+  if (!signedIn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncNow().catch(() => {}), delay);
+}
+const isBusy = (m) => pipelines.has(m.id) || m.status === 'recording' || m.status === 'processing' || (rec.meeting && rec.meeting.id === m.id);
+async function syncNow({ manual = false } = {}) {
+  if (!signedIn() || syncing) return syncing;
+  if (!tokenValid()) {
+    if (manual) googleSignIn({ silent: !gauth.needsLogin });
+    renderAccount();
+    return null;
+  }
+  syncing = (async () => {
+    renderAccount('Sincronitzant…');
+    const files = await driveList();
+    let changed = false;
+
+    // 1. Configuració i esborrats
+    const cfgFile = files['config.json'];
+    let remoteCfg = null;
+    if (cfgFile) remoteCfg = await (await driveGet(cfgFile.id)).json();
+    const localDeleted = tombstones();
+    const deleted = [...new Set([...localDeleted, ...((remoteCfg && remoteCfg.deleted) || [])])];
+    try { localStorage.setItem('tombstones', JSON.stringify(deleted)); } catch { /* res */ }
+    const remoteNewer = remoteCfg && Number(remoteCfg.updatedAt || 0) > Number(settings.updatedAt || 0);
+    if (remoteNewer) {
+      const keep = { source: settings.source, v: settings.v, lastBackup: settings.lastBackup };
+      saveSettings({ ...remoteCfg.settings, ...keep, updatedAt: remoteCfg.updatedAt }, { silent: true });
+      if (Array.isArray(remoteCfg.recentEmails)) rememberEmails(remoteCfg.recentEmails);
+      changed = true;
+    }
+    if (!remoteCfg || !remoteNewer && (Number(settings.updatedAt || 0) > Number(remoteCfg.updatedAt || 0) || deleted.length !== (remoteCfg.deleted || []).length)) {
+      const cfg = { settings: syncableSettings(), recentEmails: recentEmails(), deleted, updatedAt: settings.updatedAt || Date.now() };
+      await driveUpload({ id: cfgFile && cfgFile.id, name: 'config.json', blob: new Blob([JSON.stringify(cfg)], { type: 'application/json' }), updatedAt: cfg.updatedAt });
+    }
+
+    // 2. Reunions esborrades en algun aparell
+    for (const id of deleted) {
+      const local = await db.get('meetings', id);
+      if (local && !isBusy(local)) {
+        for (const ph of local.photos || []) await db.del('audio', ph.key);
+        await db.del('meetings', id); meetingCache.delete(id); changed = true;
+      }
+      for (const [name, f] of Object.entries(files)) if (name.includes(id)) { await driveDelete(f.id); delete files[name]; }
+    }
+
+    // 3. Reunions: baixa les noves o més recents, puja les locals noves o modificades
+    const locals = {};
+    for (const m of await db.all('meetings')) locals[m.id] = m;
+    for (const [name, f] of Object.entries(files)) {
+      const mm = name.match(/^meeting-(.+)\.json$/);
+      if (!mm || deleted.includes(mm[1])) continue;
+      const local = locals[mm[1]];
+      const rUpd = Number((f.appProperties || {}).updatedAt || 0);
+      if (local && (isBusy(local) || (local.updatedAt || 0) >= rUpd)) continue;
+      const remote = await (await driveGet(f.id)).json();
+      remote.updatedAt = rUpd;
+      await db.put('meetings', remote); meetingCache.set(remote.id, remote);
+      locals[remote.id] = remote; changed = true;
+    }
+    for (const m of Object.values(locals)) {
+      if (isBusy(m) || deleted.includes(m.id)) continue;
+      const f = files[`meeting-${m.id}.json`];
+      const rUpd = f ? Number((f.appProperties || {}).updatedAt || 0) : -1;
+      if ((m.updatedAt || 0) > rUpd) {
+        if (!m.updatedAt) { m.updatedAt = Date.now(); await db.put('meetings', m); }
+        await driveUpload({ id: f && f.id, name: `meeting-${m.id}.json`, blob: new Blob([JSON.stringify(m)], { type: 'application/json' }), updatedAt: m.updatedAt });
+      }
+      // Fotos de documents
+      for (const ph of m.photos || []) {
+        const pf = files[photoFileName(ph.key)];
+        const blob = await db.get('audio', ph.key);
+        if (!pf && blob) await driveUpload({ name: photoFileName(ph.key), blob });
+        else if (pf && !blob) { await db.put('audio', await (await driveGet(pf.id)).blob(), ph.key); changed = true; }
+      }
+    }
+    saveAuth({ lastSync: Date.now() });
+    return changed;
+  })().then((changed) => {
+    if (changed) { refreshHomeBanners(); if (currentView === 'history') renderHistory(); if (currentView === 'settings') fillSettings(); }
+    renderAccount();
+    return changed;
+  }).catch((e) => {
+    if (e instanceof AuthError) { if (manual) googleSignIn({ silent: true }); }
+    else saveAuth({ lastError: e.message });
+    renderAccount(e instanceof AuthError ? '' : `⚠️ No s'ha pogut sincronitzar: ${friendlyError(e.message)}`);
+    throw e;
+  }).finally(() => { syncing = null; });
+  return syncing;
+}
+
+function renderAccount(statusText = null) {
+  const on = googleEnabled();
+  $('#account-section').hidden = !on;
+  $('#welcome-google').hidden = !on || signedIn();
+  if (!on) return;
+  const st = $('#account-status');
+  if (signedIn()) {
+    const when = gauth.lastSync ? `Última sincronització: ${fmtDate(gauth.lastSync)}` : "Encara no s'ha sincronitzat";
+    st.innerHTML = `✅ Connectat com a <b>${escapeHtml(gauth.email)}</b><br><span class="muted">${escapeHtml(statusText || (gauth.needsLogin ? 'Cal tornar a connectar amb Google.' : when))}</span>`;
+  } else {
+    st.textContent = 'No connectat. Entra amb Google per tenir les reunions a tots els teus aparells.';
+  }
+  $('#btn-google-signin').hidden = signedIn() && !gauth.needsLogin;
+  $('#btn-sync-now').hidden = !signedIn();
+  $('#btn-google-signout').hidden = !signedIn();
+  $('#set-sync-keys').checked = settings.syncKeys !== false;
+  $('#reconnect-banner').hidden = !(signedIn() && gauth.needsLogin);
+}
+document.querySelectorAll('.btn-google').forEach((b) => { b.onclick = () => googleSignIn(); });
+$('#btn-sync-now').onclick = () => syncNow({ manual: true }).then((c) => toast(c ? '✓ Sincronitzat: hi ha canvis nous' : '✓ Tot està al dia')).catch(() => {});
+$('#btn-google-signout').onclick = () => {
+  if (!confirm("Tancar la sessió de Google en aquest aparell? Les reunions es queden al mòbil i al teu Drive.")) return;
+  if (gauth.token) fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(gauth.token)}`, { method: 'POST' }).catch(() => {});
+  gauth = {}; try { localStorage.removeItem('gauth'); } catch { /* res */ }
+  renderAccount();
+};
+$('#set-sync-keys').onchange = (e) => saveSettings({ syncKeys: e.target.checked });
+$('#btn-reconnect').onclick = () => googleSignIn();
+
+// En obrir l'app: recull la resposta de Google, i sincronitza (o renova la sessió en silenci).
+async function startGoogleSync() {
+  if (!googleEnabled()) { renderAccount(); return; }
+  const r = handleOAuthRedirect();
+  if (r === 'ok') {
+    try { await loadGoogleProfile(); toast(`✓ Connectat com a ${gauth.email}`); }
+    catch (e) { toast(`No s'ha pogut connectar amb Google: ${e.message}`, 6000); }
+  } else if (r && r !== 'state' && !/interaction_required|login_required|consent_required/.test(r)) {
+    toast(`Google no ha permès connectar (${r})`, 6000);
+  }
+  renderAccount();
+  if (!signedIn()) return;
+  if (tokenValid()) { syncNow().catch(() => {}); return; }
+  // Sessió caducada: renova-la en silenci (com a molt un cop cada 10 minuts).
+  if (!gauth.needsLogin && Date.now() - (gauth.silentAt || 0) > 600000 && !rec.meeting) {
+    saveAuth({ silentAt: Date.now() });
+    googleSignIn({ silent: true });
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && signedIn() && tokenValid() && Date.now() - (gauth.lastSync || 0) > 120000) syncSoon(500);
+});
+setInterval(() => { if (document.visibilityState === 'visible' && signedIn() && tokenValid()) syncSoon(0); }, 5 * 60000);
+
+// ---------------------------------------------------------------------------
 // Esdeveniments
 // ---------------------------------------------------------------------------
 $('#btn-record').onclick = startRecording;
@@ -2528,3 +2777,4 @@ if ('serviceWorker' in navigator) {
 $('#app-version').textContent = `Versió ${APP_VERSION}`;
 resumeUnfinished().catch(() => {});
 showView('home');
+startGoogleSync();

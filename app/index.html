@@ -30,6 +30,11 @@
       <div id="setup-banner" class="welcome card" hidden>
         <img src="icons/icon.svg?v=2" alt="" class="welcome-logo">
         <h2>Benvingut/da a Xiu-xiu</h2>
+        <div id="welcome-google" class="welcome-google" hidden>
+          <p><b>Ja fas servir Xiu-xiu en un altre aparell?</b> Entra amb Google i recuperaràs la clau, la configuració i totes les reunions.</p>
+          <button class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>Entra amb Google</button>
+          <p class="or"><span>o comença de zero</span></p>
+        </div>
         <p>Escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat amb les tasques de cadascú. Per començar, necessites una clau gratuïta de Google (1 minut):</p>
         <div class="wstep">
           <span class="wnum">1</span>
@@ -53,6 +58,7 @@
 
       <div id="home-main">
         <div id="pending-banner" class="banner" hidden></div>
+        <div id="reconnect-banner" class="banner warn" hidden>☁️ La connexió amb Google ha caducat i les reunions no se sincronitzen. <button class="link" id="btn-reconnect" type="button">Torna a connectar</button></div>
         <div id="backup-reminder" class="banner" hidden>💾 Fa temps que no fas una còpia de seguretat de les teves reunions. <button class="link" id="btn-backup-now" type="button">Fes-la ara</button></div>
 
         <div class="record-hero">
@@ -195,7 +201,21 @@
     <!-- CONFIGURACIÓ -->
     <section id="view-settings" class="view" hidden>
       <h2>Configuració</h2>
-      <p class="fineprint left">Tot es desa només en aquest mòbil.</p>
+      <p class="fineprint left">Tot es desa en aquest aparell i, si entres amb Google, també al teu Drive.</p>
+
+      <div id="account-section" hidden>
+        <h3>☁️ Compte i sincronització</h3>
+        <div class="card group">
+          <p id="account-status" class="account-status"></p>
+          <button id="btn-google-signin" class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>Entra amb Google</button>
+          <div class="row2">
+            <button id="btn-sync-now" class="btn secondary small" type="button">🔄 Sincronitza ara</button>
+            <button id="btn-google-signout" class="btn secondary small" type="button">Tanca la sessió</button>
+          </div>
+          <label class="check"><input id="set-sync-keys" type="checkbox"> Desa també les claus al meu Drive (així no les hauràs de tornar a posar)</label>
+          <p class="fineprint left">Les reunions es guarden en una carpeta privada i oculta del teu Google Drive que només Xiu-xiu pot llegir. Ningú més hi té accés.</p>
+        </div>
+      </div>
 
       <h3>🔑 Clau de Google (Gemini)</h3>
       <div class="card group">
