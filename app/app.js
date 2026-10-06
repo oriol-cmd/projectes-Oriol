@@ -994,6 +994,7 @@ async function renderHistory() {
     let badge = '';
     if (pipelines.has(m.id) || m.status === 'processing') badge = '<span class="badge warn">Processant</span>';
     else if (m.status === 'error') badge = '<span class="badge err">Error</span>';
+    else if (m.email && m.email.status === 'sent' && m.email.confirmed === false) badge = '<span class="badge warn">Sense confirmar</span>';
     else if (m.email && m.email.status === 'sent') badge = '<span class="badge ok">Enviat</span>';
     else if (m.status === 'done' && m.email && m.email.status === 'error') badge = '<span class="badge warn">No enviat</span>';
     li.innerHTML = `<button class="item"><div class="t">${escapeHtml(m.summary ? summaryTitle(m) : (m.title || 'Reunió'))}${badge}</div>
