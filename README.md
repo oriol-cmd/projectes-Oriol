@@ -87,6 +87,15 @@ Aquest repositori ja inclou l'automatització (`.github/workflows/pages.yml`). C
    - Clau de Gemini (i prem **Comprova la clau**)
    - *(Opcional)* URL i clau secreta de l'script del full (i prem **Envia un correu de prova**) Si tot surt amb ✓, ja la pots fer servir.
 
+## Qui parla
+
+Per saber qui diu què (i a qui toca cada tasca):
+1. En començar la gravació, **presenteu-vos un a un** dient el nom: «Soc l'Oriol», «Jo soc la Montse»…
+2. Toqueu **«👋 Presentacions fetes»**.
+3. L'app fa servir aquest tros com a **mostra de veus**: a cada tram, Gemini compara les veus amb la mostra i etiqueta cada intervenció amb el nom («**Oriol:** …»). El resum atribueix les tasques i decisions a cada persona.
+
+Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada». Es pot desactivar a *Configuració > Avançat*. Enviar la mostra amb cada tram fa que el cost de transcripció sigui aproximadament el doble (uns 10 € al mes per 15 h setmanals).
+
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.

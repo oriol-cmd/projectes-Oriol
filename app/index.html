@@ -48,6 +48,7 @@
           <span class="dot"></span>
         </button>
         <p class="hint">Toca per començar a gravar</p>
+        <p class="fineprint intro-tip">👋 Per saber qui diu què, comenceu presentant-vos («Soc l'Oriol…») i toqueu «Presentacions fetes».</p>
       </div>
       <p class="fineprint">Deixa el mòbil damunt la taula, amb l'app oberta. La pantalla es mantindrà encesa mentre grava.</p>
     </section>
@@ -64,6 +65,7 @@
         <button id="btn-pause" class="btn secondary">Pausa</button>
         <button id="btn-stop" class="btn danger">Acaba la reunió</button>
       </div>
+      <button id="btn-intro" class="btn secondary intro" hidden>👋 Presentacions fetes</button>
       <button id="btn-mark" class="btn ghost">＋ Marca un moment important</button>
       <p class="fineprint" id="rec-warning" hidden>No bloquegis el mòbil ni canviïs d'app: l'iPhone atura el micròfon de les webs en segon pla.</p>
     </section>
@@ -147,6 +149,7 @@
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
           <input id="set-segment" type="number" min="10" max="300" step="10"></label>
         <label class="check"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
+        <label class="check"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
       </details>
 
       <div class="settings-actions">

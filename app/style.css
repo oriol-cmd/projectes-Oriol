@@ -175,3 +175,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 15px;
   max-width: calc(100% - 32px); z-index: 10; box-shadow: 0 6px 20px rgba(0,0,0,.25);
 }
+
+.btn.intro { width: 100%; margin-top: 12px; border-color: var(--accent); color: var(--accent); }
+.intro-tip { max-width: 320px; margin: 10px auto 0; }
+#result-transcript strong, .live strong { color: var(--accent); }

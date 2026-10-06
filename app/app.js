@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 11;
+const APP_VERSION = 12;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -14,6 +14,7 @@ const DEFAULTS = {
   lang: 'auto',
   extra: '',
   liveSec: 60, // cada quants segons apareix text nou en directe
+  speakers: true, // identifica qui parla a partir de les presentacions inicials
   v: 2,
   keepAudio: false,
 };
@@ -86,6 +87,12 @@ class FatalError extends Error {}
 // ---------------------------------------------------------------------------
 // Ressalta les marques «[dubte de comprensió]» (text ja escapat).
 const DOUBT_STYLE = 'background:#fde68a;color:#78350f;border-radius:4px;padding:0 4px;font-weight:600';
+// Una línia de transcripció en HTML: nom de qui parla en negreta + dubtes ressaltats.
+function speakerHtml(line) {
+  const m = line.match(/^([^:\[\]]{1,40}):\s+(.*)$/);
+  if (!m) return markDoubts(escapeHtml(line));
+  return `<strong>${escapeHtml(m[1])}:</strong> ${markDoubts(escapeHtml(m[2]))}`;
+}
 function markDoubts(html) {
   return html.replace(/\[dubte de comprensió[^\]]*\]/gi, (t) => `<mark style="${DOUBT_STYLE}">${t}</mark>`);
 }
@@ -336,32 +343,49 @@ async function toWav(blob) {
 const LANG_NAMES = { ca: 'català', es: 'castellà', en: 'anglès' };
 let forceWav = false;
 
-async function transcribeBlob(blob, idx, prevText, context) {
+// ref: { blob, text } = àudio de les presentacions (mostra de veus) · isRef: és el tram de presentacions
+async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false } = {}) {
+  const speakerRules = !speakers ? [
+    'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
+  ] : isRef ? [
+    "Aquest és l'INICI de la reunió: normalment els participants es presenten dient el seu nom.",
+    "Escriu només la transcripció, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»), fent servir el nom amb què cadascú s'ha presentat. Si algú no ha dit el nom, posa «Persona no identificada:».",
+  ] : [
+    "Et dono DOS àudios. El PRIMER és l'inici de la reunió, on els participants es presenten" + (ref && ref.text ? ` (transcripció de les presentacions: «${ref.text.slice(0, 700)}»)` : '') + ". Fes-lo servir NOMÉS com a mostra per reconèixer la veu de cada persona: NO el transcriguis.",
+    "El SEGON àudio és el tram que has de transcriure.",
+    "Escriu només la transcripció del segon àudio, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Identifica qui parla comparant la veu amb la mostra i ajudant-te del context (si algú diu «Montse, tu faràs…», qui respon probablement és la Montse).",
+    "Fes servir només noms de persones que s'hagin presentat. Si no pots saber amb seguretat qui parla, posa «Persona no identificada:».",
+  ];
   const prompt = [
-    "Transcriu literalment aquest àudio, que és un tram d'una reunió gravada amb un mòbil damunt la taula.",
+    isRef || !ref
+      ? "Transcriu literalment aquest àudio, que és un tram d'una reunió gravada amb un mòbil damunt la taula."
+      : "Transcriu literalment un tram d'una reunió gravada amb un mòbil damunt la taula.",
     settings.lang === 'auto'
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
-    'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
+    ...speakerRules,
     "Si no hi ha veu, respon només: [silenci]",
     "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió] en aquell punt. Exemple: «quedem dijous [dubte de comprensió] a les deu».",
     context ? `Context de la reunió (per escriure bé noms i termes): ${context}` : '',
     prevText ? `Final del tram anterior (només per continuïtat, no el repeteixis): «${prevText.slice(-300)}»` : '',
   ].filter(Boolean).join('\n');
 
-  const send = async (b) => gemini([
-    { inlineData: { mimeType: (b.type || 'audio/mp4').split(';')[0], data: await blobToBase64(b) } },
+  const audioPart = async (b) => ({ inlineData: { mimeType: (b.type || 'audio/mp4').split(';')[0], data: await blobToBase64(b) } });
+  const send = async (b, r) => gemini([
+    ...(r ? [await audioPart(r)] : []),
+    await audioPart(b),
     { text: prompt },
   ], { task: 'transcribe' });
+  const refBlob = ref && ref.blob ? ref.blob : null;
   let text;
   if (!forceWav) {
-    try { text = await send(blob); }
+    try { text = await send(blob, refBlob); }
     catch (e) {
       if (!(e instanceof UnsupportedAudioError)) throw e;
       forceWav = true;
     }
   }
-  if (text === undefined) text = await send(await toWav(blob));
+  if (text === undefined) text = await send(await toWav(blob), refBlob ? await toWav(refBlob) : null);
   text = text.trim();
   return /^\[silenci\]$/i.test(text) ? '' : text;
 }
@@ -378,11 +402,19 @@ function kickQueue(meetingId) {
         const blob = await db.get('audio', audioKey(m.id, seg.idx));
         if (!blob) { seg.status = 'error'; seg.error = "No s'ha trobat l'àudio"; await saveMeeting(m); continue; }
         const prev = m.segments.filter((s) => s.idx < seg.idx && s.status === 'done').map((s) => s.text).join(' ');
+        const isRef = !!m.speakers && seg.idx === m.refIdx;
+        let ref = null;
+        if (m.speakers && m.refIdx != null && !isRef) {
+          const refSeg = m.segments.find((s) => s.idx === m.refIdx);
+          const refBlob = await db.get('audio', audioKey(m.id, m.refIdx));
+          if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text };
+        }
         try {
-          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context);
+          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers });
           seg.status = 'done';
           delete seg.error;
-          if (!settings.keepAudio) await db.del('audio', audioKey(m.id, seg.idx));
+          // L'àudio de les presentacions es guarda fins al final: és la mostra de veus.
+          if (!settings.keepAudio && !isRef) await db.del('audio', audioKey(m.id, seg.idx));
         } catch (e) {
           seg.status = 'error';
           seg.error = e.message;
@@ -407,7 +439,7 @@ function kickQueue(meetingId) {
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `Ets un secretari de reunions excel·lent. Reps la transcripció automàtica d'una reunió (gravada amb un mòbil damunt la taula) i n'has de fer l'acta-resum.
 
-La transcripció no identifica qui parla i pot tenir errors de reconeixement: dedueix pel context qui diu què quan sigui raonablement clar, corregeix errors evidents de transcripció i no t'inventis res.
+La transcripció pot indicar qui parla al principi de cada línia («Nom: …»), identificat per la veu a partir de les presentacions de l'inici. Fes-ho servir per atribuir a cada persona les seves opinions, propostes, decisions i, sobretot, les TASQUES (qui s'encarrega de què). Si una línia diu «Persona no identificada» o no hi ha noms, dedueix pel context qui diu què només quan sigui raonablement clar; si no, no atribueixis la tasca a ningú i afegeix-hi [dubte de comprensió]. La transcripció pot tenir errors de reconeixement: corregeix errors evidents i no t'inventis res.
 
 La transcripció marca amb [dubte de comprensió] les parts que no s'han entès bé. Si un nom, xifra, data o idea que poses al resum ve d'una part marcada, o te'n falta informació per entendre-la, afegeix-hi just al costat [dubte de comprensió]. No elimines aquests dubtes ni els resolguis inventant.
 
@@ -614,6 +646,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
       m.status = 'done';
       m.stage = '';
       await saveMeeting(m);
+      if (m.refIdx != null && !settings.keepAudio) await db.del('audio', audioKey(m.id, m.refIdx));
     } catch (e) {
       m.status = 'error';
       m.error = e.message;
@@ -713,6 +746,7 @@ function finishSegment(r, chunks, startMs, peak) {
       const idx = m.segments.length;
       await db.put('audio', blob, audioKey(m.id, idx));
       m.segments.push({ idx, startMs, status: 'pending', text: '' });
+      if (m.speakers && m.refIdx == null) { m.refIdx = idx; updateIntroButton(); }
       await saveMeeting(m);
       kickQueue(m.id);
       updateRecProgress();
@@ -780,6 +814,7 @@ async function startRecording() {
     startedAt: Date.now(),
     durationMs: 0,
     engine: settings.engine,
+    speakers: settings.engine !== 'device' && settings.speakers !== false,
     status: 'recording',
     segments: [],
     marks: [],
@@ -811,6 +846,7 @@ async function startRecording() {
   setRecStateUi();
   showView('rec');
   renderLive();
+  updateIntroButton();
   rec.lastTick = performance.now();
   rec.tickTimer = setInterval(tick, 250);
   requestAnimationFrame(drawMeter);
@@ -908,6 +944,12 @@ async function stopRecording() {
   runPipeline(m.id);
 }
 
+// Botó «Presentacions fetes»: visible fins que hi ha mostra de veus.
+function updateIntroButton() {
+  const m = rec.meeting;
+  $('#btn-intro').hidden = !(m && m.speakers && m.refIdx == null);
+}
+
 function addMark() {
   if (!rec.meeting) return;
   rec.meeting.marks.push(Math.round(rec.activeMs));
@@ -933,7 +975,7 @@ function renderLive(interim = '') {
   const add = (text, cls) => {
     const p = document.createElement('p');
     if (cls) p.className = cls;
-    p.innerHTML = markDoubts(escapeHtml(text));
+    p.innerHTML = speakerHtml(text);
     box.appendChild(p);
   };
   if (m.engine === 'device') {
@@ -1049,7 +1091,7 @@ async function showResult(id) {
     st.textContent = `No s'ha pogut enviar el correu: ${m.email.error || 'pendent'}. Toca «Torna a enviar».`;
   }
   $('#result-summary').innerHTML = m.summary ? mdToHtml(m.summary) : '<p>Encara no hi ha resum.</p>';
-  $('#result-transcript').innerHTML = markDoubts(escapeHtml(buildTranscript(m) || '(buida)'));
+  $('#result-transcript').innerHTML = (buildTranscript(m) || '(buida)').split('\n').map(speakerHtml).join('\n');
   $('#btn-resend').disabled = !m.summary;
   $('#btn-copy').disabled = !m.summary;
   $('#btn-mail').disabled = !m.summary;
@@ -1133,6 +1175,7 @@ function fillSettings() {
   $('#set-extra').value = settings.extra;
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
+  $('#set-speakers').checked = settings.speakers !== false;
   syncEngineFields();
   $('#settings-msg').textContent = '';
 }
@@ -1148,6 +1191,7 @@ function readSettingsForm() {
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
     v: 2,
     keepAudio: $('#set-keep-audio').checked,
+    speakers: $('#set-speakers').checked,
   };
 }
 function syncEngineFields() {
@@ -1191,6 +1235,13 @@ $('#btn-record').onclick = startRecording;
 $('#btn-pause').onclick = togglePause;
 $('#btn-stop').onclick = () => { if (confirm('Acabar la reunió i fer-ne el resum?')) stopRecording(); };
 $('#btn-mark').onclick = addMark;
+$('#btn-intro').onclick = () => {
+  if (!rec.meeting || rec.paused) return;
+  rec.segStartMs = rec.activeMs;
+  rotateSegment(); // tanca el tram de presentacions: serà la mostra de veus
+  $('#btn-intro').hidden = true;
+  toast('Presentacions desades. Ja reconeixeré qui parla.');
+};
 $('#btn-history').onclick = () => showView('history');
 $('#btn-settings').onclick = () => showView('settings');
 document.querySelector('.topbar h1').onclick = () => showView('home');
