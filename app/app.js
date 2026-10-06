@@ -83,10 +83,15 @@ class FatalError extends Error {}
 // ---------------------------------------------------------------------------
 // Markdown mínim -> HTML (per a l'app i per al correu)
 // ---------------------------------------------------------------------------
+// Ressalta les marques «[dubte de comprensió]» (text ja escapat).
+const DOUBT_STYLE = 'background:#fde68a;color:#78350f;border-radius:4px;padding:0 4px;font-weight:600';
+function markDoubts(html) {
+  return html.replace(/\[dubte de comprensió[^\]]*\]/gi, (t) => `<mark style="${DOUBT_STYLE}">${t}</mark>`);
+}
 function inlineMd(s) {
-  return escapeHtml(s)
+  return markDoubts(escapeHtml(s)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[\s(])\*(?!\s)(.+?)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+    .replace(/(^|[\s(])\*(?!\s)(.+?)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>'));
 }
 function mdToHtml(md, style = {}) {
   const st = (tag) => (style[tag] ? ` style="${style[tag]}"` : '');
@@ -337,7 +342,8 @@ async function transcribeBlob(blob, idx, prevText, context) {
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
     'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
-    "Si no hi ha veu o no s'entén res, respon només: [silenci]",
+    "Si no hi ha veu, respon només: [silenci]",
+    "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió] en aquell punt. Exemple: «quedem dijous [dubte de comprensió] a les deu».",
     context ? `Context de la reunió (per escriure bé noms i termes): ${context}` : '',
     prevText ? `Final del tram anterior (només per continuïtat, no el repeteixis): «${prevText.slice(-300)}»` : '',
   ].filter(Boolean).join('\n');
@@ -400,7 +406,9 @@ function kickQueue(meetingId) {
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `Ets un secretari de reunions excel·lent. Reps la transcripció automàtica d'una reunió (gravada amb un mòbil damunt la taula) i n'has de fer l'acta-resum.
 
-La transcripció no identifica qui parla i pot tenir errors de reconeixement: dedueix pel context qui diu què quan sigui raonablement clar, corregeix errors evidents de transcripció i no t'inventis res. Si un nom, xifra o data és dubtós, indica-ho amb "(?)".
+La transcripció no identifica qui parla i pot tenir errors de reconeixement: dedueix pel context qui diu què quan sigui raonablement clar, corregeix errors evidents de transcripció i no t'inventis res.
+
+La transcripció marca amb [dubte de comprensió] les parts que no s'han entès bé. Si un nom, xifra, data o idea que poses al resum ve d'una part marcada, o te'n falta informació per entendre-la, afegeix-hi just al costat [dubte de comprensió]. No elimines aquests dubtes ni els resolguis inventant.
 
 Escriu SEMPRE en català, en Markdown, amb exactament aquesta estructura:
 
@@ -423,6 +431,9 @@ Escriu SEMPRE en català, en Markdown, amb exactament aquesta estructura:
 
 ## Dades clau
 - Xifres, imports, dates i noms propis importants esmentats.
+
+## Dubtes de comprensió
+- Llista breu dels punts on la transcripció no era clara i que poden afectar el resum (què no s'ha entès i en quin tema). Si no n'hi ha cap, escriu "- Cap."
 
 Si una secció no té contingut, escriu "- Cap." Sigues concret i útil: el lector no ha assistit a la reunió i ha de poder actuar amb aquest resum. No afegeixis cap text abans del títol ni després de l'última secció.`;
 
@@ -921,7 +932,7 @@ function renderLive(interim = '') {
   const add = (text, cls) => {
     const p = document.createElement('p');
     if (cls) p.className = cls;
-    p.textContent = text;
+    p.innerHTML = markDoubts(escapeHtml(text));
     box.appendChild(p);
   };
   if (m.engine === 'device') {
@@ -1037,7 +1048,7 @@ async function showResult(id) {
     st.textContent = `No s'ha pogut enviar el correu: ${m.email.error || 'pendent'}. Toca «Torna a enviar».`;
   }
   $('#result-summary').innerHTML = m.summary ? mdToHtml(m.summary) : '<p>Encara no hi ha resum.</p>';
-  $('#result-transcript').textContent = buildTranscript(m) || '(buida)';
+  $('#result-transcript').innerHTML = markDoubts(escapeHtml(buildTranscript(m) || '(buida)'));
   $('#btn-resend').disabled = !m.summary;
   $('#btn-copy').disabled = !m.summary;
   $('#btn-mail').disabled = !m.summary;
