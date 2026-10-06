@@ -1,5 +1,5 @@
 /**
- * Reunions: envia els resums per correu i els guarda en aquest full de càlcul.
+ * Dit i Fet: envia els resums per correu i els guarda en aquest full de càlcul.
  *
  * Com instal·lar-lo (un sol cop):
  * 1. Crea un full de càlcul nou a Google Sheets (p. ex. «Reunions»).
@@ -39,7 +39,7 @@ function doPost(e) {
 
     // 2. Envia el correu.
     const to = ALLOWED_RECIPIENTS.indexOf(String(data.to || '').toLowerCase()) >= 0 ? data.to : ALLOWED_RECIPIENTS[0];
-    const options = { name: 'Resums de Reunions' };
+    const options = { name: 'Dit i Fet' };
     if (data.html) options.htmlBody = data.html + sheetLink_();
     if (data.transcript) {
       options.attachments = [Utilities.newBlob(data.transcript, 'text/plain', data.filename || 'transcripcio.txt')];
@@ -57,7 +57,7 @@ function sendToOthers_(data) {
     .filter(function (x) { return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(x); })
     .slice(0, MAX_RECIPIENTS);
   if (!list.length) return json_({ ok: false, error: 'Cap adreça vàlida' });
-  const options = { name: 'Resums de Reunions', replyTo: ALLOWED_RECIPIENTS[0] };
+  const options = { name: 'Dit i Fet', replyTo: ALLOWED_RECIPIENTS[0] };
   if (data.html) options.htmlBody = data.html; // sense l'enllaç al full privat
   if (data.transcript) {
     options.attachments = [Utilities.newBlob(data.transcript, 'text/plain', data.filename || 'transcripcio.txt')];

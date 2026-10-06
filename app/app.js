@@ -1,6 +1,6 @@
-/* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
+/* Dit i Fet — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -690,7 +690,7 @@ function buildEmail(m) {
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1f2937;max-width:680px">
 <p style="margin:0 0 14px;color:#64748b;font-size:13px">${escapeHtml(when)} · ${escapeHtml(fmtDuration(m.durationMs || 0))}</p>
 ${mdToHtml(m.summary, EMAIL_STYLE)}
-<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">Transcripció completa adjunta. Generat automàticament per l'app Reunions.</p>
+<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">Transcripció completa adjunta. Generat automàticament per Dit i Fet.</p>
 </div>`;
   return {
     subject: `Resum: ${title} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`,
@@ -1413,7 +1413,7 @@ async function testEmail() {
   msg.textContent = 'Enviant correu de prova…';
   try {
     const r = await sendEmail({
-      subject: 'Prova: app de Reunions',
+      subject: 'Prova: Dit i Fet',
       html: '<p>Si reps aquest correu, l\'enviament automàtic de resums funciona correctament. ✅</p>',
       text: "Si reps aquest correu, l'enviament automàtic de resums funciona correctament.",
     });

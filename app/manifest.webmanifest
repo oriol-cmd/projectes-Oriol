@@ -1,7 +1,7 @@
 {
-  "name": "Resums de Reunions",
-  "short_name": "Reunions",
-  "description": "Grava reunions, en fa un resum amb IA i l'envia per correu.",
+  "name": "Dit i Fet",
+  "short_name": "Dit i Fet",
+  "description": "Escolta les teves reunions i en fa un resum ordenat amb les tasques de cadascú.",
   "lang": "ca",
   "start_url": "./",
   "scope": "./",
