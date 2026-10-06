@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 27;
+const APP_VERSION = 28;
 
 // ---------------------------------------------------------------------------
 // Configuració
