@@ -1,4 +1,4 @@
-# Dit i Fet — resums de reunions des del mòbil
+# Xiu-xiu — resums de reunions des del mòbil
 
 App web per a l'iPhone (s'instal·la a la pantalla d'inici com una app normal) que **escolta la conversa, en mostra la transcripció en directe i, en acabar, en fa un resum ordenat**. Sense cap clau de pagament.
 
@@ -83,7 +83,7 @@ Aquest repositori ja inclou l'automatització (`.github/workflows/pages.yml`). C
 
 1. Obre l'adreça amb **Safari**.
 2. Botó **Compartir > Afegeix a la pantalla d'inici**.
-3. Obre l'app des de la icona **Dit i Fet**, ves a ⚙️ **Configuració** i omple:
+3. Obre l'app des de la icona **Xiu-xiu**, ves a ⚙️ **Configuració** i omple:
    - Clau de Gemini (i prem **Comprova la clau**)
    - *(Opcional)* URL i clau secreta de l'script del full (i prem **Envia un correu de prova**) Si tot surt amb ✓, ja la pots fer servir.
 
@@ -150,4 +150,4 @@ apps-script/Code.gs  Script del full de Google: correu + registre de reunions i 
 ```
 
 ---
-*Dit i Fet by Oriolbop*
+*Xiu-xiu by Oriolbop*
