@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -347,12 +347,17 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
       if (res.status === 404) { missingModels.add(model); lastErr = new Error(`Model ${model} no disponible`); break; }
       if (/API_KEY_INVALID|API key not valid/i.test(errText)) throw new FatalError('La clau de Gemini no és vàlida');
       if (res.status === 403) throw new FatalError(`Gemini ha denegat l'accés: ${errText.slice(0, 160)}`);
-      if (res.status === 400 && /thinking/i.test(errText) && body.generationConfig.thinkingConfig) {
-        noThinkingCfg.add(model); // aquest model no accepta el límit: torna-ho a provar sense
-        continue;
-      }
-      if (res.status === 400 && /mime|unsupported|audio|inline/i.test(errText) && parts.some((pt) => pt.inlineData)) {
-        throw new UnsupportedAudioError(errText.slice(0, 160));
+      if (res.status === 400) {
+        // Google sovint respon un genèric «invalid argument». Anem descartant causes:
+        // 1) el límit de «pensament» (alguns models no l'accepten)
+        if (body.generationConfig.thinkingConfig) { noThinkingCfg.add(model); continue; }
+        // 2) el format de l'àudio (es reenvia en WAV)
+        const nonWavAudio = parts.some((pt) => pt.inlineData && /^audio\//.test(pt.inlineData.mimeType) && pt.inlineData.mimeType !== 'audio/wav');
+        if (nonWavAudio) throw new UnsupportedAudioError(errText.slice(0, 160));
+        // 3) el model: prova el següent
+        lastErr = new Error(`Google no ha acceptat la petició (${model})`);
+        if (hasNext) break;
+        throw new Error(`Google no ha acceptat la petició: ${errText.replace(/\s+/g, ' ').slice(0, 160)}`);
       }
       if (res.status === 429) {
         if (/PerDay|per day/i.test(errText)) { markExhausted(model); lastErr = new FatalError(QUOTA_MSG); break; }
@@ -1217,6 +1222,7 @@ function updateProcView(m) {
 async function showResult(id) {
   const m = await getMeeting(id);
   if (!m) return;
+  $('#share-panel').hidden = true;
   viewingId = id;
   if (m.status === 'processing' || pipelines.has(id)) { showView('proc'); updateProcView(m); return; }
   showView('result');
@@ -1245,7 +1251,6 @@ async function showResult(id) {
   await renderPhotos(m, $('#result-photos'));
   $('#result-photos-wrap').hidden = false;
   $('#btn-share').disabled = !m.summary;
-  $('#share-panel').hidden = true;
 }
 
 async function renderHistory() {
