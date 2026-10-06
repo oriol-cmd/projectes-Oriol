@@ -196,6 +196,8 @@ function exhaustedModels() {
     return q.day === quotaDay() ? q.models || [] : [];
   } catch { return []; }
 }
+// Oblida les quotes esgotades (p. ex. després d'activar la facturació).
+function resetQuota() { try { localStorage.removeItem('quota'); } catch { /* res */ } }
 function markExhausted(model) {
   const models = [...new Set([...exhaustedModels(), model])];
   try { localStorage.setItem('quota', JSON.stringify({ day: quotaDay(), models })); } catch { /* res */ }
@@ -987,7 +989,7 @@ async function showResult(id) {
   if (m.status === 'error') {
     st.className = 'banner err';
     st.innerHTML = `No s'ha pogut completar: ${escapeHtml(m.error)} <button class="link" id="btn-retry">Reintenta</button>`;
-    $('#btn-retry').onclick = () => { showView('proc'); updateProcView(m); runPipeline(id); };
+    $('#btn-retry').onclick = () => { resetQuota(); showView('proc'); updateProcView(m); runPipeline(id); };
   } else if (m.email.status === 'off') {
     st.className = 'banner ok';
     st.textContent = '✓ Resum llest';
@@ -1108,6 +1110,7 @@ function syncEngineFields() {
 }
 
 async function testKeys() {
+  resetQuota();
   saveSettings(readSettingsForm());
   const msg = $('#settings-msg');
   msg.textContent = 'Comprovant…';
