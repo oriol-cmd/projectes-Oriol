@@ -337,8 +337,11 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .account-status { margin: 0 0 12px; font-size: 15px; }
 .account-status .muted { color: var(--muted); font-size: 13px; }
 
-/* Privadesa */
-.privacy details summary { cursor: pointer; font-weight: 600; color: var(--accent); }
-.privacy h4 { font-size: 15px; margin: 16px 0 4px; }
-.privacy ul { padding-left: 20px; margin: 4px 0; }
-.privacy li { font-size: 14.5px; margin: 4px 0; color: var(--text); }
+/* Privadesa (enllaç discret a baix d'Ajustos) */
+.privacy-link { text-align: center; margin: 2px 0 8px; }
+.privacy-link summary { list-style: none; cursor: pointer; font-size: 12.5px; color: var(--muted); text-decoration: underline; display: inline-block; }
+.privacy-link summary::-webkit-details-marker { display: none; }
+.privacy-body { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px 10px; margin-top: 10px; }
+.privacy-body h4 { font-size: 14px; margin: 14px 0 4px; }
+.privacy-body ul { padding-left: 18px; margin: 4px 0; }
+.privacy-body li { font-size: 13.5px; margin: 3px 0; color: var(--text); }

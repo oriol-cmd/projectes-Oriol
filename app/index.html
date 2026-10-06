@@ -277,10 +277,23 @@
         <input id="restore-input" type="file" accept="application/json,.json" hidden>
       </div>
 
-      <h3>🔒 Privadesa i protecció de dades</h3>
-      <div class="card group privacy">
-        <details>
-          <summary>Què passa amb l'àudio i les dades de les reunions</summary>
+      <h3>⚙️ Avançat</h3>
+      <div class="card group">
+        <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
+          <input id="set-segment" type="number" min="10" max="300" step="10"></label>
+        <label class="check"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
+        <label class="check last"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn primary" id="btn-save-settings" type="button">Desa els canvis</button>
+      </div>
+      <p id="settings-msg" class="fineprint"></p>
+      <p class="signature">Xiu-xiu <span>by Oriolbop</span></p>
+      <p id="app-version" class="fineprint"></p>
+      <details class="privacy-link">
+          <summary>Privadesa i protecció de dades</summary>
+          <div class="privacy-body">
           <h4>🎙️ L'àudio</h4>
           <ul>
             <li>Mentre graves, cada tros d'àudio es guarda al mòbil <b>només fins que s'ha transcrit</b>. Després s'esborra.</li>
@@ -313,23 +326,8 @@
             <li>Pots esborrar en qualsevol moment una reunió (resum, transcripció, fotos i àudio) des de <i>⋯ > Esborra aquesta reunió</i>.</li>
           </ul>
           <p class="fineprint left">Xiu-xiu no té cap servidor propi: ni l'autor de l'app ni ningú més pot veure les teves reunions.</p>
+        </div>
         </details>
-      </div>
-
-      <h3>⚙️ Avançat</h3>
-      <div class="card group">
-        <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
-          <input id="set-segment" type="number" min="10" max="300" step="10"></label>
-        <label class="check"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
-        <label class="check last"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
-      </div>
-
-      <div class="settings-actions">
-        <button class="btn primary" id="btn-save-settings" type="button">Desa els canvis</button>
-      </div>
-      <p id="settings-msg" class="fineprint"></p>
-      <p class="signature">Xiu-xiu <span>by Oriolbop</span></p>
-      <p id="app-version" class="fineprint"></p>
     </section>
   </main>
 
