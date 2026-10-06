@@ -20,7 +20,7 @@
     <button class="icon-btn" id="btn-history" aria-label="Historial">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
     </button>
-    <h1>Xiu-xiu</h1>
+    <h1 class="brand"><img src="icons/icon.svg?v=2" alt="" class="brand-logo">Xiu-xiu</h1>
     <button class="icon-btn" id="btn-settings" aria-label="Configuració">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
@@ -33,9 +33,10 @@
   <main>
     <!-- INICI -->
     <section id="view-home" class="view">
-      <div id="setup-banner" class="welcome" hidden>
-        <h2>Benvingut/da! 👋</h2>
-        <p><b>Xiu-xiu</b> escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat. Per començar, necessites una clau gratuïta de Google (1 minut):</p>
+      <div id="setup-banner" class="welcome card" hidden>
+        <img src="icons/icon.svg?v=2" alt="" class="welcome-logo">
+        <h2>Benvingut/da a Xiu-xiu</h2>
+        <p>Escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat amb les tasques de cadascú. Per començar, necessites una clau gratuïta de Google (1 minut):</p>
         <div class="wstep">
           <span class="wnum">1</span>
           <div>
@@ -51,62 +52,72 @@
             <p id="welcome-msg" class="fineprint"></p>
           </div>
         </div>
-        <p class="fineprint" style="text-align:left">La clau és teva i es queda només en aquest mòbil: el cost o la quota gratuïta de Google van a càrrec teu. Les teves reunions no surten d'aquest mòbil, excepte cap a Google per transcriure-les i resumir-les.</p>
+        <p class="fineprint left">La clau és teva i es queda només en aquest mòbil: el cost o la quota gratuïta de Google van a càrrec teu. Les teves reunions no surten d'aquest mòbil, excepte cap a Google per transcriure-les i resumir-les.</p>
         <p class="signature">Xiu-xiu <span>by Oriolbop</span></p>
       </div>
+
       <div id="home-main">
-      <div id="pending-banner" class="banner" hidden></div>
-      <div id="backup-reminder" class="banner" hidden>💾 Fa temps que no fas una còpia de seguretat de les teves reunions. <button class="link" id="btn-backup-now" type="button">Fes-la ara</button></div>
+        <div id="pending-banner" class="banner" hidden></div>
+        <div id="backup-reminder" class="banner" hidden>💾 Fa temps que no fas una còpia de seguretat de les teves reunions. <button class="link" id="btn-backup-now" type="button">Fes-la ara</button></div>
 
-      <div class="field">
-        <span>Tipus de reunió</span>
-        <div id="type-chips" class="type-chips" role="group" aria-label="Tipus de reunió"></div>
-      </div>
+        <div class="record-hero">
+          <button id="btn-record" class="record-btn" aria-label="Comença a gravar"><span class="dot"></span></button>
+          <p class="hint">Toca per començar a gravar</p>
+        </div>
 
-      <label class="field">
-        <span>Títol de la reunió <em>(opcional)</em></span>
-        <input id="meeting-title" type="text" placeholder="p. ex. Comitè de direcció" autocomplete="off">
-      </label>
-      <label class="field">
-        <span>Context o assistents <em>(opcional, millora el resum)</em></span>
-        <textarea id="meeting-context" rows="2" placeholder="p. ex. Anna (finances), Jordi (vendes). Tema: pressupost 2027"></textarea>
-      </label>
+        <div class="card form-card">
+          <div class="field">
+            <span>Tipus de reunió</span>
+            <div id="type-chips" class="type-chips" role="group" aria-label="Tipus de reunió"></div>
+          </div>
+          <label class="field">
+            <span>Títol <em>(opcional)</em></span>
+            <input id="meeting-title" type="text" placeholder="p. ex. Comitè de direcció" autocomplete="off">
+          </label>
+          <label class="field last">
+            <span>Assistents i context <em>(opcional, millora el resum)</em></span>
+            <textarea id="meeting-context" rows="2" placeholder="p. ex. Anna (finances), Jordi (vendes). Tema: pressupost 2027"></textarea>
+          </label>
+        </div>
 
-      <div class="record-wrap">
-        <button id="btn-record" class="record-btn" aria-label="Comença a gravar">
-          <span class="dot"></span>
-        </button>
-        <p class="hint">Toca per començar a gravar</p>
-        <p class="fineprint intro-tip">👋 Per saber qui diu què, comenceu presentant-vos («Soc l'Oriol…») i toqueu «Presentacions fetes».</p>
-      </div>
-      <p class="fineprint">Deixa el mòbil damunt la taula, amb l'app oberta. La pantalla es mantindrà encesa mentre grava.</p>
+        <ul class="tips">
+          <li>👋 Comenceu presentant-vos («Soc l'Oriol…») i toqueu <b>«Presentacions fetes»</b>: així sabrà qui diu què.</li>
+          <li>📱 Deixa el mòbil damunt la taula amb l'app oberta; la pantalla es mantindrà encesa.</li>
+        </ul>
 
-      <section id="home-tasks" class="home-block" hidden>
-        <h3 id="home-tasks-title">Tasques</h3>
-        <ul id="recent-tasks" class="task-list"></ul>
-      </section>
-      <section id="home-recent" class="home-block" hidden>
-        <h3>Últimes reunions <button class="link small-link" data-goto="history" type="button">Veure-les totes</button></h3>
-        <ul id="recent-list" class="history"></ul>
-      </section>
+        <section id="home-tasks" class="home-block" hidden>
+          <h3 id="home-tasks-title">Tasques</h3>
+          <ul id="recent-tasks" class="task-list card"></ul>
+        </section>
+        <section id="home-recent" class="home-block" hidden>
+          <h3>Últimes reunions <button class="link small-link" data-goto="history" type="button">Veure-les totes</button></h3>
+          <ul id="recent-list" class="cards"></ul>
+        </section>
       </div>
     </section>
 
     <!-- GRAVANT -->
     <section id="view-rec" class="view" hidden>
-      <p class="rec-title" id="rec-title"></p>
-      <div class="timer" id="timer">00:00</div>
-      <div class="rec-state"><span class="pulse"></span><span id="rec-state-text">Gravant</span></div>
-      <canvas id="meter" width="600" height="60" aria-hidden="true"></canvas>
-      <div id="live-text" class="live" aria-live="polite"></div>
-      <p class="rec-progress" id="rec-progress"></p>
-      <div class="rec-actions">
-        <button id="btn-pause" class="btn secondary">Pausa</button>
-        <button id="btn-stop" class="btn danger">Acaba la reunió</button>
+      <div class="rec-head">
+        <p class="rec-title" id="rec-title"></p>
+        <div class="timer" id="timer">00:00</div>
+        <div class="rec-state"><span class="pulse"></span><span id="rec-state-text">Gravant</span></div>
+        <canvas id="meter" width="600" height="60" aria-hidden="true"></canvas>
       </div>
-      <button id="btn-intro" class="btn secondary intro" hidden>👋 Presentacions fetes</button>
-      <button id="btn-photo" class="btn secondary photo-btn">📷 Foto d'un document <span id="photo-count"></span></button>
-      <button id="btn-mark" class="btn ghost">＋ Marca un moment important</button>
+      <div class="live-card card">
+        <div class="live-label">Transcripció en directe</div>
+        <div id="live-text" class="live" aria-live="polite"></div>
+      </div>
+      <p class="rec-progress" id="rec-progress"></p>
+      <button id="btn-intro" class="btn primary-soft intro" type="button" hidden>👋 Presentacions fetes</button>
+      <div class="rec-tools">
+        <button id="btn-photo" class="tool" type="button">📷 Foto <span id="photo-count"></span></button>
+        <button id="btn-mark" class="tool" type="button">⭐ Moment clau</button>
+      </div>
+      <div class="rec-actions">
+        <button id="btn-pause" class="btn secondary" type="button">Pausa</button>
+        <button id="btn-stop" class="btn danger" type="button">Acaba la reunió</button>
+      </div>
       <p class="fineprint" id="rec-warning" hidden>No bloquegis el mòbil ni canviïs d'app: el mòbil atura el micròfon de les webs en segon pla.</p>
     </section>
 
@@ -118,7 +129,7 @@
         <li id="step-summary"><span class="st"></span><div><b>Resum</b><small id="step-summary-info"></small></div></li>
         <li id="step-email"><span class="st"></span><div><b>Correu i full de càlcul</b><small id="step-email-info"></small></div></li>
       </ol>
-      <article id="proc-summary" class="summary" hidden></article>
+      <article id="proc-summary" class="summary card" hidden></article>
       <p class="fineprint">Pots tancar l'app: si es talla, ho reprendrà en tornar a obrir-la.</p>
     </section>
 
@@ -130,114 +141,153 @@
         <button type="button" data-lang="es">Castellano</button>
         <button type="button" data-lang="en">English</button>
       </div>
-      <article id="result-summary" class="summary"></article>
+      <article id="result-summary" class="summary card"></article>
       <div id="result-photos-wrap" class="photos-wrap" hidden>
         <div id="result-photos" class="photos"></div>
-        <button id="btn-photo-after" class="btn ghost small">📷 Afegeix una foto d'un document</button>
       </div>
-      <div class="result-actions">
-        <button id="btn-mail" class="btn primary">✉️ Envia'm el resum per correu</button>
-        <button id="btn-share" class="btn secondary wide">👥 Envia a altres persones</button>
-        <div id="share-panel" class="share-panel" hidden>
-          <label class="field"><span>Adreces de correu <em>(separades per comes)</em></span>
-            <textarea id="share-to" rows="2" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="nom@exemple.com, altra.persona@exemple.com"></textarea></label>
-          <div id="share-recent" class="chips"></div>
-          <label class="check"><input id="share-transcript" type="checkbox"> Adjunta també la transcripció completa</label>
-          <button id="btn-share-send" class="btn primary">Envia el resum</button>
-          <button id="btn-share-mail" class="btn ghost">o obre-ho al correu del mòbil</button>
-          <p id="share-msg" class="fineprint"></p>
-        </div>
-        <button id="btn-wa" class="btn wa wide" type="button">💬 Envia el resum per WhatsApp</button>
-        <button id="btn-pdf" class="btn secondary wide">📄 Acta en PDF <small>(desa-la o envia-la per WhatsApp)</small></button>
-        <button id="btn-copy" class="btn secondary">Copia el resum</button>
-        <button id="btn-resend" class="btn secondary">Torna a enviar</button>
-        <button id="btn-redo" class="btn secondary">Refés el resum</button>
-        <button id="btn-new" class="btn primary">Nova reunió</button>
-      </div>
-      <details class="transcript">
+      <details class="transcript card">
         <summary>Transcripció completa</summary>
         <pre id="result-transcript"></pre>
       </details>
+
+      <div class="action-bar">
+        <button id="btn-share-open" class="btn primary" type="button">↗ Comparteix el resum</button>
+        <button id="btn-more" class="btn secondary square" type="button" aria-label="Més opcions">⋯</button>
+      </div>
+      <button id="btn-new" class="btn ghost full" type="button">＋ Nova reunió</button>
     </section>
 
     <!-- HISTORIAL -->
     <section id="view-history" class="view" hidden>
       <h2>Historial</h2>
-      <ul id="history-list" class="history"></ul>
+      <input id="history-search" class="search" type="search" placeholder="🔍 Cerca per títol, persona o tema" autocomplete="off">
+      <ul id="history-list" class="cards"></ul>
       <p class="fineprint" id="history-empty">Encara no hi ha reunions.</p>
     </section>
 
     <!-- CONFIGURACIÓ -->
     <section id="view-settings" class="view" hidden>
       <h2>Configuració</h2>
-      <p class="fineprint">Tot es desa només en aquest mòbil.</p>
+      <p class="fineprint left">Tot es desa només en aquest mòbil.</p>
 
-      <h3>Correu i Google Sheets <em style="text-transform:none;letter-spacing:0">(opcional)</em></h3>
-      <p class="fineprint" style="text-align:left;margin-top:0">Si ho omples, cada resum t'arribarà per correu i es desarà en un full de càlcul. Instruccions al README.</p>
-      <label class="field"><span>El teu correu (on vols rebre els resums)</span>
-        <input id="set-email" type="email" autocomplete="off"></label>
-      <label class="field"><span>URL de l'script del full de Google</span>
-        <input id="set-script-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
-      <label class="field"><span>Clau secreta de l'script</span>
-        <input id="set-script-secret" type="password" autocomplete="off"></label>
-      <button class="btn secondary small" id="btn-test-email">Envia un correu de prova</button>
+      <h3>🔑 Clau de Google (Gemini)</h3>
+      <div class="card group">
+        <label class="field"><span>Clau de Gemini</span>
+          <input id="set-gemini-key" type="password" placeholder="Enganxa aquí la clau de Google" autocomplete="off"></label>
+        <p class="fineprint left">La trobaràs a <b>aistudio.google.com/apikey</b></p>
+        <button class="btn secondary small" id="btn-test-keys" type="button">Comprova la clau</button>
+      </div>
 
-      <h3>Intel·ligència artificial (Gemini, gratuït)</h3>
-      <label class="field"><span>Clau de Gemini</span>
-        <input id="set-gemini-key" type="password" placeholder="Enganxa aquí la clau de Google" autocomplete="off"></label>
-      <p class="fineprint" style="text-align:left;margin-top:-6px">Gratuïta i sense targeta a <b>aistudio.google.com/apikey</b></p>
-      <button class="btn secondary small" id="btn-test-keys">Comprova la clau</button>
+      <h3>📝 Resums</h3>
+      <div class="card group">
+        <label class="field"><span>Idioma dels resums</span>
+          <select id="set-summary-lang">
+            <option value="ca">Català</option>
+            <option value="es">Castellano</option>
+            <option value="en">English</option>
+          </select></label>
+        <label class="field last"><span>Instruccions extra <em>(opcional)</em></span>
+          <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
+      </div>
 
-      <h3>Transcripció</h3>
-      <label class="field"><span>Com es transcriu</span>
-        <select id="set-engine">
-          <option value="audio">Gemini (text cada ~1 min, molt precís)</option>
-          <option value="device">Dictat del mòbil (paraula a paraula a l'instant, menys precís)</option>
-        </select></label>
-      <label class="field"><span>Idioma principal</span>
-        <select id="set-lang">
-          <option value="auto">Automàtic (català / castellà barrejats)</option>
-          <option value="ca">Català</option>
-          <option value="es">Castellà</option>
-          <option value="en">Anglès</option>
-        </select></label>
+      <h3>🎙️ Transcripció</h3>
+      <div class="card group">
+        <label class="field"><span>Com es transcriu</span>
+          <select id="set-engine">
+            <option value="audio">Gemini (text cada ~1 min, molt precís)</option>
+            <option value="device">Dictat del mòbil (a l'instant, menys precís)</option>
+          </select></label>
+        <label class="field last"><span>Idioma de les reunions</span>
+          <select id="set-lang">
+            <option value="auto">Automàtic (català / castellà barrejats)</option>
+            <option value="ca">Català</option>
+            <option value="es">Castellà</option>
+            <option value="en">Anglès</option>
+          </select></label>
+      </div>
 
-      <h3>Resum</h3>
-      <label class="field"><span>Idioma dels resums</span>
-        <select id="set-summary-lang">
-          <option value="ca">Català</option>
-          <option value="es">Castellano</option>
-          <option value="en">English</option>
-        </select></label>
-      <label class="field"><span>Instruccions extra per als resums <em>(opcional)</em></span>
-        <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
+      <h3>✉️ Correu i Google Sheets <em class="opt">opcional</em></h3>
+      <div class="card group">
+        <p class="fineprint left first">Si ho omples, cada resum t'arribarà sol per correu i es desarà en un full de càlcul.</p>
+        <label class="field"><span>El teu correu</span>
+          <input id="set-email" type="email" autocomplete="off"></label>
+        <label class="field"><span>URL de l'script del full de Google</span>
+          <input id="set-script-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+        <label class="field"><span>Clau secreta de l'script</span>
+          <input id="set-script-secret" type="password" autocomplete="off"></label>
+        <button class="btn secondary small" id="btn-test-email" type="button">Envia un correu de prova</button>
+      </div>
 
-      <details class="advanced">
-        <summary>Avançat</summary>
+      <h3 id="backup-section">💾 Còpia de seguretat</h3>
+      <div class="card group">
+        <p class="fineprint left first">Guarda la configuració i totes les reunions en un fitxer (p. ex. a iCloud Drive o Google Drive) per recuperar-les si canvies de mòbil o reinstal·les l'app.</p>
+        <div class="row2">
+          <button class="btn secondary small" id="btn-backup" type="button">Desa una còpia</button>
+          <button class="btn secondary small" id="btn-restore" type="button">Recupera-la</button>
+        </div>
+        <p id="backup-info" class="fineprint left"></p>
+        <p id="backup-msg" class="fineprint left"></p>
+        <input id="restore-input" type="file" accept="application/json,.json" hidden>
+      </div>
+
+      <h3>⚙️ Avançat</h3>
+      <div class="card group">
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
           <input id="set-segment" type="number" min="10" max="300" step="10"></label>
-        <label class="check"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
         <label class="check"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
-      </details>
-
-      <h3 id="backup-section">Còpia de seguretat</h3>
-      <p class="fineprint" style="text-align:left;margin-top:0">Guarda la configuració i totes les reunions en un fitxer (p. ex. a iCloud Drive o Google Drive) per recuperar-les si canvies de mòbil o reinstal·les l'app.</p>
-      <div class="row2">
-        <button class="btn secondary small" id="btn-backup" type="button">💾 Desa una còpia</button>
-        <button class="btn secondary small" id="btn-restore" type="button">📂 Recupera una còpia</button>
+        <label class="check last"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
       </div>
-      <p id="backup-info" class="fineprint" style="text-align:left"></p>
-      <p id="backup-msg" class="fineprint" style="text-align:left"></p>
-      <input id="restore-input" type="file" accept="application/json,.json" hidden>
 
       <div class="settings-actions">
-        <button class="btn primary" id="btn-save-settings">Desa</button>
+        <button class="btn primary" id="btn-save-settings" type="button">Desa els canvis</button>
       </div>
       <p id="settings-msg" class="fineprint"></p>
       <p class="signature">Xiu-xiu <span>by Oriolbop</span></p>
       <p id="app-version" class="fineprint"></p>
     </section>
   </main>
+
+  <!-- Full de compartir -->
+  <div id="share-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Comparteix el resum">
+      <div class="sheet-grip"></div>
+      <h3>Comparteix el resum</h3>
+      <div class="sheet-grid">
+        <button id="btn-mail" class="sheet-item" type="button" data-closes><span class="ic">✉️</span>Envia-me'l per correu</button>
+        <button id="btn-wa" class="sheet-item" type="button" data-closes><span class="ic wa">💬</span>WhatsApp</button>
+        <button id="btn-pdf" class="sheet-item" type="button"><span class="ic">📄</span>Acta en PDF</button>
+        <button id="btn-share" class="sheet-item" type="button"><span class="ic">👥</span>A altres persones</button>
+        <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic">📋</span>Copia el text</button>
+      </div>
+      <div id="share-panel" class="share-panel" hidden>
+        <label class="field"><span>Adreces de correu <em>(separades per comes)</em></span>
+          <textarea id="share-to" rows="2" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="nom@exemple.com, altra.persona@exemple.com"></textarea></label>
+        <div id="share-recent" class="chips"></div>
+        <label class="check"><input id="share-transcript" type="checkbox"> Adjunta també la transcripció completa</label>
+        <button id="btn-share-send" class="btn primary" type="button">Envia el resum</button>
+        <button id="btn-share-mail" class="btn ghost" type="button">o obre-ho al correu del mòbil</button>
+        <p id="share-msg" class="fineprint"></p>
+      </div>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <!-- Més opcions -->
+  <div id="more-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Més opcions">
+      <div class="sheet-grip"></div>
+      <h3>Més opcions</h3>
+      <div class="sheet-list">
+        <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📷 Afegeix una foto d'un document</button>
+        <button id="btn-redo" class="sheet-row" type="button" data-closes>✨ Refés el resum</button>
+        <button id="btn-resend" class="sheet-row" type="button" data-closes>🔁 Torna a enviar el correu automàtic</button>
+        <button id="btn-delete" class="sheet-row danger-text" type="button" data-closes>🗑 Esborra aquesta reunió</button>
+      </div>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
 
   <input id="photo-input" type="file" accept="image/*" multiple hidden>
   <div id="toast" class="toast" hidden></div>

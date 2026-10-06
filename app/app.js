@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1228,6 +1228,7 @@ let currentView = 'home';
 let viewingId = null;
 
 function showView(name) {
+  if (typeof closeSheets === 'function' && document.querySelector('.sheet:not([hidden])')) closeSheets();
   if (rec.meeting && name !== 'rec') { toast('Primer acaba la reunió'); return; }
   document.querySelectorAll('.view').forEach((v) => { v.hidden = v.id !== `view-${name}`; });
   currentView = name;
@@ -1302,42 +1303,66 @@ async function showResult(id) {
   $('#btn-copy').disabled = !m.summary;
   $('#btn-mail').disabled = !m.summary;
   await renderPhotos(m, $('#result-photos'));
-  $('#result-photos-wrap').hidden = false;
+  $('#result-photos-wrap').hidden = !(m.photos && m.photos.length);
   $('#btn-share').disabled = !m.summary;
   $('#btn-pdf').disabled = !m.summary;
   $('#lang-switch').hidden = !m.summary;
-  // Sense resum, només té sentit fer-ne un de nou: amaga la resta de botons.
-  ['#btn-mail', '#btn-share', '#btn-wa', '#btn-pdf', '#btn-copy', '#btn-resend'].forEach((sel) => { $(sel).hidden = !m.summary; });
+  // Sense resum, només té sentit fer-ne un de nou: amaga «Comparteix» i «Torna a enviar».
+  ['#btn-share-open', '#btn-resend'].forEach((sel) => { $(sel).hidden = !m.summary; });
+  $('#btn-resend').hidden = !m.summary || !emailEnabled();
+  $('.action-bar').classList.toggle('solo', !m.summary);
+  $('#btn-more').textContent = m.summary ? '⋯' : '⋯  Més opcions';
+  closeSheets();
 }
 
+// Targeta d'una reunió (inici i historial)
+function meetingBadge(m) {
+  if (pipelines.has(m.id) || m.status === 'processing') return '<span class="badge warn">Processant</span>';
+  if (m.status === 'error') return '<span class="badge err">Cal revisar</span>';
+  if (m.email && m.email.status === 'sent' && m.email.confirmed === false) return '<span class="badge warn">Sense confirmar</span>';
+  if (m.email && m.email.status === 'sent') return '<span class="badge ok">Enviat</span>';
+  if (m.status === 'done' && m.email && m.email.status === 'error') return '<span class="badge warn">No enviat</span>';
+  return '';
+}
+function meetingCard(m, { withDelete = false, onDelete = null } = {}) {
+  const li = document.createElement('li');
+  const t = MEETING_TYPES[m.type || 'general'] || MEETING_TYPES.general;
+  const title = m.summary ? summaryTitle(m) : (m.title || 'Reunió');
+  li.innerHTML = `<button class="item" type="button"><span class="ticon">${t.icon}</span><span class="body">
+      <span class="t">${escapeHtml(title)}</span>
+      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${meetingBadge(m)}</span></span></button>`;
+  li.querySelector('.item').onclick = () => showResult(m.id);
+  if (withDelete) {
+    li.classList.add('has-del');
+    const del = document.createElement('button');
+    del.className = 'del'; del.type = 'button'; del.setAttribute('aria-label', 'Esborra'); del.textContent = '🗑';
+    del.onclick = onDelete;
+    li.appendChild(del);
+  }
+  return li;
+}
+async function deleteMeeting(m) {
+  if (!confirm('Esborrar aquesta reunió (resum, transcripció i fotos)?')) return false;
+  for (const s of m.segments || []) await db.del('audio', audioKey(m.id, s.idx));
+  for (const ph of m.photos || []) await db.del('audio', ph.key);
+  await db.del('meetings', m.id);
+  meetingCache.delete(m.id);
+  return true;
+}
 async function renderHistory() {
-  const list = (await db.all('meetings')).sort((a, b) => b.startedAt - a.startedAt);
+  const q = ($('#history-search').value || '').trim().toLowerCase();
+  const all = (await db.all('meetings')).sort((a, b) => b.startedAt - a.startedAt);
+  const list = q ? all.filter((m) => `${m.title || ''} ${m.context || ''} ${m.summary || ''}`.toLowerCase().includes(q)) : all;
   const ul = $('#history-list');
   ul.innerHTML = '';
   $('#history-empty').hidden = list.length > 0;
+  $('#history-empty').textContent = all.length ? 'Cap reunió coincideix amb la cerca.' : 'Encara no hi ha reunions.';
+  $('#history-search').hidden = all.length < 2;
   for (const m of list) {
-    const li = document.createElement('li');
-    let badge = '';
-    if (pipelines.has(m.id) || m.status === 'processing') badge = '<span class="badge warn">Processant</span>';
-    else if (m.status === 'error') badge = '<span class="badge err">Error</span>';
-    else if (m.email && m.email.status === 'sent' && m.email.confirmed === false) badge = '<span class="badge warn">Sense confirmar</span>';
-    else if (m.email && m.email.status === 'sent') badge = '<span class="badge ok">Enviat</span>';
-    else if (m.status === 'done' && m.email && m.email.status === 'error') badge = '<span class="badge warn">No enviat</span>';
-    li.innerHTML = `<button class="item"><div class="t">${escapeHtml(m.summary ? summaryTitle(m) : (m.title || 'Reunió'))}${badge}</div>
-      <div class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}</div></button>
-      <div class="row-actions"><button class="btn ghost small" data-del>Esborra</button></div>`;
-    li.querySelector('.item').onclick = () => showResult(m.id);
-    li.querySelector('[data-del]').onclick = async () => {
-      if (!confirm('Esborrar aquesta reunió i el seu àudio?')) return;
-      for (const s of m.segments || []) await db.del('audio', audioKey(m.id, s.idx));
-      for (const ph of m.photos || []) await db.del('audio', ph.key);
-      await db.del('meetings', m.id);
-      meetingCache.delete(m.id);
-      renderHistory();
-    };
-    ul.appendChild(li);
+    ul.appendChild(meetingCard(m, { withDelete: true, onDelete: async () => { if (await deleteMeeting(m)) renderHistory(); } }));
   }
 }
+$('#history-search').oninput = () => renderHistory();
 
 async function refreshHomeBanners() {
   const miss = missingSetup();
@@ -1597,18 +1622,7 @@ async function renderHome() {
   const recent = all.slice(0, 3);
   const ul = $('#recent-list');
   ul.innerHTML = '';
-  for (const m of recent) {
-    const li = document.createElement('li');
-    const b = document.createElement('button');
-    b.className = 'item';
-    const t = MEETING_TYPES[m.type || 'general'] || MEETING_TYPES.general;
-    const title = m.summary ? summaryTitle(m) : (m.title || 'Reunió');
-    const state = pipelines.has(m.id) || m.status === 'processing' ? ' · processant…' : m.status === 'error' ? ' · ⚠ cal revisar' : '';
-    b.innerHTML = `<div class="t">${t.icon} ${escapeHtml(title)}</div><div class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${state}</div>`;
-    b.onclick = () => showResult(m.id);
-    li.appendChild(b);
-    ul.appendChild(li);
-  }
+  for (const m of recent) ul.appendChild(meetingCard(m));
   $('#home-recent').hidden = !recent.length;
   const last = all.find((m) => m.summary);
   const tasks = last ? parseTasks(last.summary).slice(0, 6) : [];
@@ -1858,6 +1872,28 @@ async function makePdf(m, lang) {
   }
   return doc.output('blob');
 }
+// ---------------------------------------------------------------------------
+// Fulls inferiors: «Comparteix» i «⋯ Més opcions»
+// ---------------------------------------------------------------------------
+function openSheet(id) {
+  closeSheets();
+  $(id).hidden = false;
+}
+function closeSheets() {
+  document.querySelectorAll('.sheet').forEach((el) => { el.hidden = true; });
+  $('#share-panel').hidden = true;
+}
+$('#btn-share-open').onclick = () => { $('#share-msg').textContent = ''; openSheet('#share-sheet'); };
+$('#btn-more').onclick = () => openSheet('#more-sheet');
+document.querySelectorAll('[data-close-sheet]').forEach((el) => { el.onclick = closeSheets; });
+// Les accions marcades amb data-closes tanquen el full un cop tocades.
+document.querySelectorAll('.sheet [data-closes]').forEach((el) => el.addEventListener('click', () => setTimeout(closeSheets, 50)));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
+$('#btn-delete').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (m && await deleteMeeting(m)) { toast('Reunió esborrada'); showView('home'); }
+};
+
 // Obre WhatsApp amb el resum ja escrit (només cal triar el contacte o el grup).
 $('#btn-wa').onclick = async () => {
   const m = await getMeeting(viewingId);
@@ -1883,7 +1919,8 @@ $('#btn-pdf').onclick = async () => {
   try {
     const blob = await makePdf(m, resultLang);
     const name = `${summaryTitle(m, getSummary(m, resultLang)).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'Acta'} - ${new Date(m.startedAt).toISOString().slice(0, 10)}.pdf`;
-    await shareOrDownload(blob, name, summaryTitle(m));
+    const r = await shareOrDownload(blob, name, summaryTitle(m));
+    if (r !== 'cancelled') closeSheets();
   } catch (e) {
     toast(`No s'ha pogut fer el PDF: ${e.message}`, 5000);
   } finally {
@@ -1938,7 +1975,8 @@ $('#photo-input').onchange = async (e) => {
     const m = await getMeeting(viewingId);
     const n = await addPhotos(m, files, null);
     await renderPhotos(m, $('#result-photos'));
-    if (n) toast('Foto afegida. Toca «Refés el resum» perquè la tingui en compte.', 4500);
+    $('#result-photos-wrap').hidden = !(m.photos && m.photos.length);
+    if (n) toast('Foto afegida. A «⋯» toca «Refés el resum» perquè la tingui en compte.', 5000);
   }
 };
 $('#btn-intro').onclick = () => {
@@ -1995,7 +2033,7 @@ $('#btn-share').onclick = () => {
   const panel = $('#share-panel');
   panel.hidden = !panel.hidden;
   $('#share-msg').textContent = '';
-  if (!panel.hidden) { renderRecentEmails(); $('#share-to').focus(); }
+  if (!panel.hidden) { renderRecentEmails(); panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); $('#share-to').focus(); }
 };
 $('#share-to').oninput = renderRecentEmails;
 $('#btn-share-send').onclick = async () => {
