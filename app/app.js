@@ -91,30 +91,64 @@ function inlineMd(s) {
 function mdToHtml(md, style = {}) {
   const st = (tag) => (style[tag] ? ` style="${style[tag]}"` : '');
   const out = [];
-  let list = null; // 'ul' | 'ol'
-  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  const stack = []; // llistes obertes: {type, indent}
+  const closeTo = (indent) => {
+    while (stack.length && stack[stack.length - 1].indent > indent) out.push(`</li></${stack.pop().type}>`);
+  };
+  const closeAll = () => closeTo(-1);
+  const item = (type, indent, html) => {
+    closeTo(indent);
+    const top = stack[stack.length - 1];
+    if (top && top.indent === indent && top.type !== type) { out.push(`</li></${stack.pop().type}>`); }
+    const cur = stack[stack.length - 1];
+    if (!cur || cur.indent < indent) {
+      out.push(`<${type}${st(type)}>`);
+      stack.push({ type, indent });
+    } else {
+      out.push('</li>');
+    }
+    out.push(`<li${st('li')}>${html}`);
+  };
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd();
     let m;
-    if (!line.trim()) { closeList(); continue; }
+    if (!line.trim()) continue;
     if ((m = line.match(/^(#{1,3})\s+(.*)$/))) {
-      closeList();
+      closeAll();
       const tag = 'h' + m[1].length;
       out.push(`<${tag}${st(tag)}>${inlineMd(m[2])}</${tag}>`);
-    } else if ((m = line.match(/^\s*[-*•]\s+(\[( |x|X)\]\s+)?(.*)$/))) {
-      if (list !== 'ul') { closeList(); out.push(`<ul${st('ul')}>`); list = 'ul'; }
-      const box = m[1] ? (m[2].trim() ? '☑ ' : '☐ ') : '';
-      out.push(`<li${st('li')}>${box}${inlineMd(m[3])}</li>`);
-    } else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
-      if (list !== 'ol') { closeList(); out.push(`<ol${st('ol')}>`); list = 'ol'; }
-      out.push(`<li${st('li')}>${inlineMd(m[1])}</li>`);
+    } else if ((m = line.match(/^(\s*)[-*•]\s+(\[( |x|X)\]\s+)?(.*)$/))) {
+      const box = m[2] ? (m[3].trim() ? '☑ ' : '☐ ') : '';
+      item('ul', m[1].replace(/\t/g, '    ').length, box + inlineMd(m[4]));
+    } else if ((m = line.match(/^(\s*)\d+[.)]\s+(.*)$/))) {
+      item('ol', m[1].replace(/\t/g, '    ').length, inlineMd(m[2]));
     } else {
-      closeList();
+      closeAll();
       out.push(`<p${st('p')}>${inlineMd(line)}</p>`);
     }
   }
-  closeList();
+  closeAll();
   return out.join('\n');
+}
+
+// El mateix resum en text pla ben ordenat (per a l'app de correu del mòbil).
+function mdToPlain(md) {
+  const out = [];
+  for (const raw of md.split('\n')) {
+    const line = raw.trimEnd();
+    let m;
+    const clean = (t) => t.replace(/\*\*(.+?)\*\*/g, '$1').replace(/(^|\s)\*(\S.*?)\*/g, '$1$2');
+    if (!line.trim()) continue;
+    if ((m = line.match(/^#\s+(.*)$/))) out.push(clean(m[1]).toUpperCase(), '');
+    else if ((m = line.match(/^#{2,3}\s+(.*)$/))) { if (out.length && out[out.length - 1] !== '') out.push(''); out.push(clean(m[1]).toUpperCase()); }
+    else if ((m = line.match(/^(\s*)[-*•]\s+(\[( |x|X)\]\s+)?(.*)$/))) {
+      const nested = m[1].length >= 2;
+      const mark = m[2] ? (m[3].trim() ? '☑' : '☐') : nested ? '–' : '•';
+      out.push(`${nested ? '     ' : ''}${mark} ${clean(m[4])}`);
+    } else if ((m = line.match(/^(\s*)(\d+[.)])\s+(.*)$/))) out.push(`${m[1].length >= 2 ? '     ' : ''}${m[2]} ${clean(m[3])}`);
+    else out.push(clean(line));
+  }
+  return out.join('\r\n').replace(/(\r\n){3,}/g, '\r\n\r\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -1153,12 +1187,27 @@ $('#btn-new').onclick = () => showView('home');
 $('#btn-mail').onclick = async () => {
   const m = await getMeeting(viewingId);
   const subject = `Resum: ${summaryTitle(m)} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`;
-  const body = m.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/^- \[ \]\s*/gm, '☐ ');
+  const body = mdToPlain(m.summary);
   location.href = `mailto:${encodeURIComponent(settings.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
 $('#btn-copy').onclick = async () => {
   const m = await getMeeting(viewingId);
-  try { await navigator.clipboard.writeText(m.summary); toast('Resum copiat'); } catch { toast("No s'ha pogut copiar"); }
+  // Amb format (per enganxar a un correu) i en text pla com a alternativa.
+  const html = `<div style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.5">${mdToHtml(m.summary, EMAIL_STYLE)}</div>`;
+  const plain = mdToPlain(m.summary);
+  try {
+    if (window.ClipboardItem && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      })]);
+    } else {
+      await navigator.clipboard.writeText(plain);
+    }
+    toast('Resum copiat amb format. Enganxa\'l al correu.');
+  } catch {
+    try { await navigator.clipboard.writeText(plain); toast('Resum copiat'); } catch { toast("No s'ha pogut copiar"); }
+  }
 };
 $('#btn-resend').onclick = async () => {
   const m = await getMeeting(viewingId);
