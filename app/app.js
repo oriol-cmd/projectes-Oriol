@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1279,7 +1279,9 @@ async function renderHistory() {
 
 async function refreshHomeBanners() {
   const miss = missingSetup();
+  // Sense clau: només la benvinguda. Amb clau: només la part de gravar.
   $('#setup-banner').hidden = miss.length === 0;
+  $('#home-main').hidden = miss.length > 0;
   const all = await db.all('meetings');
   const pending = all.filter((m) => m.status === 'error' || (m.status === 'done' && m.email.status === 'error'));
   const working = all.filter((m) => pipelines.has(m.id));
