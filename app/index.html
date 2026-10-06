@@ -17,13 +17,7 @@
 </head>
 <body>
   <header class="topbar">
-    <button class="icon-btn" id="btn-history" aria-label="Historial">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-    </button>
     <h1 class="brand"><img src="icons/icon.svg?v=2" alt="" class="brand-logo">Xiu-xiu</h1>
-    <button class="icon-btn" id="btn-settings" aria-label="Configuració">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    </button>
   </header>
   <div id="update-banner" class="update-banner" hidden>
     <span>✨ <b>Nova versió de Xiu-xiu.</b><span id="update-notes"></span></span>
@@ -52,6 +46,7 @@
             <p id="welcome-msg" class="fineprint"></p>
           </div>
         </div>
+        <p class="fineprint left">💾 Ja havies fet servir Xiu-xiu i tens una còpia de seguretat? <button class="link" id="btn-welcome-restore" type="button">Recupera-la</button></p>
         <p class="fineprint left">La clau és teva i es queda només en aquest mòbil: el cost o la quota gratuïta de Google van a càrrec teu. Les teves reunions no surten d'aquest mòbil, excepte cap a Google per transcriure-les i resumir-les.</p>
         <p class="signature">Xiu-xiu <span>by Oriolbop</span></p>
       </div>
@@ -154,7 +149,7 @@
         <button id="btn-share-open" class="btn primary" type="button">↗ Comparteix el resum</button>
         <button id="btn-more" class="btn secondary square" type="button" aria-label="Més opcions">⋯</button>
       </div>
-      <button id="btn-new" class="btn ghost full" type="button">＋ Nova reunió</button>
+      <button id="btn-new" class="btn ghost full" type="button" hidden>＋ Nova reunió</button>
     </section>
 
     <!-- HISTORIAL -->
@@ -288,6 +283,21 @@
       <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
     </div>
   </div>
+
+  <nav id="tabbar" class="tabbar" aria-label="Navegació">
+    <button id="btn-tab-home" class="tab" type="button" data-view="home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span>Gravar</span>
+    </button>
+    <button id="btn-history" class="tab" type="button" data-view="history">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span>Reunions</span>
+    </button>
+    <button id="btn-settings" class="tab" type="button" data-view="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span>Ajustos</span>
+    </button>
+  </nav>
 
   <input id="photo-input" type="file" accept="image/*" multiple hidden>
   <div id="toast" class="toast" hidden></div>

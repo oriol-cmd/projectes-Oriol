@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1232,10 +1232,20 @@ function showView(name) {
   if (rec.meeting && name !== 'rec') { toast('Primer acaba la reunió'); return; }
   document.querySelectorAll('.view').forEach((v) => { v.hidden = v.id !== `view-${name}`; });
   currentView = name;
+  updateTabbar();
   window.scrollTo(0, 0);
   if (name === 'home') refreshHomeBanners();
   if (name === 'history') renderHistory();
   if (name === 'settings') fillSettings();
+}
+
+// Barra de navegació inferior: sempre visible, excepte gravant o sense clau.
+function updateTabbar() {
+  const tabView = { home: 'home', rec: 'home', proc: 'history', result: 'history', history: 'history', settings: 'settings' }[currentView];
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', String(t.dataset.view === tabView)));
+  const hide = currentView === 'rec' || (currentView === 'home' && missingSetup().length > 0);
+  $('#tabbar').hidden = hide;
+  document.body.classList.toggle('has-tabbar', !hide);
 }
 
 function setStep(id, state, info) {
@@ -1369,6 +1379,7 @@ async function refreshHomeBanners() {
   // Sense clau: només la benvinguda. Amb clau: només la part de gravar.
   $('#setup-banner').hidden = miss.length === 0;
   $('#home-main').hidden = miss.length > 0;
+  if (currentView === 'home') updateTabbar();
   renderTypeChips();
   renderHome();
   const all = await db.all('meetings');
@@ -1708,10 +1719,12 @@ async function importBackup(file) {
   meetingCache.clear();
   fillSettings();
   msg.textContent = `✓ Recuperat: ${added} reunions noves i la configuració.`;
-  toast('✓ Còpia recuperada');
+  toast(`✓ Còpia recuperada: ${added} reunions`);
+  refreshHomeBanners();
 }
 $('#btn-backup').onclick = () => exportBackup().catch((e) => { $('#backup-msg').textContent = `✗ ${e.message}`; });
 $('#btn-restore').onclick = () => $('#restore-input').click();
+$('#btn-welcome-restore').onclick = () => $('#restore-input').click();
 $('#restore-input').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importBackup(f); };
 $('#btn-backup-now').onclick = () => { showView('settings'); setTimeout(() => $('#backup-section').scrollIntoView({ behavior: 'smooth' }), 100); };
 
@@ -1988,7 +2001,8 @@ $('#btn-intro').onclick = () => {
 };
 $('#btn-history').onclick = () => showView('history');
 $('#btn-settings').onclick = () => showView('settings');
-document.querySelector('.topbar h1').onclick = () => showView('home');
+$('#btn-tab-home').onclick = () => showView('home');
+document.querySelector('.brand').onclick = () => showView('home');
 $('#btn-new').onclick = () => showView('home');
 // ---------------------------------------------------------------------------
 // Enviar el resum a altres persones
