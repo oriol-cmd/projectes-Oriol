@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 17;
+const APP_VERSION = 18;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1509,6 +1509,27 @@ $('#btn-share-mail').onclick = async () => {
 // Obre l'app de correu amb el resum ja escrit (no depèn de l'script de Google).
 $('#btn-mail').onclick = async () => {
   const m = await getMeeting(viewingId);
+  // Amb l'script de Google configurat: s'envia sol, amb format, sense obrir el correu.
+  if (emailEnabled() && settings.email) {
+    const btn = $('#btn-mail');
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Enviant…';
+    try {
+      const r = await sendEmail(buildEmail(m), { noFallback: true });
+      m.email = { status: 'sent', at: Date.now(), confirmed: r.confirmed };
+      await saveMeeting(m);
+      toast(`✓ Resum enviat a ${settings.email}`);
+      showResult(m.id);
+    } catch (e) {
+      toast(`✗ No s'ha pogut enviar: ${e.message}`, 6000);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+    return;
+  }
+  // Sense script: obre l'app de correu del mòbil amb el resum ja escrit.
   const subject = `Resum: ${summaryTitle(m)} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`;
   const body = mdToPlain(m.summary);
   location.href = `mailto:${encodeURIComponent(settings.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
