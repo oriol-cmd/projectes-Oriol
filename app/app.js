@@ -12,8 +12,8 @@ const DEFAULTS = {
   geminiKey: '',
   lang: 'auto',
   extra: '',
-  geminiModel: 'gemini-flash-latest',
-  liveSec: 20, // cada quants segons apareix text nou en directe
+  liveSec: 60, // cada quants segons apareix text nou en directe
+  v: 2,
   keepAudio: false,
 };
 
@@ -22,6 +22,8 @@ function loadSettings() {
   try { s = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('settings') || '{}') }; }
   catch { s = { ...DEFAULTS }; }
   if (s.engine !== 'device') s.engine = 'audio';
+  if (!s.v || s.v < 2) { s.liveSec = 60; s.v = 2; } // trams més llargs: la quota gratuïta és limitada
+  delete s.geminiModel;
   return s;
 }
 let settings = loadSettings();
@@ -177,12 +179,32 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 // ---------------------------------------------------------------------------
 class UnsupportedAudioError extends Error {}
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
-const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
+// Flash-Lite té molta més quota gratuïta diària que Flash: el fem servir per a la
+// transcripció (moltes peticions) i reservem Flash per al resum (una per reunió).
+const GEMINI_MODELS = {
+  transcribe: ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'],
+  summary: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
+};
 const missingModels = new Set();
+const QUOTA_MSG = "S'ha esgotat la quota gratuïta de Gemini d'avui (es renova cap a les 9 del matí). Ho reprendrà sol; si fas moltes reunions, mira «Quota» al README.";
 
-async function gemini(parts, { system, maxTokens = 16384 } = {}) {
-  let models = [...new Set([settings.geminiModel || DEFAULTS.geminiModel, GEMINI_FALLBACK_MODEL])];
-  if (models.some((x) => !missingModels.has(x))) models = models.filter((x) => !missingModels.has(x));
+// La quota diària de Google es renova a mitjanit de Califòrnia.
+const quotaDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+function exhaustedModels() {
+  try {
+    const q = JSON.parse(localStorage.getItem('quota') || '{}');
+    return q.day === quotaDay() ? q.models || [] : [];
+  } catch { return []; }
+}
+function markExhausted(model) {
+  const models = [...new Set([...exhaustedModels(), model])];
+  try { localStorage.setItem('quota', JSON.stringify({ day: quotaDay(), models })); } catch { /* res */ }
+}
+
+async function gemini(parts, { system, maxTokens = 16384, task = 'summary' } = {}) {
+  const spent = exhaustedModels();
+  const models = GEMINI_MODELS[task].filter((x) => !missingModels.has(x) && !spent.includes(x));
+  if (!models.length) throw new FatalError(QUOTA_MSG);
   const body = {
     contents: [{ role: 'user', parts }],
     generationConfig: { maxOutputTokens: maxTokens },
@@ -220,7 +242,7 @@ async function gemini(parts, { system, maxTokens = 16384 } = {}) {
         throw new UnsupportedAudioError(errText.slice(0, 160));
       }
       if (res.status === 429) {
-        if (/PerDay|per day/i.test(errText)) throw new FatalError("S'ha esgotat la quota gratuïta de Gemini d'avui. Torna-ho a provar demà (es reprendrà sol).");
+        if (/PerDay|per day/i.test(errText)) { markExhausted(model); lastErr = new FatalError(QUOTA_MSG); break; }
         const m = errText.match(/"retryDelay":\s*"(\d+)/);
         lastErr = new Error('Gemini: massa peticions seguides');
         await sleep(Math.min(90, m ? Number(m[1]) + 2 : 10 * 2 ** attempt) * 1000);
@@ -287,7 +309,7 @@ async function transcribeBlob(blob, idx, prevText, context) {
   const send = async (b) => gemini([
     { inlineData: { mimeType: (b.type || 'audio/mp4').split(';')[0], data: await blobToBase64(b) } },
     { text: prompt },
-  ]);
+  ], { task: 'transcribe' });
   let text;
   if (!forceWav) {
     try { text = await send(blob); }
@@ -1061,7 +1083,6 @@ function fillSettings() {
   $('#set-gemini-key').value = settings.geminiKey;
   $('#set-lang').value = settings.lang;
   $('#set-extra').value = settings.extra;
-  $('#set-gemini-model').value = settings.geminiModel;
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   syncEngineFields();
@@ -1076,8 +1097,8 @@ function readSettingsForm() {
     geminiKey: $('#set-gemini-key').value.trim(),
     lang: $('#set-lang').value,
     extra: $('#set-extra').value.trim(),
-    geminiModel: $('#set-gemini-model').value.trim() || DEFAULTS.geminiModel,
-    liveSec: Math.min(120, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
+    liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
+    v: 2,
     keepAudio: $('#set-keep-audio').checked,
   };
 }
@@ -1091,7 +1112,7 @@ async function testKeys() {
   const msg = $('#settings-msg');
   msg.textContent = 'Comprovant…';
   try {
-    const t = await gemini([{ text: 'Respon només: OK' }], { maxTokens: 2048 });
+    const t = await gemini([{ text: 'Respon només: OK' }], { maxTokens: 2048, task: 'transcribe' });
     msg.textContent = t ? '✓ La clau de Gemini funciona' : '✗ Gemini no ha respost';
   } catch (e) {
     msg.textContent = `✗ ${e.message}`;

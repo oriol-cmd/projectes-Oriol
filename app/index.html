@@ -127,7 +127,7 @@
       <h3>Transcripció</h3>
       <label class="field"><span>Com es transcriu</span>
         <select id="set-engine">
-          <option value="audio">Gemini (text cada ~20 s, molt precís)</option>
+          <option value="audio">Gemini (text cada ~1 min, molt precís)</option>
           <option value="device">Dictat de l'iPhone (paraula a paraula a l'instant, menys precís)</option>
         </select></label>
       <label class="field"><span>Idioma principal</span>
@@ -144,10 +144,8 @@
 
       <details class="advanced">
         <summary>Avançat</summary>
-        <label class="field"><span>Model de Gemini</span>
-          <input id="set-gemini-model" type="text" autocomplete="off"></label>
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
-          <input id="set-segment" type="number" min="10" max="120" step="5"></label>
+          <input id="set-segment" type="number" min="10" max="300" step="10"></label>
         <label class="check"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
       </details>
 

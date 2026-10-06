@@ -27,7 +27,16 @@ Altres funcions:
 | Correu i registre | Google Sheets + Apps Script, amb el teu compte | Gratuït |
 | Allotjament de l'app | Netlify o GitHub Pages | Gratuït |
 
-El nivell gratuït de Gemini té un límit de peticions diàries. En mode directe, una hora de conversa en fa unes 150–180 (menys si hi ha silencis), de manera que dona per a diverses reunions cada dia. Si en fas moltes, a *Configuració > Avançat* pots allargar l'interval de 20 s, i així es gasten menys peticions. Si algun dia s'esgota, l'app ho avisa i ho reprèn sola l'endemà.
+### Quota
+
+El nivell gratuït de Gemini té un límit de peticions diàries per model, que es renova cap a les 9 del matí. Per aprofitar-lo al màxim:
+- La **transcripció** fa servir **Gemini Flash-Lite**, que té molta més quota gratuïta, i talla l'àudio en trams d'~1 minut. Els trams en silenci no es compten. Una reunió d'una hora gasta unes 50–60 peticions.
+- El **resum** fa servir **Gemini Flash**, que és més bo, però només una petició per reunió.
+- Si un model esgota la quota, l'app passa sola al següent. Si s'esgoten tots, ho avisa i ho reprèn l'endemà, sense perdre res.
+
+Amb **unes 3 hores de reunió al dia** hauria de ser suficient. Si algun dia no n'hi ha prou:
+- A *Configuració > Avançat*, puja el temps entre textos (p. ex. a 120 s). Gastaràs la meitat de peticions.
+- O activa la **facturació** al projecte de Google AI Studio (*Settings > Billing*). Llavors no hi ha límit pràctic i es paga per ús, que per a aquest volum hauria de ser poc. A més, Google deixa de fer servir les teves dades.
 
 > ⚠️ **Privadesa:** al nivell gratuït, Google pot fer servir el contingut que s'hi envia (l'àudio i les transcripcions) per millorar els seus productes, i el pot revisar personal humà. Per a reunions amb informació confidencial, tens dues opcions:
 > - Activar la facturació al projecte d'AI Studio. Llavors Google deixa de fer-ho servir, i el cost seria de cèntims per reunió.
