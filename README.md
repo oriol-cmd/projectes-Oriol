@@ -79,13 +79,15 @@ Necessita una adreça `https://`. Tens dues opcions:
 Aquest repositori ja inclou l'automatització (`.github/workflows/pages.yml`). Com que el repositori és privat, GitHub Pages requereix un pla GitHub Pro. Si el tens:
 *Settings > Pages > Source: GitHub Actions*. L'app quedarà a `https://oriol-cmd.github.io/projectes-Oriol/`.
 
-### 4. Instal·lar-la a l'iPhone
+### 4. Instal·lar-la al mòbil
 
 1. Obre l'adreça amb **Safari**.
 2. Botó **Compartir > Afegeix a la pantalla d'inici**.
 3. Obre l'app des de la icona **Reunions**, ves a ⚙️ **Configuració** i omple:
    - Clau de Gemini (i prem **Comprova la clau**)
    - *(Opcional)* URL i clau secreta de l'script del full (i prem **Envia un correu de prova**) Si tot surt amb ✓, ja la pots fer servir.
+
+**A Android (Chrome):** obre l'adreça amb **Chrome** > menú **⋮** > **«Instal·la l'aplicació»** (o «Afegeix a la pantalla d'inici»). La resta funciona igual.
 
 ## Qui parla
 

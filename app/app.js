@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 15;
+const APP_VERSION = 16;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -9,7 +9,7 @@ const DEFAULTS = {
   email: '',
   scriptUrl: '',
   scriptSecret: '',
-  engine: 'audio', // 'audio' = Gemini escolta l'àudio · 'device' = dictat de l'iPhone
+  engine: 'audio', // 'audio' = Gemini escolta l'àudio · 'device' = dictat del mòbil
   geminiKey: '',
   lang: 'auto',
   extra: '',
@@ -81,6 +81,18 @@ async function fetchWithTimeout(url, opts = {}, ms = 120000) {
 }
 
 class FatalError extends Error {}
+
+// Instruccions diferents per a iPhone (Safari) i Android (Chrome).
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const TXT = IS_IOS ? {
+  micDenied: 'Cal donar permís al micròfon (Ajustos > Apps > Safari > Micròfon > Permetre)',
+  noWake: "Aquest iPhone no permet mantenir la pantalla encesa des de la web: posa Ajustos > Pantalla i brillantor > Bloqueig automàtic a «Mai» mentre gravis.",
+  dictation: "Dictat de l'iPhone",
+} : {
+  micDenied: 'Cal donar permís al micròfon: toca la icona ⓘ o el cadenat al costat de l\'adreça > Permisos > Micròfon > Permet',
+  noWake: 'Aquest mòbil no permet mantenir la pantalla encesa des de la web: posa Configuració > Pantalla > Temps d\'espera de la pantalla al màxim mentre gravis.',
+  dictation: 'Dictat del mòbil',
+};
 
 // ---------------------------------------------------------------------------
 // Markdown mínim -> HTML (per a l'app i per al correu)
@@ -218,7 +230,7 @@ async function saveMeeting(m) {
 }
 const audioKey = (id, idx) => `${id}:${idx}`;
 
-// Demana a Safari que no esborri les dades.
+// Demana al navegador que no esborri les dades.
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 // ---------------------------------------------------------------------------
@@ -904,13 +916,13 @@ async function startRecording() {
   } catch (e) {
     rec.meeting = null;
     const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-    toast(denied ? "Cal donar permís al micròfon (Ajustos > Safari > Micròfon)" : e.message, 6000);
+    toast(denied ? TXT.micDenied : e.message, 7000);
     return;
   }
 
   const hasWake = await requestWakeLock();
   $('#rec-warning').hidden = false;
-  if (!hasWake) $('#rec-warning').textContent = "Aquest iPhone no permet mantenir la pantalla encesa des de la web: posa Ajustos > Pantalla > Bloqueig automàtic a «Mai» mentre gravis.";
+  if (!hasWake) $('#rec-warning').textContent = TXT.noWake;
   $('#rec-title').textContent = m.title || fmtDate(m.startedAt);
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
@@ -1122,7 +1134,7 @@ function updateProcView(m) {
   const total = m.segments.length;
   const done = m.segments.filter((s) => s.status === 'done').length;
   const segErr = m.segments.find((s) => s.status === 'error');
-  if (m.engine === 'device') setStep('step-transcribe', 'done', "Dictat de l'iPhone");
+  if (m.engine === 'device') setStep('step-transcribe', 'done', TXT.dictation);
   else if (total && done === total) setStep('step-transcribe', 'done', `${total} trams`);
   else if (segErr && m.status === 'error') setStep('step-transcribe', 'error', segErr.error);
   else setStep('step-transcribe', 'active', total ? `${done} de ${total} trams` : 'Preparant…');
