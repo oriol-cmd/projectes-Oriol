@@ -1,5 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
+const APP_VERSION = 11;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1246,6 +1247,16 @@ document.addEventListener('click', (e) => {
   if (g) showView(g.dataset.goto);
 });
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {});
+  // Quan arriba una versió nova, recarrega (si no s'està gravant).
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded || rec.meeting) return;
+    reloaded = true;
+    location.reload();
+  });
+}
+$('#app-version').textContent = `Versió ${APP_VERSION}`;
 resumeUnfinished().catch(() => {});
 showView('home');
