@@ -982,6 +982,7 @@ async function showResult(id) {
   $('#result-transcript').textContent = buildTranscript(m) || '(buida)';
   $('#btn-resend').disabled = !m.summary;
   $('#btn-copy').disabled = !m.summary;
+  $('#btn-mail').disabled = !m.summary;
 }
 
 async function renderHistory() {
@@ -1124,6 +1125,13 @@ $('#btn-history').onclick = () => showView('history');
 $('#btn-settings').onclick = () => showView('settings');
 document.querySelector('.topbar h1').onclick = () => showView('home');
 $('#btn-new').onclick = () => showView('home');
+// Obre l'app de correu amb el resum ja escrit (no depèn de l'script de Google).
+$('#btn-mail').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  const subject = `Resum: ${summaryTitle(m)} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`;
+  const body = m.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/^- \[ \]\s*/gm, '☐ ');
+  location.href = `mailto:${encodeURIComponent(settings.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+};
 $('#btn-copy').onclick = async () => {
   const m = await getMeeting(viewingId);
   try { await navigator.clipboard.writeText(m.summary); toast('Resum copiat'); } catch { toast("No s'ha pogut copiar"); }
