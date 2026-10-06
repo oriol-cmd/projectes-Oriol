@@ -14,8 +14,9 @@
 
 const SECRET = 'CANVIA-AQUESTA-CLAU';
 
-// La teva adreça: rep els resums automàtics i les respostes dels altres.
-const ALLOWED_RECIPIENTS = ['oriol@esportec.cat'];
+// La teva adreça (la del compte de Google que instal·la l'script): rep els resums
+// automàtics i les respostes dels altres. No cal canviar-la.
+const ALLOWED_RECIPIENTS = [Session.getEffectiveUser().getEmail()];
 const MAX_RECIPIENTS = 25;
 
 const SHEET_MEETINGS = 'Reunions';

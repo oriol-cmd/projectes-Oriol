@@ -1,12 +1,12 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 14;
+const APP_VERSION = 15;
 
 // ---------------------------------------------------------------------------
 // Configuració
 // ---------------------------------------------------------------------------
 const DEFAULTS = {
-  email: 'oriol@esportec.cat',
+  email: '',
   scriptUrl: '',
   scriptSecret: '',
   engine: 'audio', // 'audio' = Gemini escolta l'àudio · 'device' = dictat de l'iPhone
@@ -1291,6 +1291,7 @@ async function testKeys() {
 async function testEmail() {
   saveSettings(readSettingsForm());
   const msg = $('#settings-msg');
+  if (!settings.email) { msg.textContent = 'Escriu primer el teu correu.'; return; }
   msg.textContent = 'Enviant correu de prova…';
   try {
     const r = await sendEmail({

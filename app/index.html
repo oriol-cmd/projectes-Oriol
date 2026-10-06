@@ -29,8 +29,15 @@
   <main>
     <!-- INICI -->
     <section id="view-home" class="view">
-      <div id="setup-banner" class="banner warn" hidden>
-        Falta posar la clau gratuïta de Gemini. <button class="link" data-goto="settings">Obre la configuració</button>
+      <div id="setup-banner" class="welcome" hidden>
+        <h2>Benvingut/da! 👋</h2>
+        <p>Aquesta app escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat. Per començar només cal una cosa (2 minuts):</p>
+        <ol>
+          <li>Obre <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener"><b>aistudio.google.com/apikey</b></a>, entra amb el teu compte de Google i toca <b>«Create API key»</b>.</li>
+          <li>Copia la clau (comença per <code>AIza…</code>).</li>
+          <li>Enganxa-la a la <button class="link" data-goto="settings">⚙️ Configuració</button>, juntament amb el teu correu, i toca «Desa».</li>
+        </ol>
+        <p class="fineprint" style="text-align:left">La clau és teva i es queda només en aquest mòbil: el cost o la quota gratuïta de Google van a càrrec teu. Les teves reunions no surten d'aquest mòbil, excepte cap a Google per transcriure-les i resumir-les.</p>
       </div>
       <div id="pending-banner" class="banner" hidden></div>
 
@@ -127,7 +134,7 @@
 
       <h3>Correu i Google Sheets <em style="text-transform:none;letter-spacing:0">(opcional)</em></h3>
       <p class="fineprint" style="text-align:left;margin-top:0">Si ho omples, cada resum t'arribarà per correu i es desarà en un full de càlcul. Instruccions al README.</p>
-      <label class="field"><span>Enviar el resum a</span>
+      <label class="field"><span>El teu correu (on vols rebre els resums)</span>
         <input id="set-email" type="email" autocomplete="off"></label>
       <label class="field"><span>URL de l'script del full de Google</span>
         <input id="set-script-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>

@@ -106,6 +106,15 @@ A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les 
 
 Si a la reunió parleu d'un document (notes escrites a mà, un esquema, un pressupost…), toca **«📷 Foto d'un document»** mentre graves. L'app guarda en quin minut s'ha fet. En fer el resum, Gemini llegeix les fotos juntament amb la transcripció, les relaciona amb el que es deia i afegeix una secció **«Documents comentats»**. El que no es llegeixi bé surt marcat com a [dubte de comprensió]. També pots afegir fotos després, des de la reunió guardada, i tocar «Refés el resum».
 
+## Compartir l'app amb altres persones
+
+Qualsevol persona pot fer servir l'app amb el mateix enllaç: **https://oriol-cmd.github.io/projectes-Oriol/**
+
+- Cada persona hi posa **la seva pròpia clau de Gemini**, que es guarda només al seu mòbil. El cost (o la quota gratuïta) és seu.
+- Les reunions, l'historial i la configuració de cadascú es queden al seu mòbil: ningú veu les dels altres.
+- El primer cop que l'obre, l'app li explica com treure la clau.
+- *(Opcional)* Per rebre els resums automàticament i desar-los en un Google Sheets, ha de fer **el seu propi** full amb l'script (secció «Full de Google Sheets»). L'script envia sempre al compte de Google de qui l'instal·la, de manera que només cal canviar-hi el `SECRET`. Sense script, pot fer servir el botó «✉️ Envia'm el resum per correu».
+
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.
