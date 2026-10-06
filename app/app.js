@@ -970,9 +970,9 @@ async function showResult(id) {
     st.className = 'banner ok';
     st.textContent = '✓ Resum llest';
   } else if (m.email.status === 'sent') {
-    st.className = 'banner ok';
+    st.className = m.email.confirmed === false ? 'banner warn' : 'banner ok';
     st.textContent = m.email.confirmed === false
-      ? `Resum enviat a ${settings.email} (sense confirmació del servidor).`
+      ? `No s'ha pogut confirmar que el correu hagi sortit: l'script de Google no ha respost. Revisa l'URL i que estigui publicat per a «Qualsevol», i toca «Torna a enviar».`
       : `✓ Resum enviat a ${settings.email}`;
   } else {
     st.className = 'banner warn';
@@ -1106,7 +1106,7 @@ async function testEmail() {
       html: '<p>Si reps aquest correu, l\'enviament automàtic de resums funciona correctament. ✅</p>',
       text: "Si reps aquest correu, l'enviament automàtic de resums funciona correctament.",
     });
-    msg.textContent = r.confirmed ? `✓ Correu enviat a ${settings.email}` : `Enviat a ${settings.email} (revisa la safata d'entrada)`;
+    msg.textContent = r.confirmed ? `✓ Correu enviat a ${settings.email}` : `✗ L'script de Google no respon. Comprova l'URL (ha d'acabar en /exec) i que l'accés sigui «Qualsevol».`;
   } catch (e) {
     msg.textContent = `✗ ${e.message}`;
   }
