@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 
 // ---------------------------------------------------------------------------
 // Configuració

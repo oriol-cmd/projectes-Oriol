@@ -209,3 +209,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .welcome .wbtn.primary { color: var(--accent-text); }
 .wstep .fineprint { text-align: left; margin: 8px 0 0; }
 #welcome-key { margin-top: 8px; }
+
+.signature { text-align: center; margin: 18px 0 4px; font-weight: 700; letter-spacing: .02em; color: var(--text); }
+.signature span { font-weight: 500; color: var(--muted); font-style: italic; }
