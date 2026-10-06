@@ -357,6 +357,22 @@
     </div>
   </div>
 
+  <!-- Avís de gravació en videotrucades -->
+  <div id="consent-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Avisa que gravaràs la videotrucada">
+      <div class="sheet-grip"></div>
+      <h3>🔴 Avisa que gravaràs la videotrucada</h3>
+      <p class="consent-text">Abans de començar, els participants han de saber que la reunió es grava. Copia aquest missatge i enganxa'l al xat de Meet, Teams o Zoom (o digue-ho en veu alta):</p>
+      <div class="consent-msg card" id="consent-msg">📌 Avís: aquesta reunió s'està gravant per fer-ne l'acta i el resum amb Xiu-xiu. Si algú no hi està d'acord, que ho digui ara.
+📌 Aviso: esta reunión se está grabando para elaborar el acta y el resumen con Xiu-xiu. Si alguien no está de acuerdo, que lo diga ahora.</div>
+      <button id="btn-consent-copy" class="btn secondary full" type="button">📋 Copia el missatge</button>
+      <label class="check consent-check"><input id="consent-ok" type="checkbox"> He avisat els participants que es grava la reunió</label>
+      <button id="btn-consent-start" class="btn danger full" type="button" disabled>Comença a gravar</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
   <!-- Més opcions -->
   <div id="more-sheet" class="sheet" hidden>
     <div class="sheet-backdrop" data-close-sheet></div>

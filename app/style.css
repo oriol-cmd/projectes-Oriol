@@ -345,3 +345,9 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .privacy-body h4 { font-size: 14px; margin: 14px 0 4px; }
 .privacy-body ul { padding-left: 18px; margin: 4px 0; }
 .privacy-body li { font-size: 13.5px; margin: 3px 0; color: var(--text); }
+
+/* Avís de gravació en videotrucades */
+.consent-text { font-size: 14.5px; margin: 0 0 10px; }
+.consent-msg { padding: 12px 14px; font-size: 14px; white-space: pre-line; margin-bottom: 10px; }
+.consent-check { margin: 12px 2px; }
+#consent-sheet .btn { margin-bottom: 8px; }

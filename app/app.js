@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1090,6 +1090,7 @@ async function startRecording() {
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
   showView('rec');
+  document.title = m.source === 'call' ? '🔴 Gravant la videotrucada · Xiu-xiu' : '🔴 Gravant · Xiu-xiu';
   renderLive();
   updateIntroButton();
   $('#photo-count').textContent = '';
@@ -1155,6 +1156,7 @@ function togglePause() {
 }
 
 async function stopRecording() {
+  document.title = 'Xiu-xiu';
   if (!rec.meeting || rec.stopping) return;
   rec.stopping = true;
   const m = rec.meeting;
@@ -2563,7 +2565,22 @@ setInterval(() => { if (document.visibilityState === 'visible' && signedIn() && 
 // ---------------------------------------------------------------------------
 // Esdeveniments
 // ---------------------------------------------------------------------------
-$('#btn-record').onclick = startRecording;
+$('#btn-record').onclick = () => {
+  // Videotrucades: abans de gravar, cal avisar els participants.
+  if (CAN_CAPTURE_CALL && settings.source === 'call' && !missingSetup().length) {
+    $('#consent-ok').checked = false;
+    $('#btn-consent-start').disabled = true;
+    openSheet('#consent-sheet');
+    return;
+  }
+  startRecording();
+};
+$('#consent-ok').onchange = (e) => { $('#btn-consent-start').disabled = !e.target.checked; };
+$('#btn-consent-copy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('#consent-msg').textContent.trim()); toast('Missatge copiat: enganxa\'l al xat de la videotrucada'); }
+  catch { toast("No s'ha pogut copiar. Selecciona el text i copia'l a mà."); }
+};
+$('#btn-consent-start').onclick = () => { closeSheets(); startRecording(); };
 $('#btn-pause').onclick = togglePause;
 $('#btn-stop').onclick = () => { if (confirm('Acabar la reunió i fer-ne el resum?')) stopRecording(); };
 $('#btn-mark').onclick = addMark;
