@@ -127,6 +127,18 @@ Qualsevol persona pot fer servir l'app amb el mateix enllaç: **https://oriol-cm
 - **Avís de versió nova**: quan hi ha una actualització, surt un avís amb el botó «Actualitza».
 - **Errors entenedors**: si alguna cosa falla, l'app ho explica clarament i ho torna a provar sola (el detall tècnic queda amagat).
 
+### Importar àudios i vídeos
+A la pantalla de gravar, **«📂 Importa un àudio o vídeo»** fa el resum d'una gravació que ja tens: una nota de veu, un àudio de WhatsApp (desa'l abans a *Fitxers*), una gravació de Zoom o Teams, un MP3, M4A, WAV, OGG, MP4… Els fitxers grans es pugen a Google per transcriure'ls.
+
+### Videotrucades a l'ordinador
+Obre Xiu-xiu a l'ordinador amb **Chrome o Edge** i tria **«🖥️ Videotrucada»**. En començar, el navegador et demana què vols compartir: tria la **pestanya** de Meet, Teams o Zoom web (o **tota la pantalla**, a Windows, si fas servir l'aplicació d'escriptori) i marca **«Comparteix també l'àudio»**. Xiu-xiu grava el so de la trucada i el teu micròfon alhora. (Al Mac, Chrome només pot gravar el so d'una pestanya, no el d'aplicacions.)
+
+### Pregunta a les reunions
+A la pestanya **«Pregunta»**, escriu una pregunta («Què vam decidir amb l'Ignasi sobre el pressupost?») i Xiu-xiu respon a partir dels resums (i, si cal, de les transcripcions) de les teves reunions, indicant de quina reunió treu cada dada. Pots limitar la cerca a un tipus de reunió o a un grup.
+
+### Classificar les reunions
+Cada reunió té un **tipus** (equip, entrevista, comercial…) i, si vols, un **grup o projecte** (camp «Grup o projecte» abans de gravar, o *⋯ > Grup o projecte* després). A **«Reunions»**, els filtres de dalt les agrupen per tipus i per grup.
+
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.

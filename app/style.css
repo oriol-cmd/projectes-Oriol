@@ -303,3 +303,22 @@ body.has-tabbar .action-bar { bottom: calc(env(safe-area-inset-bottom) + 74px); 
 body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .topbar { justify-content: center; min-height: calc(env(safe-area-inset-top) + 56px); }
 .update-banner { top: calc(env(safe-area-inset-top) + 56px); }
+
+.tabbar { grid-template-columns: repeat(4, 1fr); }
+.source-seg { margin: 16px 0 0; width: 100%; max-width: 360px; }
+#source-hint { max-width: 360px; margin: 8px 0 0; }
+.import-btn { margin-top: 14px; }
+.filters { margin-bottom: 12px; }
+.filters .type-chip .n { opacity: .7; font-weight: 500; margin-left: 2px; }
+/* Pregunta */
+.ask-log { display: grid; gap: 10px; margin: 6px 0 12px; }
+.bubble { padding: 12px 14px; border-radius: var(--radius); max-width: 92%; overflow-wrap: anywhere; }
+.bubble.q { justify-self: end; background: var(--accent); color: var(--accent-text); border-bottom-right-radius: 6px; white-space: pre-wrap; }
+.bubble.a { justify-self: start; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); border-bottom-left-radius: 6px; }
+.bubble.a p { margin: 4px 0; } .bubble.a ul, .bubble.a ol { padding-left: 20px; margin: 4px 0; }
+.bubble.a h1, .bubble.a h2, .bubble.a h3 { font-size: 15px; margin: 8px 0 4px; }
+.bubble.thinking { color: var(--muted); font-style: italic; }
+.ask-suggest { margin-bottom: 12px; }
+.ask-box { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 8px; align-items: end; }
+.ask-box textarea { min-height: 50px; }
+.ask-box .btn { min-height: 50px; }

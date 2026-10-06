@@ -58,6 +58,12 @@
         <div class="record-hero">
           <button id="btn-record" class="record-btn" aria-label="Comença a gravar"><span class="dot"></span></button>
           <p class="hint">Toca per començar a gravar</p>
+          <div id="source-switch" class="seg source-seg" role="group" aria-label="Font de l'àudio" hidden>
+            <button type="button" data-source="mic">🎙 Micròfon</button>
+            <button type="button" data-source="call">🖥️ Videotrucada</button>
+          </div>
+          <p id="source-hint" class="fineprint" hidden>Grava el so d'una pestanya (Meet, Teams o Zoom al navegador) o de tot l'ordinador, i també el teu micròfon. Quan t'ho demani, marca <b>«Comparteix també l'àudio»</b>.</p>
+          <button id="btn-import" class="btn secondary small import-btn" type="button">📂 Importa un àudio o vídeo</button>
         </div>
 
         <div class="card form-card">
@@ -68,6 +74,11 @@
           <label class="field">
             <span>Títol <em>(opcional)</em></span>
             <input id="meeting-title" type="text" placeholder="p. ex. Comitè de direcció" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Grup o projecte <em>(opcional, per classificar-la)</em></span>
+            <input id="meeting-group" type="text" list="groups-list" placeholder="p. ex. Projecte Mar, Direcció…" autocomplete="off">
+            <datalist id="groups-list"></datalist>
           </label>
           <label class="field last">
             <span>Assistents i context <em>(opcional, millora el resum)</em></span>
@@ -156,8 +167,28 @@
     <section id="view-history" class="view" hidden>
       <h2>Historial</h2>
       <input id="history-search" class="search" type="search" placeholder="🔍 Cerca per títol, persona o tema" autocomplete="off">
+      <div id="history-filters" class="type-chips filters" role="group" aria-label="Classificació"></div>
       <ul id="history-list" class="cards"></ul>
       <p class="fineprint" id="history-empty">Encara no hi ha reunions.</p>
+    </section>
+
+    <!-- PREGUNTA -->
+    <section id="view-ask" class="view" hidden>
+      <h2>Pregunta a les reunions</h2>
+      <p class="fineprint left first">Xiu-xiu buscarà la resposta en els resums (i, si cal, en les transcripcions) de les teves reunions.</p>
+      <label class="field"><span>On busco?</span>
+        <select id="ask-scope"></select></label>
+      <div id="ask-log" class="ask-log"></div>
+      <div id="ask-suggest" class="chips ask-suggest">
+        <button type="button" class="chip">Quines tasques tinc pendents?</button>
+        <button type="button" class="chip">Què vam decidir l'última setmana?</button>
+        <button type="button" class="chip">Resumeix els temes oberts</button>
+      </div>
+      <div class="ask-box card">
+        <textarea id="ask-input" rows="2" placeholder="p. ex. Què vam acordar amb l'Ignasi sobre el pressupost?"></textarea>
+        <button id="btn-ask" class="btn primary" type="button">Pregunta</button>
+      </div>
+      <button id="btn-ask-clear" class="btn ghost full" type="button" hidden>Comença una conversa nova</button>
     </section>
 
     <!-- CONFIGURACIÓ -->
@@ -275,6 +306,7 @@
       <div class="sheet-grip"></div>
       <h3>Més opcions</h3>
       <div class="sheet-list">
+        <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
         <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📷 Afegeix una foto d'un document</button>
         <button id="btn-redo" class="sheet-row" type="button" data-closes>✨ Refés el resum</button>
         <button id="btn-resend" class="sheet-row" type="button" data-closes>🔁 Torna a enviar el correu automàtic</button>
@@ -293,6 +325,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
       <span>Reunions</span>
     </button>
+    <button id="btn-tab-ask" class="tab" type="button" data-view="ask">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.2M12 16.5v.01"/></svg>
+      <span>Pregunta</span>
+    </button>
     <button id="btn-settings" class="tab" type="button" data-view="settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       <span>Ajustos</span>
@@ -300,6 +336,7 @@
   </nav>
 
   <input id="photo-input" type="file" accept="image/*" multiple hidden>
+  <input id="import-input" type="file" accept="audio/*,video/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.flac,.mp4,.mov,.webm" hidden>
   <div id="toast" class="toast" hidden></div>
   <script src="app.js"></script>
 </body>

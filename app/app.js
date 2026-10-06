@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -18,6 +18,7 @@ const DEFAULTS = {
   summaryLang: 'ca', // idioma per defecte dels resums: ca | es | en
   lastType: 'general', // últim tipus de reunió triat
   lastBackup: 0, // data de l'última còpia de seguretat
+  source: 'mic', // 'mic' | 'call' (videotrucada a l'ordinador)
   v: 2,
   keepAudio: false,
 };
@@ -376,7 +377,8 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
         // 1) el límit de «pensament» (alguns models no l'accepten)
         if (body.generationConfig.thinkingConfig) { noThinkingCfg.add(model); continue; }
         // 2) el format de l'àudio (es reenvia en WAV)
-        const nonWavAudio = parts.some((pt) => pt.inlineData && /^audio\//.test(pt.inlineData.mimeType) && pt.inlineData.mimeType !== 'audio/wav');
+        const media = (pt) => pt.inlineData || pt.fileData;
+        const nonWavAudio = parts.some((pt) => media(pt) && /^(audio|video)\//.test(media(pt).mimeType) && media(pt).mimeType !== 'audio/wav');
         if (nonWavAudio) throw new UnsupportedAudioError(errText.slice(0, 160));
         // 3) el model: prova el següent
         lastErr = new Error(`Google no ha acceptat la petició (${model})`);
@@ -650,6 +652,9 @@ async function summarize(m, onText = null) {
   ];
   if (m.title) info.push(`Títol indicat per l'usuari: ${m.title}`);
   if (m.context) info.push(`Context i assistents: ${m.context}`);
+  if (m.group) info.push(`Grup de treball o projecte: ${m.group}`);
+  if (m.source === 'call') info.push("És una videotrucada: s'ha gravat el so de la trucada i el micròfon de l'usuari.");
+  if (m.engine === 'import') info.push("La reunió prové d'un fitxer d'àudio o vídeo importat.");
   if (m.type && m.type !== 'general' && MEETING_TYPES[m.type]) {
     info.push(`Tipus de reunió: ${MEETING_TYPES[m.type].label}. ${MEETING_TYPES[m.type].prompt}`);
   }
@@ -788,7 +793,12 @@ function runPipeline(id, { redoSummary = false } = {}) {
     updateProcView(m);
     try {
       // 1. Transcripció
-      if (m.engine !== 'device') {
+      if (m.engine === 'import') {
+        if (!(m.segments[0] && m.segments[0].status === 'done')) {
+          m.stage = 'transcribe'; updateProcView(m);
+          await transcribeImport(m);
+        }
+      } else if (m.engine !== 'device') {
         m.segments.forEach((s) => { if (s.status === 'error') s.status = 'pending'; });
         await saveMeeting(m);
         updateProcView(m);
@@ -835,6 +845,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
       delete m.retryAt;
       await saveMeeting(m);
       if (m.refIdx != null && !settings.keepAudio) await db.del('audio', audioKey(m.id, m.refIdx));
+      if (m.engine === 'import' && !settings.keepAudio) await db.del('audio', `${m.id}:import`);
     } catch (e) {
       m.status = 'error';
       m.error = e.message;
@@ -897,11 +908,39 @@ async function requestWakeLock() {
   return false;
 }
 
+const CAN_CAPTURE_CALL = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && !/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !IS_IOS;
+function stopExtraStreams() {
+  (rec.extraStreams || []).forEach((st) => st.getTracks().forEach((t) => t.stop()));
+  rec.extraStreams = [];
+}
 async function openMic() {
-  rec.stream = await navigator.mediaDevices.getUserMedia({
+  stopExtraStreams();
+  const micStream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
   });
-  rec.stream.getAudioTracks().forEach((t) => { t.onended = () => { if (!document.hidden) recoverMic(); }; });
+  if (rec.meeting && rec.meeting.source === 'call') {
+    // Videotrucada: barreja el so de la pestanya/ordinador amb el micròfon.
+    let display;
+    try {
+      display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, systemAudio: 'include', selfBrowserSurface: 'exclude' });
+    } catch (e) { micStream.getTracks().forEach((t) => t.stop()); throw new Error("Cal triar la pestanya o la pantalla de la videotrucada per poder-la gravar."); }
+    if (!display.getAudioTracks().length) {
+      display.getTracks().forEach((t) => t.stop()); micStream.getTracks().forEach((t) => t.stop());
+      throw new Error("No s'ha compartit l'àudio. Torna-ho a provar i marca «Comparteix també l'àudio» (de la pestanya o del sistema).");
+    }
+    if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
+    const dest = rec.audioCtx.createMediaStreamDestination();
+    rec.audioCtx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(dest);
+    rec.audioCtx.createMediaStreamSource(micStream).connect(dest);
+    display.getVideoTracks().forEach((t) => { t.enabled = false; });
+    display.getAudioTracks().forEach((t) => { t.onended = () => { if (rec.meeting && !rec.stopping) toast("S'ha deixat de compartir la videotrucada. Toca «Acaba la reunió» o torna a començar.", 7000); }; });
+    rec.extraStreams = [display, micStream];
+    rec.stream = dest.stream;
+  } else {
+    rec.stream = micStream;
+    rec.stream.getAudioTracks().forEach((t) => { t.onended = () => { if (!document.hidden) recoverMic(); }; });
+  }
   try {
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
@@ -963,6 +1002,7 @@ async function recoverMic() {
     const old = rec.recorder;
     if (old && old.state !== 'inactive') { rec.recorder = null; old.stop(); }
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
+    stopExtraStreams();
     await segmentChain;
     await openMic();
     if (!rec.paused) startSegment();
@@ -1007,6 +1047,8 @@ async function startRecording() {
     id: uid(),
     title: $('#meeting-title').value.trim(),
     context: $('#meeting-context').value.trim(),
+    group: $('#meeting-group').value.trim(),
+    source: CAN_CAPTURE_CALL && settings.source === 'call' ? 'call' : 'mic',
     startedAt: Date.now(),
     durationMs: 0,
     engine: settings.engine,
@@ -1023,6 +1065,7 @@ async function startRecording() {
     if (m.engine !== 'device') {
       rec.mime = pickMime();
       if (rec.mime === null) throw new Error('Aquest navegador no pot gravar àudio');
+      rec.meeting = m; // openMic necessita saber la font (micròfon o videotrucada)
       await openMic();
     }
     Object.assign(rec, { meeting: m, activeMs: 0, paused: false, stopping: false, levels: [] });
@@ -1127,6 +1170,7 @@ async function stopRecording() {
     }
   } finally {
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
+    stopExtraStreams();
     if (rec.wakeLock) { rec.wakeLock.release().catch(() => {}); rec.wakeLock = null; }
     Object.assign(rec, { meeting: null, stream: null, recorder: null, speech: null, analyser: null });
     $('#btn-stop').disabled = false;
@@ -1136,6 +1180,7 @@ async function stopRecording() {
   await saveMeeting(m);
   $('#meeting-title').value = '';
   $('#meeting-context').value = '';
+  $('#meeting-group').value = '';
   viewingId = m.id;
   showView('proc');
   updateProcView(m);
@@ -1237,11 +1282,12 @@ function showView(name) {
   if (name === 'home') refreshHomeBanners();
   if (name === 'history') renderHistory();
   if (name === 'settings') fillSettings();
+  if (name === 'ask') renderAskScope();
 }
 
 // Barra de navegació inferior: sempre visible, excepte gravant o sense clau.
 function updateTabbar() {
-  const tabView = { home: 'home', rec: 'home', proc: 'history', result: 'history', history: 'history', settings: 'settings' }[currentView];
+  const tabView = { home: 'home', rec: 'home', proc: 'history', result: 'history', history: 'history', ask: 'ask', settings: 'settings' }[currentView];
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', String(t.dataset.view === tabView)));
   const hide = currentView === 'rec' || (currentView === 'home' && missingSetup().length > 0);
   $('#tabbar').hidden = hide;
@@ -1262,6 +1308,11 @@ function updateProcView(m) {
   const done = m.segments.filter((s) => s.status === 'done').length;
   const segErr = m.segments.find((s) => s.status === 'error');
   if (m.engine === 'device') setStep('step-transcribe', 'done', TXT.dictation);
+  else if (m.engine === 'import') {
+    if (m.segments[0] && m.segments[0].status === 'done') setStep('step-transcribe', 'done', 'Fitxer transcrit');
+    else if (m.status === 'error' && m.stage === 'transcribe') setStep('step-transcribe', 'error', friendlyError(m.error));
+    else setStep('step-transcribe', 'active', m.importProgress || 'Transcrivint el fitxer… (pot trigar uns minuts)');
+  }
   else if (total && done === total) setStep('step-transcribe', 'done', `${total} trams`);
   else if (segErr && m.status === 'error') setStep('step-transcribe', 'error', friendlyError(segErr.error));
   else setStep('step-transcribe', 'active', total ? `${done} de ${total} trams` : 'Preparant…');
@@ -1322,6 +1373,7 @@ async function showResult(id) {
   $('#btn-resend').hidden = !m.summary || !emailEnabled();
   $('.action-bar').classList.toggle('solo', !m.summary);
   $('#btn-more').textContent = m.summary ? '⋯' : '⋯  Més opcions';
+  $('#group-current').textContent = m.group || 'cap';
   closeSheets();
 }
 
@@ -1340,7 +1392,7 @@ function meetingCard(m, { withDelete = false, onDelete = null } = {}) {
   const title = m.summary ? summaryTitle(m) : (m.title || 'Reunió');
   li.innerHTML = `<button class="item" type="button"><span class="ticon">${t.icon}</span><span class="body">
       <span class="t">${escapeHtml(title)}</span>
-      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${meetingBadge(m)}</span></span></button>`;
+      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${m.group ? ` · 🏷 ${escapeHtml(m.group)}` : ''}${meetingBadge(m)}</span></span></button>`;
   li.querySelector('.item').onclick = () => showResult(m.id);
   if (withDelete) {
     li.classList.add('has-del');
@@ -1355,6 +1407,7 @@ async function deleteMeeting(m) {
   if (!confirm('Esborrar aquesta reunió (resum, transcripció i fotos)?')) return false;
   for (const s of m.segments || []) await db.del('audio', audioKey(m.id, s.idx));
   for (const ph of m.photos || []) await db.del('audio', ph.key);
+  await db.del('audio', `${m.id}:import`);
   await db.del('meetings', m.id);
   meetingCache.delete(m.id);
   return true;
@@ -1362,7 +1415,9 @@ async function deleteMeeting(m) {
 async function renderHistory() {
   const q = ($('#history-search').value || '').trim().toLowerCase();
   const all = (await db.all('meetings')).sort((a, b) => b.startedAt - a.startedAt);
-  const list = q ? all.filter((m) => `${m.title || ''} ${m.context || ''} ${m.summary || ''}`.toLowerCase().includes(q)) : all;
+  renderHistoryFilters(all);
+  const filtered = filterMeetings(all, historyFilter);
+  const list = q ? filtered.filter((m) => `${m.title || ''} ${m.context || ''} ${m.group || ''} ${m.summary || ''}`.toLowerCase().includes(q)) : filtered;
   const ul = $('#history-list');
   ul.innerHTML = '';
   $('#history-empty').hidden = list.length > 0;
@@ -1382,6 +1437,8 @@ async function refreshHomeBanners() {
   if (currentView === 'home') updateTabbar();
   renderTypeChips();
   renderHome();
+  renderSourceSwitch();
+  renderGroupsDatalist();
   const all = await db.all('meetings');
   const pending = all.filter((m) => m.status === 'error' || (m.status === 'done' && m.email.status === 'error'));
   const working = all.filter((m) => pipelines.has(m.id));
@@ -1966,6 +2023,294 @@ setInterval(checkForUpdate, 30 * 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
 
 // ---------------------------------------------------------------------------
+// Font de l'àudio a l'ordinador: micròfon o videotrucada
+// ---------------------------------------------------------------------------
+function renderSourceSwitch() {
+  $('#source-switch').hidden = !CAN_CAPTURE_CALL;
+  const src = CAN_CAPTURE_CALL && settings.source === 'call' ? 'call' : 'mic';
+  document.querySelectorAll('#source-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.source === src)));
+  $('#source-hint').hidden = src !== 'call';
+}
+document.querySelectorAll('#source-switch button').forEach((b) => {
+  b.onclick = () => { saveSettings({ source: b.dataset.source }); renderSourceSwitch(); };
+});
+
+// ---------------------------------------------------------------------------
+// Grups de treball / projectes
+// ---------------------------------------------------------------------------
+async function allGroups() {
+  const all = await db.all('meetings');
+  const count = {};
+  for (const m of all) if (m.group) count[m.group] = (count[m.group] || 0) + 1;
+  return Object.entries(count).sort((a, b) => b[1] - a[1]).map(([g]) => g);
+}
+async function renderGroupsDatalist() {
+  const dl = $('#groups-list');
+  dl.innerHTML = '';
+  for (const g of await allGroups()) { const o = document.createElement('option'); o.value = g; dl.appendChild(o); }
+}
+$('#btn-set-group').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m) return;
+  const groups = await allGroups();
+  const v = prompt(`Grup o projecte d'aquesta reunió${groups.length ? `\n(els que ja tens: ${groups.slice(0, 8).join(', ')})` : ''}\nDeixa-ho buit per treure'l.`, m.group || '');
+  if (v === null) return;
+  m.group = v.trim();
+  await saveMeeting(m);
+  $('#group-current').textContent = m.group || 'cap';
+  toast(m.group ? `🏷 Reunió classificada a «${m.group}»` : 'Grup tret');
+};
+
+// ---------------------------------------------------------------------------
+// Classificació a l'historial (per tipus i per grup)
+// ---------------------------------------------------------------------------
+let historyFilter = { kind: 'all', value: '' };
+function filterMeetings(list, f) {
+  if (f.kind === 'type') return list.filter((m) => (m.type || 'general') === f.value);
+  if (f.kind === 'group') return list.filter((m) => m.group === f.value);
+  return list;
+}
+function renderHistoryFilters(all) {
+  const box = $('#history-filters');
+  box.innerHTML = '';
+  const chips = [{ kind: 'all', value: '', label: 'Totes', n: all.length }];
+  const types = {};
+  for (const m of all) { const t = m.type || 'general'; types[t] = (types[t] || 0) + 1; }
+  for (const [t, n] of Object.entries(types)) if (MEETING_TYPES[t]) chips.push({ kind: 'type', value: t, label: `${MEETING_TYPES[t].icon} ${MEETING_TYPES[t].label}`, n });
+  const groups = {};
+  for (const m of all) if (m.group) groups[m.group] = (groups[m.group] || 0) + 1;
+  for (const [g, n] of Object.entries(groups).sort((a, b) => b[1] - a[1])) chips.push({ kind: 'group', value: g, label: `🏷 ${g}`, n });
+  box.hidden = chips.length <= 2 && !Object.keys(groups).length;
+  for (const c of chips) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'type-chip';
+    b.innerHTML = `${escapeHtml(c.label)} <span class="n">${c.n}</span>`;
+    b.setAttribute('aria-pressed', String(historyFilter.kind === c.kind && historyFilter.value === c.value));
+    b.onclick = () => { historyFilter = { kind: c.kind, value: c.value }; renderHistory(); };
+    box.appendChild(b);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Importar un àudio o vídeo (nota de veu, gravació de Zoom/Teams…)
+// ---------------------------------------------------------------------------
+function importMime(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const byExt = { opus: 'audio/ogg', ogg: 'audio/ogg', oga: 'audio/ogg', mp3: 'audio/mp3', wav: 'audio/wav', aac: 'audio/aac', flac: 'audio/flac', m4a: 'audio/mp4', mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+  return byExt[ext] || (file.type || 'audio/mp4').split(';')[0];
+}
+function mediaDuration(file) {
+  return new Promise((resolve) => {
+    const el = document.createElement(/^video/.test(file.type) ? 'video' : 'audio');
+    const url = URL.createObjectURL(file);
+    const done = (v) => { URL.revokeObjectURL(url); resolve(v); };
+    el.preload = 'metadata';
+    el.onloadedmetadata = () => done(isFinite(el.duration) ? Math.round(el.duration * 1000) : 0);
+    el.onerror = () => done(0);
+    setTimeout(() => done(0), 6000);
+    el.src = url;
+  });
+}
+// Puja un fitxer gran a Google (Files API) i retorna l'URI per fer-lo servir a Gemini.
+async function uploadToGemini(blob, mime, name) {
+  const start = await fetchWithTimeout('https://generativelanguage.googleapis.com/upload/v1beta/files', {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': settings.geminiKey,
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': String(blob.size),
+      'X-Goog-Upload-Header-Content-Type': mime,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ file: { display_name: (name || 'reunio').slice(0, 100) } }),
+  }, 60000);
+  if (!start.ok) throw new Error(`Google no ha acceptat la pujada del fitxer (${start.status}): ${(await start.text()).slice(0, 160)}`);
+  const url = start.headers.get('x-goog-upload-url');
+  if (!url) throw new Error("Google no ha retornat l'adreça per pujar el fitxer");
+  const up = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'X-Goog-Upload-Offset': '0', 'X-Goog-Upload-Command': 'upload, finalize' },
+    body: blob,
+  }, 900000);
+  if (!up.ok) throw new Error(`No s'ha pogut pujar el fitxer (${up.status})`);
+  let file = (await up.json()).file;
+  for (let i = 0; i < 100 && file && file.state === 'PROCESSING'; i++) {
+    await sleep(3000);
+    const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/${file.name}`, { headers: { 'x-goog-api-key': settings.geminiKey } }, 30000);
+    if (r.ok) file = await r.json();
+  }
+  if (!file || file.state === 'FAILED') throw new Error('Google no ha pogut processar el fitxer');
+  return file.uri;
+}
+async function transcribeImport(m) {
+  const blob = await db.get('audio', `${m.id}:import`);
+  if (!blob) throw new FatalError("No s'ha trobat el fitxer importat. Torna'l a importar.");
+  const prompt = [
+    "Transcriu literalment aquesta gravació d'una reunió o conversa.",
+    settings.lang === 'auto'
+      ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
+      : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
+    "Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
+    "Cada 5 minuts aproximadament, afegeix una línia amb el temps de la gravació entre claudàtors, p. ex. [05:00], [10:00].",
+    "Escriu només la transcripció, sense títols, comentaris ni resums.",
+    "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió].",
+    m.context ? `Context (per escriure bé noms i termes): ${m.context}` : '',
+  ].filter(Boolean).join('\n');
+
+  const primary = m.importMime || 'audio/mp4';
+  const mimes = [...new Set([primary, ...(primary === 'audio/mp4' ? ['video/mp4', 'audio/aac'] : primary === 'audio/ogg' ? ['audio/opus'] : [])])];
+  let lastErr;
+  for (const mime of mimes) {
+    try {
+      let part;
+      if (blob.size <= 14e6) {
+        m.importProgress = 'Transcrivint el fitxer…'; updateProcView(m);
+        part = { inlineData: { mimeType: mime, data: await blobToBase64(blob) } };
+      } else {
+        m.importProgress = `Pujant el fitxer a Google (${Math.round(blob.size / 1e6)} MB)…`; updateProcView(m);
+        part = { fileData: { mimeType: mime, fileUri: await uploadToGemini(blob, mime, m.importName) } };
+        m.importProgress = 'Transcrivint el fitxer… (pot trigar uns minuts)'; updateProcView(m);
+      }
+      const text = await gemini([part, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 });
+      m.segments = [{ idx: 0, startMs: 0, status: 'done', text: text.trim() }];
+      delete m.importProgress;
+      await saveMeeting(m);
+      return;
+    } catch (e) {
+      lastErr = e;
+      if (!(e instanceof UnsupportedAudioError)) throw e;
+    }
+  }
+  // Últim recurs per a fitxers petits: convertir-los a WAV al mòbil.
+  if (blob.size <= 25e6) {
+    m.importProgress = 'Convertint el fitxer…'; updateProcView(m);
+    const wav = await toWav(blob);
+    const text = await gemini([{ inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } }, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 });
+    m.segments = [{ idx: 0, startMs: 0, status: 'done', text: text.trim() }];
+    delete m.importProgress;
+    await saveMeeting(m);
+    return;
+  }
+  throw new FatalError(`Google no accepta aquest format de fitxer. Prova d'exportar-lo en MP3 o M4A. (${lastErr ? lastErr.message : ''})`);
+}
+async function importFile(file) {
+  const miss = missingSetup();
+  if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); return; }
+  if (file.size > 1.9e9) { toast('El fitxer és massa gran (màxim 2 GB).', 5000); return; }
+  const m = {
+    id: uid(),
+    title: $('#meeting-title').value.trim() || file.name.replace(/\.[^.]+$/, ''),
+    context: $('#meeting-context').value.trim(),
+    group: $('#meeting-group').value.trim(),
+    startedAt: file.lastModified || Date.now(),
+    durationMs: await mediaDuration(file),
+    engine: 'import',
+    importMime: importMime(file),
+    importName: file.name,
+    type: settings.lastType || 'general',
+    status: 'processing',
+    segments: [],
+    marks: [],
+    summary: '',
+    email: { status: 'pending' },
+  };
+  await db.put('audio', file, `${m.id}:import`);
+  await saveMeeting(m);
+  $('#meeting-title').value = ''; $('#meeting-context').value = ''; $('#meeting-group').value = '';
+  viewingId = m.id;
+  showView('proc');
+  updateProcView(m);
+  runPipeline(m.id);
+}
+$('#btn-import').onclick = () => $('#import-input').click();
+$('#import-input').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); };
+
+// ---------------------------------------------------------------------------
+// Pregunta a les reunions
+// ---------------------------------------------------------------------------
+let askHistory = []; // [{ q, a }]
+async function renderAskScope() {
+  const sel = $('#ask-scope');
+  const prev = sel.value;
+  const all = await db.all('meetings');
+  sel.innerHTML = '';
+  const add = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sel.appendChild(o); };
+  add('all', `Totes les reunions (${all.filter((m) => m.summary).length})`);
+  const types = [...new Set(all.map((m) => m.type || 'general'))].filter((t) => MEETING_TYPES[t]);
+  for (const t of types) add(`type:${t}`, `${MEETING_TYPES[t].icon} ${MEETING_TYPES[t].label}`);
+  for (const g of await allGroups()) add(`group:${g}`, `🏷 ${g}`);
+  if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+function renderAskLog(streaming = null) {
+  const log = $('#ask-log');
+  log.innerHTML = '';
+  const bubble = (cls, html) => { const d = document.createElement('div'); d.className = `bubble ${cls}`; d.innerHTML = html; log.appendChild(d); return d; };
+  for (const t of askHistory) {
+    bubble('q', escapeHtml(t.q));
+    if (t.a != null) bubble('a', mdToHtml(t.a));
+  }
+  if (streaming != null) bubble(streaming ? 'a' : 'a thinking', streaming ? mdToHtml(streaming) : 'Buscant a les reunions…');
+  $('#btn-ask-clear').hidden = !askHistory.length;
+  $('#ask-suggest').hidden = askHistory.length > 0;
+}
+function scoreMeeting(m, words) {
+  const hay = `${m.title || ''} ${m.group || ''} ${m.summary || ''}`.toLowerCase();
+  return words.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+}
+async function askMeetings(q) {
+  const scope = $('#ask-scope').value || 'all';
+  let list = (await db.all('meetings')).filter((m) => m.summary).sort((a, b) => b.startedAt - a.startedAt);
+  if (scope.startsWith('type:')) list = filterMeetings(list, { kind: 'type', value: scope.slice(5) });
+  if (scope.startsWith('group:')) list = filterMeetings(list, { kind: 'group', value: scope.slice(6) });
+  if (!list.length) throw new FatalError('Encara no hi ha cap reunió amb resum en aquest apartat.');
+  // Context: resums (més recents primer) i, per a les 3 reunions més relacionades, la transcripció.
+  const words = q.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 3);
+  const related = list.slice().sort((a, b) => scoreMeeting(b, words) - scoreMeeting(a, words)).slice(0, 3).filter((m) => scoreMeeting(m, words) > 0);
+  let ctx = '';
+  for (const m of list) {
+    const t = MEETING_TYPES[m.type || 'general'] || MEETING_TYPES.general;
+    const block = `\n\n=== REUNIÓ: «${summaryTitle(m)}» — ${fmtDate(m.startedAt)} — ${t.label}${m.group ? ` — grup: ${m.group}` : ''} ===\n${m.summary}`;
+    if (ctx.length + block.length > 160000) break;
+    ctx += block;
+  }
+  for (const m of related) {
+    const tr = buildTranscript(m);
+    if (tr) ctx += `\n\n=== TRANSCRIPCIÓ (fragment) de «${summaryTitle(m)}» — ${fmtDate(m.startedAt)} ===\n${tr.slice(0, 15000)}`;
+  }
+  const system = `Ets l'assistent de l'usuari per consultar les seves reunions. Respon NOMÉS a partir de la informació de les reunions que et dono (resums i fragments de transcripció). Si no hi ha prou informació, digues-ho clarament i no t'ho inventis. Cita sempre de quina reunió treus cada dada, entre parèntesis amb el títol i la data, p. ex. (Pressupost 2027, 6 d'oct.). Sigues concret i breu; fes servir llistes quan ajudi. Respon en l'idioma de la pregunta. Avui és ${new Date().toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.`;
+  const convo = askHistory.filter((t) => t.a != null).slice(-4).map((t) => `Pregunta anterior: ${t.q}\nResposta anterior: ${t.a}`).join('\n\n');
+  const text = `<reunions>${ctx}\n</reunions>\n\n${convo ? `${convo}\n\n` : ''}Pregunta: ${q}`;
+  let last = 0;
+  return gemini([{ text }], {
+    system, maxTokens: 8192, thinking: 1024,
+    onText: (t) => { const now = Date.now(); if (now - last > 120) { last = now; renderAskLog(t); } },
+  });
+}
+async function sendAsk(q) {
+  q = (q || '').trim();
+  if (!q) return;
+  $('#ask-input').value = '';
+  const turn = { q, a: null };
+  askHistory.push(turn);
+  renderAskLog('');
+  $('#btn-ask').disabled = true;
+  try {
+    turn.a = await askMeetings(q);
+  } catch (e) {
+    turn.a = `⚠️ ${friendlyError(e.message) === 'Hi ha hagut un problema inesperat.' ? e.message : friendlyError(e.message)}`;
+  } finally {
+    $('#btn-ask').disabled = false;
+    renderAskLog();
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+}
+$('#btn-ask').onclick = () => sendAsk($('#ask-input').value);
+$('#ask-input').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAsk($('#ask-input').value); } };
+document.querySelectorAll('#ask-suggest .chip').forEach((c) => { c.onclick = () => sendAsk(c.textContent); });
+$('#btn-ask-clear').onclick = () => { askHistory = []; renderAskLog(); };
+
+// ---------------------------------------------------------------------------
 // Esdeveniments
 // ---------------------------------------------------------------------------
 $('#btn-record').onclick = startRecording;
@@ -2002,6 +2347,7 @@ $('#btn-intro').onclick = () => {
 $('#btn-history').onclick = () => showView('history');
 $('#btn-settings').onclick = () => showView('settings');
 $('#btn-tab-home').onclick = () => showView('home');
+$('#btn-tab-ask').onclick = () => showView('ask');
 document.querySelector('.brand').onclick = () => showView('home');
 $('#btn-new').onclick = () => showView('home');
 // ---------------------------------------------------------------------------
