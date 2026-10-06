@@ -31,12 +31,22 @@
     <section id="view-home" class="view">
       <div id="setup-banner" class="welcome" hidden>
         <h2>Benvingut/da! 👋</h2>
-        <p>Aquesta app escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat. Per començar només cal una cosa (2 minuts):</p>
-        <ol>
-          <li>Obre <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener"><b>aistudio.google.com/apikey</b></a>, entra amb el teu compte de Google i toca <b>«Create API key»</b>.</li>
-          <li>Copia la clau (comença per <code>AIza…</code>).</li>
-          <li>Enganxa-la a la <button class="link" data-goto="settings">⚙️ Configuració</button>, juntament amb el teu correu, i toca «Desa».</li>
-        </ol>
+        <p>Aquesta app escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat. Per començar, necessites una clau gratuïta de Google (1 minut):</p>
+        <div class="wstep">
+          <span class="wnum">1</span>
+          <div>
+            <a class="btn primary wbtn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Crea la meva clau a Google ↗</a>
+            <p class="fineprint">Entra amb el teu compte de Google (accepta les condicions si te les demana), toca <b>«Create API key»</b> i després <b>«Copy»</b>. Després torna aquí.</p>
+          </div>
+        </div>
+        <div class="wstep">
+          <span class="wnum">2</span>
+          <div>
+            <button id="btn-paste-key" class="btn primary wbtn" type="button">📋 Enganxa la clau</button>
+            <input id="welcome-key" type="password" placeholder="o enganxa-la aquí (AIza…)" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <p id="welcome-msg" class="fineprint"></p>
+          </div>
+        </div>
         <p class="fineprint" style="text-align:left">La clau és teva i es queda només en aquest mòbil: el cost o la quota gratuïta de Google van a càrrec teu. Les teves reunions no surten d'aquest mòbil, excepte cap a Google per transcriure-les i resumir-les.</p>
       </div>
       <div id="pending-banner" class="banner" hidden></div>

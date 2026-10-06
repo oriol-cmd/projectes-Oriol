@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1350,6 +1350,48 @@ function syncEngineFields() {
   const eng = $('#set-engine').value;
   document.querySelectorAll('[data-engine]').forEach((el) => { el.hidden = el.dataset.engine !== eng; });
 }
+
+// Comprova una clau sense gastar quota (llista de models).
+async function checkGeminiKey(key) {
+  let res;
+  try {
+    res = await fetchWithTimeout(`${GEMINI_URL.replace(/models\/$/, 'models')}?pageSize=1`, { headers: { 'x-goog-api-key': key } }, 20000);
+  } catch { return { ok: false, msg: 'Sense connexió. Torna-ho a provar.' }; }
+  if (res.ok) return { ok: true };
+  const t = await res.text();
+  if (/API_KEY_INVALID|API key not valid/i.test(t)) return { ok: false, msg: 'Aquesta clau no és vàlida. Torna a copiar-la de Google.' };
+  return { ok: false, msg: `Google ha respost ${res.status}. Torna-ho a provar d'aquí a un moment.` };
+}
+
+// Assistent de la pantalla de benvinguda: enganxa, comprova i desa la clau.
+async function useWelcomeKey(raw) {
+  const msg = $('#welcome-msg');
+  const key = (raw || '').trim().replace(/^["']|["']$/g, '');
+  if (!/^AIza[\w-]{20,}$/.test(key)) {
+    msg.textContent = key ? 'Això no sembla una clau de Google (ha de començar per «AIza»).' : 'Primer copia la clau a la pàgina de Google.';
+    return;
+  }
+  msg.textContent = 'Comprovant la clau…';
+  const r = await checkGeminiKey(key);
+  if (!r.ok) { msg.textContent = `✗ ${r.msg}`; return; }
+  saveSettings({ geminiKey: key });
+  resetQuota();
+  msg.textContent = '';
+  $('#welcome-key').value = '';
+  toast('✓ Llest! Ja pots començar a gravar.', 4000);
+  refreshHomeBanners();
+}
+$('#btn-paste-key').onclick = async () => {
+  try {
+    const t = await navigator.clipboard.readText();
+    $('#welcome-key').value = t.trim();
+    useWelcomeKey(t);
+  } catch {
+    $('#welcome-msg').textContent = 'No puc llegir el porta-retalls: mantén premut el camp de sota i tria «Enganxa».';
+    $('#welcome-key').focus();
+  }
+};
+$('#welcome-key').oninput = (e) => { if (/^\s*AIza[\w-]{20,}\s*$/.test(e.target.value)) useWelcomeKey(e.target.value); };
 
 async function testKeys() {
   resetQuota();
