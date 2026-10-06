@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 16;
+const APP_VERSION = 17;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -262,21 +262,59 @@ function markExhausted(model) {
   try { localStorage.setItem('quota', JSON.stringify({ day: quotaDay(), models })); } catch { /* res */ }
 }
 
-async function gemini(parts, { system, maxTokens = 16384, task = 'summary' } = {}) {
+const noThinkingCfg = new Set(); // models que no accepten thinkingConfig
+
+// Llegeix una resposta en streaming (SSE) de Gemini i va cridant onText amb el text acumulat.
+async function readGeminiStream(res, onText) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', text = '', finish = '', blocked = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      let data;
+      try { data = JSON.parse(line.slice(5)); } catch { continue; }
+      if (data.promptFeedback && data.promptFeedback.blockReason) blocked = data.promptFeedback.blockReason;
+      const cand = (data.candidates || [])[0];
+      if (!cand) continue;
+      if (cand.finishReason) finish = cand.finishReason;
+      const piece = ((cand.content && cand.content.parts) || []).filter((pt) => pt.text && !pt.thought).map((pt) => pt.text).join('');
+      if (piece) { text += piece; onText(text); }
+    }
+  }
+  if (blocked) throw new Error(`Gemini ha bloquejat la petició (${blocked})`);
+  if (!text.trim() && finish && finish !== 'STOP') throw new Error(`Gemini no ha respost (${finish})`);
+  return text.trim();
+}
+
+// thinking: límit de «pensament» (tokens) per anar més de pressa · onText: resposta en directe
+async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thinking = null, onText = null } = {}) {
   const spent = exhaustedModels();
   const models = GEMINI_MODELS[task].filter((x) => !missingModels.has(x) && !spent.includes(x));
   if (!models.length) throw new FatalError(QUOTA_MSG);
-  const body = {
-    contents: [{ role: 'user', parts }],
-    generationConfig: { maxOutputTokens: maxTokens },
-  };
-  if (system) body.systemInstruction = { parts: [{ text: system }] };
   let lastErr;
-  for (const model of models) {
+  for (let mi = 0; mi < models.length; mi++) {
+    const model = models[mi];
+    const hasNext = mi < models.length - 1;
     for (let attempt = 0; attempt < 5; attempt++) {
+      const body = {
+        contents: [{ role: 'user', parts }],
+        generationConfig: { maxOutputTokens: maxTokens },
+      };
+      if (thinking != null && !noThinkingCfg.has(model)) body.generationConfig.thinkingConfig = { thinkingBudget: thinking };
+      if (system) body.systemInstruction = { parts: [{ text: system }] };
+      const url = onText
+        ? `${GEMINI_URL}${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
+        : `${GEMINI_URL}${encodeURIComponent(model)}:generateContent`;
       let res;
       try {
-        res = await fetchWithTimeout(`${GEMINI_URL}${encodeURIComponent(model)}:generateContent`, {
+        res = await fetchWithTimeout(url, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.geminiKey },
           body: JSON.stringify(body),
@@ -287,6 +325,16 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary' } = {
         continue;
       }
       if (res.ok) {
+        if (onText) {
+          try { return await readGeminiStream(res, onText); }
+          catch (e) {
+            if (/bloquejat|no ha respost/.test(e.message)) throw e;
+            lastErr = new Error('La connexió amb Gemini s\'ha tallat');
+            onText('');
+            await sleep(2000);
+            continue;
+          }
+        }
         const data = await res.json();
         if (data.promptFeedback && data.promptFeedback.blockReason) throw new Error(`Gemini ha bloquejat la petició (${data.promptFeedback.blockReason})`);
         const cand = (data.candidates || [])[0];
@@ -299,17 +347,23 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary' } = {
       if (res.status === 404) { missingModels.add(model); lastErr = new Error(`Model ${model} no disponible`); break; }
       if (/API_KEY_INVALID|API key not valid/i.test(errText)) throw new FatalError('La clau de Gemini no és vàlida');
       if (res.status === 403) throw new FatalError(`Gemini ha denegat l'accés: ${errText.slice(0, 160)}`);
+      if (res.status === 400 && /thinking/i.test(errText) && body.generationConfig.thinkingConfig) {
+        noThinkingCfg.add(model); // aquest model no accepta el límit: torna-ho a provar sense
+        continue;
+      }
       if (res.status === 400 && /mime|unsupported|audio|inline/i.test(errText) && parts.some((pt) => pt.inlineData)) {
         throw new UnsupportedAudioError(errText.slice(0, 160));
       }
       if (res.status === 429) {
         if (/PerDay|per day/i.test(errText)) { markExhausted(model); lastErr = new FatalError(QUOTA_MSG); break; }
-        const m = errText.match(/"retryDelay":\s*"(\d+)/);
         lastErr = new Error('Gemini: massa peticions seguides');
-        await sleep(Math.min(90, m ? Number(m[1]) + 2 : 10 * 2 ** attempt) * 1000);
+        // Si hi ha un altre model disponible, no esperis: prova'l ara mateix.
+        if (hasNext) break;
+        const m = errText.match(/"retryDelay":\s*"(\d+)/);
+        await sleep(Math.min(30, m ? Number(m[1]) + 1 : 5 * 2 ** attempt) * 1000);
         continue;
       }
-      if (res.status >= 500) { lastErr = new Error(`Gemini ${res.status}`); await sleep(4000 * 2 ** attempt); continue; }
+      if (res.status >= 500) { lastErr = new Error(`Gemini ${res.status}`); if (hasNext) break; await sleep(3000 * 2 ** attempt); continue; }
       throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
     }
   }
@@ -387,7 +441,7 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     ...(r ? [await audioPart(r)] : []),
     await audioPart(b),
     { text: prompt },
-  ], { task: 'transcribe' });
+  ], { task: 'transcribe', thinking: 0 }); // transcriure no requereix «pensar»: més ràpid
   const refBlob = ref && ref.blob ? ref.blob : null;
   let text;
   if (!forceWav) {
@@ -558,7 +612,7 @@ async function renderPhotos(m, box) {
   }
 }
 
-async function summarize(m) {
+async function summarize(m, onText = null) {
   const transcript = buildTranscript(m);
   if (!transcript) throw new FatalError("No s'ha captat cap paraula a la gravació");
   const info = [
@@ -584,7 +638,7 @@ Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres,
 
   const text = await gemini(
     [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }, ...photoParts],
-    { system: SYSTEM_PROMPT, maxTokens: 16384 },
+    { system: SYSTEM_PROMPT, maxTokens: 16384, thinking: 2048, onText },
   );
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
   if (!clean) throw new Error('Gemini ha retornat un resum buit');
@@ -710,7 +764,16 @@ function runPipeline(id, { redoSummary = false } = {}) {
       // 2. Resum
       if (!m.summary) {
         m.stage = 'summary'; updateProcView(m);
-        m.summary = await summarize(m);
+        let last = 0;
+        m.summary = await summarize(m, (t) => {
+          // Mostra el resum mentre s'escriu (com a màxim ~6 cops per segon).
+          const now = Date.now();
+          if (now - last < 150 || currentView !== 'proc' || viewingId !== m.id) return;
+          last = now;
+          const box = $('#proc-summary');
+          box.hidden = !t;
+          box.innerHTML = mdToHtml(t.replace(/^```(?:markdown)?\s*/i, ''));
+        });
         await saveMeeting(m);
       }
       // 3. Correu
@@ -1130,6 +1193,7 @@ function setStep(id, state, info) {
 
 function updateProcView(m) {
   if (!m || currentView !== 'proc' || viewingId !== m.id) return;
+  if (m.stage !== 'summary') { $('#proc-summary').hidden = true; $('#proc-summary').innerHTML = ''; }
   $('#proc-title').textContent = m.title || 'Processant la reunió…';
   const total = m.segments.length;
   const done = m.segments.filter((s) => s.status === 'done').length;
