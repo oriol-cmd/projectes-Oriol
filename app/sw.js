@@ -1,5 +1,5 @@
 // Guarda l'app per obrir-la ràpid i sense cobertura. Les crides a les APIs no es toquen.
-const CACHE = 'reunions-v22';
+const CACHE = 'reunions-v23';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

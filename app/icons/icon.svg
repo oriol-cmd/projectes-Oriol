@@ -1,7 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0f172a"/>
-  <rect x="196" y="96" width="120" height="200" rx="60" fill="#ffffff"/>
-  <path d="M146 250a110 110 0 0 0 220 0" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round"/>
-  <path d="M256 360v56M200 416h112" stroke="#ffffff" stroke-width="28" stroke-linecap="round"/>
-  <circle cx="376" cy="136" r="40" fill="#dc2626"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e40af"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Orella -->
+  <g transform="translate(262 268) scale(0.9) translate(-277 -270)" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 250 C150 165 210 110 285 110 C360 110 405 165 405 235 C405 300 360 320 335 350 C310 380 320 420 275 430 C235 440 210 405 205 380"/>
+    <path d="M235 255 C235 205 260 180 290 180 C325 180 345 205 345 235 C345 268 318 278 300 300"/>
+  </g>
+  <!-- Bombolla que xiuxiueja a cau d'orella (la punta apunta a l'orella) -->
+  <g transform="translate(46 318)">
+    <path d="M0 36 C0 16 16 0 36 0 H118 C138 0 154 16 154 36 V48 L184 30 L154 72 V76 C154 96 138 112 118 112 H36 C16 112 0 96 0 76 Z" fill="#fbbf24"/>
+    <circle cx="44" cy="56" r="11" fill="#0f172a"/>
+    <circle cx="77" cy="56" r="11" fill="#0f172a"/>
+    <circle cx="110" cy="56" r="11" fill="#0f172a"/>
+  </g>
 </svg>
