@@ -66,6 +66,7 @@
         <button id="btn-stop" class="btn danger">Acaba la reunió</button>
       </div>
       <button id="btn-intro" class="btn secondary intro" hidden>👋 Presentacions fetes</button>
+      <button id="btn-photo" class="btn secondary photo-btn">📷 Foto d'un document <span id="photo-count"></span></button>
       <button id="btn-mark" class="btn ghost">＋ Marca un moment important</button>
       <p class="fineprint" id="rec-warning" hidden>No bloquegis el mòbil ni canviïs d'app: l'iPhone atura el micròfon de les webs en segon pla.</p>
     </section>
@@ -85,6 +86,10 @@
     <section id="view-result" class="view" hidden>
       <div id="result-status" class="banner"></div>
       <article id="result-summary" class="summary"></article>
+      <div id="result-photos-wrap" class="photos-wrap" hidden>
+        <div id="result-photos" class="photos"></div>
+        <button id="btn-photo-after" class="btn ghost small">📷 Afegeix una foto d'un document</button>
+      </div>
       <div class="result-actions">
         <button id="btn-mail" class="btn primary">✉️ Envia'm el resum per correu</button>
         <button id="btn-share" class="btn secondary wide">👥 Envia a altres persones</button>
@@ -170,6 +175,7 @@
     </section>
   </main>
 
+  <input id="photo-input" type="file" accept="image/*" multiple hidden>
   <div id="toast" class="toast" hidden></div>
   <script src="app.js"></script>
 </body>

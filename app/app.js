@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -488,6 +488,64 @@ function buildTranscript(m) {
     .join('\n').trim();
 }
 
+// ---------------------------------------------------------------------------
+// Fotos de documents
+// ---------------------------------------------------------------------------
+const MAX_PHOTOS = 15;
+async function prepImage(file) {
+  let src;
+  try { src = await createImageBitmap(file); } catch {
+    src = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("No s'ha pogut llegir la foto"));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  const w = src.width, h = src.height;
+  const scale = Math.min(1, 1800 / Math.max(w, h)); // prou per llegir lletra manuscrita
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  return new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.82));
+}
+async function addPhotos(m, files, atMs) {
+  m.photos = m.photos || [];
+  let added = 0;
+  for (const f of files) {
+    if (m.photos.length >= MAX_PHOTOS) { toast(`Màxim ${MAX_PHOTOS} fotos per reunió`); break; }
+    try {
+      const blob = await prepImage(f);
+      const key = `${m.id}:img:${uid()}`;
+      await db.put('audio', blob, key);
+      m.photos.push({ key, atMs });
+      added++;
+    } catch (e) { toast(e.message); }
+  }
+  await saveMeeting(m);
+  return added;
+}
+const photoUrls = new Map();
+async function renderPhotos(m, box) {
+  box.textContent = '';
+  for (const ph of m.photos || []) {
+    let url = photoUrls.get(ph.key);
+    if (!url) {
+      const blob = await db.get('audio', ph.key);
+      if (!blob) continue;
+      url = URL.createObjectURL(blob);
+      photoUrls.set(ph.key, url);
+    }
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.className = 'thumb';
+    const img = document.createElement('img');
+    img.src = url; img.alt = 'Foto de document';
+    a.appendChild(img);
+    if (ph.atMs != null) { const t = document.createElement('span'); t.textContent = fmtClock(ph.atMs); a.appendChild(t); }
+    box.appendChild(a);
+  }
+}
+
 async function summarize(m) {
   const transcript = buildTranscript(m);
   if (!transcript) throw new FatalError("No s'ha captat cap paraula a la gravació");
@@ -500,8 +558,20 @@ async function summarize(m) {
   if (m.marks && m.marks.length) info.push(`L'usuari ha marcat com a moments importants (temps de gravació): ${m.marks.map(fmtClock).join(', ')}. Dona-hi especial atenció.`);
   if (settings.extra) info.push(`Instruccions addicionals de l'usuari: ${settings.extra}`);
 
+  // Fotos de documents (p. ex. notes escrites a mà) com a context.
+  const photoParts = [];
+  const photos = (m.photos || []).slice(0, MAX_PHOTOS);
+  for (const ph of photos) {
+    const blob = await db.get('audio', ph.key);
+    if (blob) photoParts.push({ inlineData: { mimeType: 'image/jpeg', data: await blobToBase64(blob) } });
+  }
+  if (photoParts.length) {
+    info.push(`S'adjunten ${photoParts.length} foto${photoParts.length > 1 ? 's' : ''} de documents mostrats o comentats a la reunió (sovint escrits a mà), en aquest ordre: ${photos.map((ph, i) => `foto ${i + 1}${ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
+Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
+  }
+
   const text = await gemini(
-    [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }],
+    [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }, ...photoParts],
     { system: SYSTEM_PROMPT, maxTokens: 16384 },
   );
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
@@ -847,6 +917,7 @@ async function startRecording() {
   showView('rec');
   renderLive();
   updateIntroButton();
+  $('#photo-count').textContent = '';
   rec.lastTick = performance.now();
   rec.tickTimer = setInterval(tick, 250);
   requestAnimationFrame(drawMeter);
@@ -1095,6 +1166,8 @@ async function showResult(id) {
   $('#btn-resend').disabled = !m.summary;
   $('#btn-copy').disabled = !m.summary;
   $('#btn-mail').disabled = !m.summary;
+  await renderPhotos(m, $('#result-photos'));
+  $('#result-photos-wrap').hidden = false;
   $('#btn-share').disabled = !m.summary;
   $('#share-panel').hidden = true;
 }
@@ -1119,6 +1192,7 @@ async function renderHistory() {
     li.querySelector('[data-del]').onclick = async () => {
       if (!confirm('Esborrar aquesta reunió i el seu àudio?')) return;
       for (const s of m.segments || []) await db.del('audio', audioKey(m.id, s.idx));
+      for (const ph of m.photos || []) await db.del('audio', ph.key);
       await db.del('meetings', m.id);
       meetingCache.delete(m.id);
       renderHistory();
@@ -1237,6 +1311,25 @@ $('#btn-record').onclick = startRecording;
 $('#btn-pause').onclick = togglePause;
 $('#btn-stop').onclick = () => { if (confirm('Acabar la reunió i fer-ne el resum?')) stopRecording(); };
 $('#btn-mark').onclick = addMark;
+// Fotos: durant la reunió (amb el minut) o després (des del resultat).
+let photoTarget = null;
+$('#btn-photo').onclick = () => { photoTarget = 'rec'; $('#photo-input').click(); };
+$('#btn-photo-after').onclick = () => { photoTarget = 'result'; $('#photo-input').click(); };
+$('#photo-input').onchange = async (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  if (!files.length) return;
+  if (photoTarget === 'rec' && rec.meeting) {
+    const n = await addPhotos(rec.meeting, files, Math.round(rec.activeMs));
+    if (n) toast(`📷 ${n} foto${n > 1 ? 's' : ''} afegida${n > 1 ? 's' : ''} a la reunió`);
+    $('#photo-count').textContent = rec.meeting.photos.length ? `${rec.meeting.photos.length} 📷` : '';
+  } else if (photoTarget === 'result' && viewingId) {
+    const m = await getMeeting(viewingId);
+    const n = await addPhotos(m, files, null);
+    await renderPhotos(m, $('#result-photos'));
+    if (n) toast('Foto afegida. Toca «Refés el resum» perquè la tingui en compte.', 4500);
+  }
+};
 $('#btn-intro').onclick = () => {
   if (!rec.meeting || rec.paused) return;
   rec.segStartMs = rec.activeMs;

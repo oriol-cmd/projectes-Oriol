@@ -102,6 +102,10 @@ A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les 
 
 > Si l'script de Google és d'abans d'aquesta funció, cal actualitzar-lo: enganxa-hi el codi nou d'`apps-script/Code.gs` (mantenint el teu `SECRET`), desa, i ves a **Implementa > Gestiona les implementacions > ✏️ > Versió: Versió nova > Implementa**. L'URL no canvia.
 
+## Fotos de documents
+
+Si a la reunió parleu d'un document (notes escrites a mà, un esquema, un pressupost…), toca **«📷 Foto d'un document»** mentre graves. L'app guarda en quin minut s'ha fet. En fer el resum, Gemini llegeix les fotos juntament amb la transcripció, les relaciona amb el que es deia i afegeix una secció **«Documents comentats»**. El que no es llegeixi bé surt marcat com a [dubte de comprensió]. També pots afegir fotos després, des de la reunió guardada, i tocar «Refés el resum».
+
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.
