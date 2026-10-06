@@ -336,3 +336,9 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .or { text-align: center; color: var(--muted); font-size: 13px; margin: 6px 0 8px !important; }
 .account-status { margin: 0 0 12px; font-size: 15px; }
 .account-status .muted { color: var(--muted); font-size: 13px; }
+
+/* Privadesa */
+.privacy details summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.privacy h4 { font-size: 15px; margin: 16px 0 4px; }
+.privacy ul { padding-left: 20px; margin: 4px 0; }
+.privacy li { font-size: 14.5px; margin: 4px 0; color: var(--text); }

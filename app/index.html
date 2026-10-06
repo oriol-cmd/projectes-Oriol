@@ -277,6 +277,45 @@
         <input id="restore-input" type="file" accept="application/json,.json" hidden>
       </div>
 
+      <h3>🔒 Privadesa i protecció de dades</h3>
+      <div class="card group privacy">
+        <details>
+          <summary>Què passa amb l'àudio i les dades de les reunions</summary>
+          <h4>🎙️ L'àudio</h4>
+          <ul>
+            <li>Mentre graves, cada tros d'àudio es guarda al mòbil <b>només fins que s'ha transcrit</b>. Després s'esborra.</li>
+            <li>Els trossos en silenci no es guarden mai.</li>
+            <li>El tros de les presentacions (per saber qui parla) i els fitxers importats s'esborren quan el resum està fet.</li>
+            <li>Si falla la transcripció (p. ex. sense cobertura), l'àudio es guarda fins que es pugui fer, per no perdre res.</li>
+            <li><b>Quan el resum està fet, al mòbil no hi queda cap àudio</b>, excepte si actives «Conserva l'àudio després de processar» (a Avançat). En aquest cas, s'esborra quan esborris la reunió.</li>
+          </ul>
+          <h4>📄 El que es queda guardat</h4>
+          <ul>
+            <li>Al mòbil: la transcripció en text, el resum, les tasques i les fotos dels documents, fins que esborris la reunió.</li>
+            <li>Si entres amb Google: el mateix (sense àudio), en una carpeta privada i oculta del teu Google Drive.</li>
+            <li>La clau de Google i la configuració es guarden al mòbil (i al teu Drive, si ho tens activat).</li>
+          </ul>
+          <h4>☁️ Què s'envia a Google (Gemini)</h4>
+          <ul>
+            <li>L'àudio, el text i les fotos s'envien a Gemini per transcriure'ls i fer-ne el resum.</li>
+            <li><b>Amb la facturació activada</b>, Google no fa servir aquestes dades per millorar els seus productes. Les pot conservar un temps limitat per detectar abusos.</li>
+            <li><b>Amb la clau gratuïta</b>, Google pot fer servir el contingut per millorar els seus productes, i el pot revisar personal humà. No ho recomanem per a reunions confidencials.</li>
+            <li>Els fitxers grans importats que es pugen a Google s'esborren sols al cap de 48 hores.</li>
+          </ul>
+          <h4>✉️ Correu, full de càlcul i còpies</h4>
+          <ul>
+            <li>El correu, el Google Sheets, la còpia de seguretat i la sincronització <b>no porten mai l'àudio</b>: només el text (i, a la còpia i al Drive, les fotos).</li>
+            <li>La còpia de seguretat inclou les teves claus: guarda-la en un lloc privat.</li>
+          </ul>
+          <h4>👥 Les persones de la reunió</h4>
+          <ul>
+            <li>Abans de gravar, informa les persones assistents que la reunió es grava per fer-ne l'acta. Si cal, demana'n el consentiment.</li>
+            <li>Pots esborrar en qualsevol moment una reunió (resum, transcripció, fotos i àudio) des de <i>⋯ > Esborra aquesta reunió</i>.</li>
+          </ul>
+          <p class="fineprint left">Xiu-xiu no té cap servidor propi: ni l'autor de l'app ni ningú més pot veure les teves reunions.</p>
+        </details>
+      </div>
+
       <h3>⚙️ Avançat</h3>
       <div class="card group">
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
