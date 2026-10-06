@@ -87,6 +87,16 @@
       <article id="result-summary" class="summary"></article>
       <div class="result-actions">
         <button id="btn-mail" class="btn primary">✉️ Envia'm el resum per correu</button>
+        <button id="btn-share" class="btn secondary wide">👥 Envia a altres persones</button>
+        <div id="share-panel" class="share-panel" hidden>
+          <label class="field"><span>Adreces de correu <em>(separades per comes)</em></span>
+            <textarea id="share-to" rows="2" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="montse@esportec.cat, ignasi@esportec.cat"></textarea></label>
+          <div id="share-recent" class="chips"></div>
+          <label class="check"><input id="share-transcript" type="checkbox"> Adjunta també la transcripció completa</label>
+          <button id="btn-share-send" class="btn primary">Envia el resum</button>
+          <button id="btn-share-mail" class="btn ghost">o obre-ho al correu del mòbil</button>
+          <p id="share-msg" class="fineprint"></p>
+        </div>
         <button id="btn-copy" class="btn secondary">Copia el resum</button>
         <button id="btn-resend" class="btn secondary">Torna a enviar</button>
         <button id="btn-redo" class="btn secondary">Refés el resum</button>

@@ -1,6 +1,6 @@
 /* Resums de Reunions — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -572,7 +572,7 @@ ${mdToHtml(m.summary, EMAIL_STYLE)}
   };
 }
 
-async function sendEmail(payload) {
+async function sendEmail(payload, { noFallback = false } = {}) {
   if (!settings.scriptUrl || !settings.scriptSecret) throw new FatalError("Falta configurar l'enviament de correu");
   const body = JSON.stringify({ secret: settings.scriptSecret, to: settings.email, ...payload });
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -588,10 +588,10 @@ async function sendEmail(payload) {
         if (data.error === 'unauthorized') throw new FatalError("La clau secreta de l'Apps Script no coincideix");
         throw new Error(data.error || 'Error desconegut en enviar');
       }
-      return { confirmed: true };
+      return { confirmed: true, data };
     } catch (e) {
       if (e instanceof FatalError) throw e;
-      if (e instanceof TypeError && attempt === 2) {
+      if (e instanceof TypeError && attempt === 2 && !noFallback) {
         // Error de CORS/xarxa: últim intent sense poder llegir la resposta.
         await fetch(settings.scriptUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
         return { confirmed: false };
@@ -1095,6 +1095,8 @@ async function showResult(id) {
   $('#btn-resend').disabled = !m.summary;
   $('#btn-copy').disabled = !m.summary;
   $('#btn-mail').disabled = !m.summary;
+  $('#btn-share').disabled = !m.summary;
+  $('#share-panel').hidden = true;
 }
 
 async function renderHistory() {
@@ -1246,6 +1248,94 @@ $('#btn-history').onclick = () => showView('history');
 $('#btn-settings').onclick = () => showView('settings');
 document.querySelector('.topbar h1').onclick = () => showView('home');
 $('#btn-new').onclick = () => showView('home');
+// ---------------------------------------------------------------------------
+// Enviar el resum a altres persones
+// ---------------------------------------------------------------------------
+const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+function parseEmails(text) {
+  return [...new Set(text.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean))];
+}
+function recentEmails() {
+  try { return JSON.parse(localStorage.getItem('recentEmails') || '[]'); } catch { return []; }
+}
+function rememberEmails(list) {
+  const all = [...new Set([...list, ...recentEmails()])].slice(0, 15);
+  try { localStorage.setItem('recentEmails', JSON.stringify(all)); } catch { /* res */ }
+}
+function renderRecentEmails() {
+  const box = $('#share-recent');
+  box.textContent = '';
+  const current = parseEmails($('#share-to').value);
+  for (const e of recentEmails()) {
+    if (current.includes(e)) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = '+ ' + e;
+    b.onclick = () => {
+      const v = $('#share-to').value.trim();
+      $('#share-to').value = v ? `${v.replace(/[,;\s]+$/, '')}, ${e}` : e;
+      renderRecentEmails();
+    };
+    box.appendChild(b);
+  }
+}
+function shareRecipients() {
+  const list = parseEmails($('#share-to').value);
+  const bad = list.filter((e) => !EMAIL_RE.test(e));
+  if (!list.length) { $('#share-msg').textContent = 'Escriu almenys una adreça.'; return null; }
+  if (bad.length) { $('#share-msg').textContent = `Adreça no vàlida: ${bad.join(', ')}`; return null; }
+  return list;
+}
+$('#btn-share').onclick = () => {
+  const panel = $('#share-panel');
+  panel.hidden = !panel.hidden;
+  $('#share-msg').textContent = '';
+  if (!panel.hidden) { renderRecentEmails(); $('#share-to').focus(); }
+};
+$('#share-to').oninput = renderRecentEmails;
+$('#btn-share-send').onclick = async () => {
+  const list = shareRecipients();
+  if (!list) return;
+  const msg = $('#share-msg');
+  if (!emailEnabled()) {
+    msg.textContent = "L'enviament automàtic no està configurat: fes servir «Obre al correu del mòbil».";
+    return;
+  }
+  const m = await getMeeting(viewingId);
+  const e = buildEmail(m);
+  const payload = { subject: e.subject, html: e.html, text: e.text, recipients: list, external: true };
+  if ($('#share-transcript').checked) { payload.transcript = e.transcript; payload.filename = e.filename; }
+  const btn = $('#btn-share-send');
+  btn.disabled = true;
+  msg.textContent = 'Enviant…';
+  try {
+    const r = await sendEmail(payload, { noFallback: true });
+    if (!r.data || !Array.isArray(r.data.sentTo)) {
+      msg.textContent = "✗ Cal actualitzar l'script de Google perquè pugui enviar a altres adreces (instruccions al README).";
+      return;
+    }
+    rememberEmails(list);
+    m.shares = [...(m.shares || []), { to: r.data.sentTo, at: Date.now() }];
+    await saveMeeting(m);
+    msg.textContent = `✓ Enviat a ${r.data.sentTo.join(', ')}`;
+    $('#share-to').value = '';
+    renderRecentEmails();
+  } catch (err) {
+    msg.textContent = `✗ ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+};
+$('#btn-share-mail').onclick = async () => {
+  const list = shareRecipients();
+  if (!list) return;
+  rememberEmails(list);
+  const m = await getMeeting(viewingId);
+  const subject = `Resum: ${summaryTitle(m)} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`;
+  location.href = `mailto:${list.map(encodeURIComponent).join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mdToPlain(m.summary))}`;
+};
+
 // Obre l'app de correu amb el resum ja escrit (no depèn de l'script de Google).
 $('#btn-mail').onclick = async () => {
   const m = await getMeeting(viewingId);

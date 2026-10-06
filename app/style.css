@@ -179,3 +179,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .btn.intro { width: 100%; margin-top: 12px; border-color: var(--accent); color: var(--accent); }
 .intro-tip { max-width: 320px; margin: 10px auto 0; }
 #result-transcript strong, .live strong { color: var(--accent); }
+
+.result-actions .wide { grid-column: 1 / -1; }
+.share-panel { grid-column: 1 / -1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: grid; gap: 8px; }
+.share-panel .field { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 99px; padding: 6px 12px; cursor: pointer; }

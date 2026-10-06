@@ -96,6 +96,12 @@ Per saber qui diu què (i a qui toca cada tasca):
 
 Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada». Es pot desactivar a *Configuració > Avançat*. Enviar la mostra amb cada tram fa que el cost de transcripció sigui aproximadament el doble (uns 10 € al mes per 15 h setmanals).
 
+## Enviar el resum a altres persones
+
+A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les adreces (o tries les que ja has fet servir) i el resum els arriba amb format, enviat des del teu compte. Pots adjuntar-hi la transcripció. Les respostes et tornen a tu.
+
+> Si l'script de Google és d'abans d'aquesta funció, cal actualitzar-lo: enganxa-hi el codi nou d'`apps-script/Code.gs` (mantenint el teu `SECRET`), desa, i ves a **Implementa > Gestiona les implementacions > ✏️ > Versió: Versió nova > Implementa**. L'URL no canvia.
+
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.

@@ -14,8 +14,9 @@
 
 const SECRET = 'CANVIA-AQUESTA-CLAU';
 
-// Adreces a què l'app pot enviar. Qualsevol altra es redirigeix a la primera.
+// La teva adreça: rep els resums automàtics i les respostes dels altres.
 const ALLOWED_RECIPIENTS = ['oriol@esportec.cat'];
+const MAX_RECIPIENTS = 25;
 
 const SHEET_MEETINGS = 'Reunions';
 const SHEET_TASKS = 'Tasques';
@@ -25,6 +26,9 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     if (!data.secret || data.secret !== SECRET) return json_({ ok: false, error: 'unauthorized' });
+
+    // Enviament a altres persones (botó «Envia a altres persones»).
+    if (Array.isArray(data.recipients)) return sendToOthers_(data);
 
     // 1. Desa-ho al full (si ja hi és, no ho duplica).
     let sheetWarning = '';
@@ -40,10 +44,25 @@ function doPost(e) {
       options.attachments = [Utilities.newBlob(data.transcript, 'text/plain', data.filename || 'transcripcio.txt')];
     }
     GmailApp.sendEmail(to, data.subject || 'Resum de reunió', data.text || '', options);
-    return json_({ ok: true, sheetWarning: sheetWarning });
+    return json_({ ok: true, sentTo: [to], sheetWarning: sheetWarning });
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message ? err.message : err) });
   }
+}
+
+function sendToOthers_(data) {
+  const list = data.recipients
+    .map(function (x) { return String(x).trim().toLowerCase(); })
+    .filter(function (x) { return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(x); })
+    .slice(0, MAX_RECIPIENTS);
+  if (!list.length) return json_({ ok: false, error: 'Cap adreça vàlida' });
+  const options = { name: 'Resums de Reunions', replyTo: ALLOWED_RECIPIENTS[0] };
+  if (data.html) options.htmlBody = data.html; // sense l'enllaç al full privat
+  if (data.transcript) {
+    options.attachments = [Utilities.newBlob(data.transcript, 'text/plain', data.filename || 'transcripcio.txt')];
+  }
+  GmailApp.sendEmail(list.join(','), data.subject || 'Resum de reunió', data.text || '', options);
+  return json_({ ok: true, sentTo: list });
 }
 
 function saveToSheet_(d) {
