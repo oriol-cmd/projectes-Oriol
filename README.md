@@ -117,6 +117,16 @@ Qualsevol persona pot fer servir l'app amb el mateix enllaç: **https://oriol-cm
 - El primer cop que l'obre, l'app li explica com treure la clau.
 - *(Opcional)* Per rebre els resums automàticament i desar-los en un Google Sheets, ha de fer **el seu propi** full amb l'script (secció «Full de Google Sheets»). L'script envia sempre al compte de Google de qui l'instal·la, de manera que només cal canviar-hi el `SECRET`. Sense script, pot fer servir el botó «✉️ Envia'm el resum per correu».
 
+## Més funcions
+
+- **Tipus de reunió**: abans de gravar, tria General, Reunió d'equip, Comercial / client, 1 a 1, Entrevista, Formació o Seguiment de projecte. El resum s'adapta (p. ex. en una comercial afegeix «Client i necessitats»).
+- **Resum en castellà o anglès**: a cada reunió, els botons *Català / Castellano / English* el tradueixen mantenint l'estructura. A *Configuració > Resum* pots triar l'idioma per defecte (és el que s'envia per correu).
+- **PDF amb el disseny de Xiu-xiu**: capçalera, dades de la reunió, tasques en una taula amb caselles i dubtes ressaltats. Es pot desar o compartir (correu, WhatsApp, Fitxers…).
+- **Còpia de seguretat**: a *Configuració > Còpia de seguretat*, desa en un fitxer la configuració, les reunions i les fotos (p. ex. a iCloud Drive o Google Drive) i recupera-ho en un altre mòbil. ⚠️ El fitxer inclou les teves claus: guarda'l en un lloc privat. No esborris mai la icona de l'app sense haver fet abans una còpia.
+- **Pantalla d'inici**: tasques de l'última reunió i últimes reunions a primer cop d'ull.
+- **Avís de versió nova**: quan hi ha una actualització, surt un avís amb el botó «Actualitza».
+- **Errors entenedors**: si alguna cosa falla, l'app ho explica clarament i ho torna a provar sola (el detall tècnic queda amagat).
+
 ## Ús
 
 1. Obre l'app, escriu el títol i qui hi ha a la reunió (opcional) i toca el **botó vermell**.

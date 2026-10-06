@@ -212,3 +212,38 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 
 .signature { text-align: center; margin: 18px 0 4px; font-weight: 700; letter-spacing: .02em; color: var(--text); }
 .signature span { font-weight: 500; color: var(--muted); font-style: italic; }
+
+/* Avís de versió nova */
+.update-banner { position: sticky; top: calc(env(safe-area-inset-top) + 61px); z-index: 4; display: flex; gap: 10px; align-items: center; justify-content: space-between; background: var(--info-bg); color: var(--info-text); padding: 10px 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
+.update-banner[hidden] { display: none; }
+.update-banner .btn { flex: none; min-height: 36px; }
+
+/* Tipus de reunió */
+.type-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; margin: 0 -2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.type-chips::-webkit-scrollbar { display: none; }
+.type-chip { flex: none; font: inherit; font-size: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 99px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.type-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+
+/* Pantalla d'inici */
+.home-block { margin-top: 26px; }
+.home-block h3 { display: flex; justify-content: space-between; align-items: baseline; }
+.small-link { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--accent); font-weight: 600; }
+.task-list { list-style: none; padding: 0; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.task-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 15px; }
+.task-list li:first-child { border-top: 0; }
+.task-list .box { flex: none; width: 16px; height: 16px; border: 2px solid var(--muted); border-radius: 4px; margin-top: 3px; }
+.task-list .due { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+/* Idioma del resum */
+.seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
+.seg[hidden] { display: none; }
+.seg button { flex: 1; font: inherit; font-size: 14px; border: 0; background: none; color: var(--muted); padding: 8px 6px; border-radius: 9px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+
+/* Errors: detall tècnic amagat */
+.tech { margin-top: 8px; font-size: 12px; opacity: .85; }
+.tech summary { cursor: pointer; }
+
+/* Còpia de seguretat */
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.share-panel[hidden], .result-actions [hidden] { display: none; }

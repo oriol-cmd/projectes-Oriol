@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -15,6 +15,9 @@ const DEFAULTS = {
   extra: '',
   liveSec: 60, // cada quants segons apareix text nou en directe
   speakers: true, // identifica qui parla a partir de les presentacions inicials
+  summaryLang: 'ca', // idioma per defecte dels resums: ca | es | en
+  lastType: 'general', // últim tipus de reunió triat
+  lastBackup: 0, // data de l'última còpia de seguretat
   v: 2,
   keepAudio: false,
 };
@@ -106,7 +109,7 @@ function speakerHtml(line) {
   return `<strong>${escapeHtml(m[1])}:</strong> ${markDoubts(escapeHtml(m[2]))}`;
 }
 function markDoubts(html) {
-  return html.replace(/\[dubte de comprensió[^\]]*\]/gi, (t) => `<mark style="${DOUBT_STYLE}">${t}</mark>`);
+  return html.replace(/\[(dubte de comprensió|duda de comprensión|unclear)[^\]]*\]/gi, (t) => `<mark style="${DOUBT_STYLE}">${t}</mark>`);
 }
 function inlineMd(s) {
   return markDoubts(escapeHtml(s)
@@ -626,6 +629,9 @@ async function summarize(m, onText = null) {
   ];
   if (m.title) info.push(`Títol indicat per l'usuari: ${m.title}`);
   if (m.context) info.push(`Context i assistents: ${m.context}`);
+  if (m.type && m.type !== 'general' && MEETING_TYPES[m.type]) {
+    info.push(`Tipus de reunió: ${MEETING_TYPES[m.type].label}. ${MEETING_TYPES[m.type].prompt}`);
+  }
   if (m.marks && m.marks.length) info.push(`L'usuari ha marcat com a moments importants (temps de gravació): ${m.marks.map(fmtClock).join(', ')}. Dona-hi especial atenció.`);
   if (settings.extra) info.push(`Instruccions addicionals de l'usuari: ${settings.extra}`);
 
@@ -663,8 +669,8 @@ const EMAIL_STYLE = {
   li: 'margin:3px 0',
 };
 
-function summaryTitle(m) {
-  const first = (m.summary || '').split('\n').find((l) => /^#\s+/.test(l));
+function summaryTitle(m, md = m.summary) {
+  const first = (md || '').split('\n').find((l) => /^#\s+/.test(l));
   return first ? first.replace(/^#\s+/, '').trim() : (m.title || 'Reunió');
 }
 
@@ -673,10 +679,10 @@ function parseTasks(md) {
   const tasks = [];
   let inTasks = false;
   for (const line of (md || '').split('\n')) {
-    if (/^##\s+/.test(line)) { inTasks = /^##\s+Tasques/i.test(line); continue; }
+    if (/^##\s+/.test(line)) { inTasks = /^##\s+(Tasques|Tareas|Tasks|Action items)/i.test(line); continue; }
     if (!inTasks) continue;
     const m = line.match(/^\s*[-*]\s+(?:\[[ xX]?\]\s*)?(.+)$/);
-    if (!m || /^cap\.?$/i.test(m[1].trim())) continue;
+    if (!m || /^(cap|ninguna|none)\.?$/i.test(m[1].trim())) continue;
     let rest = m[1].trim();
     let who = '';
     const w = rest.match(/^\*\*(.+?)\*\*\s*:?\s*(.*)$/);
@@ -689,18 +695,21 @@ function parseTasks(md) {
   return tasks;
 }
 
-function buildEmail(m) {
-  const title = summaryTitle(m);
-  const when = fmtDate(m.startedAt);
+function buildEmail(m, lang = settings.summaryLang || 'ca') {
+  const L = L10N[lang] || L10N.ca;
+  const md = getSummary(m, lang);
+  const title = summaryTitle(m, md);
+  const when = new Date(m.startedAt).toLocaleString(L.locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const typeLabel = m.type && m.type !== 'general' && MEETING_TYPES[m.type] ? ` · ${MEETING_TYPES[m.type].label}` : '';
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1f2937;max-width:680px">
-<p style="margin:0 0 14px;color:#64748b;font-size:13px">${escapeHtml(when)} · ${escapeHtml(fmtDuration(m.durationMs || 0))}</p>
-${mdToHtml(m.summary, EMAIL_STYLE)}
-<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">Transcripció completa adjunta. Generat automàticament per Xiu-xiu.</p>
+<p style="margin:0 0 14px;color:#64748b;font-size:13px">${escapeHtml(when)} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${escapeHtml(typeLabel)}</p>
+${mdToHtml(md, EMAIL_STYLE)}
+<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">${L.emailFooter}</p>
 </div>`;
   return {
-    subject: `Resum: ${title} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`,
+    subject: `${L.subject}: ${title} (${new Date(m.startedAt).toLocaleDateString(L.locale)})`,
     html,
-    text: m.summary,
+    text: md,
     transcript: buildTranscript(m),
     filename: `transcripcio-${new Date(m.startedAt).toISOString().slice(0, 10)}.txt`,
     // Per al full de càlcul
@@ -708,7 +717,7 @@ ${mdToHtml(m.summary, EMAIL_STYLE)}
     date: new Date(m.startedAt).toISOString(),
     title,
     durationMin: Math.round((m.durationMs || 0) / 60000),
-    summary: m.summary,
+    summary: md,
     tasks: parseTasks(m.summary),
   };
 }
@@ -751,7 +760,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
   if (pipelines.has(id)) return pipelines.get(id);
   const p = (async () => {
     const m = await getMeeting(id);
-    if (redoSummary) { m.summary = ''; m.email = { status: 'pending' }; }
+    if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; }
     m.status = 'processing';
     m.error = '';
     await saveMeeting(m);
@@ -781,6 +790,12 @@ function runPipeline(id, { redoSummary = false } = {}) {
         });
         await saveMeeting(m);
       }
+      // 2b. Traducció a l'idioma per defecte (si no és el català)
+      const lang = settings.summaryLang || 'ca';
+      if (lang !== 'ca' && !(m.translations && m.translations[lang])) {
+        m.stage = 'translate'; updateProcView(m);
+        await translateSummary(m, lang);
+      }
       // 3. Correu
       if (!emailEnabled()) {
         if (m.email.status !== 'sent') m.email = { status: 'off' };
@@ -795,11 +810,21 @@ function runPipeline(id, { redoSummary = false } = {}) {
       }
       m.status = 'done';
       m.stage = '';
+      m.autoRetries = 0;
+      delete m.retryAt;
       await saveMeeting(m);
       if (m.refIdx != null && !settings.keepAudio) await db.del('audio', audioKey(m.id, m.refIdx));
     } catch (e) {
       m.status = 'error';
       m.error = e.message;
+      // Errors temporals (connexió, Google saturat…): ho tornem a provar sols, fins a 3 cops.
+      delete m.retryAt;
+      if (!(e instanceof FatalError) && (m.autoRetries || 0) < 3) {
+        m.autoRetries = (m.autoRetries || 0) + 1;
+        const delay = 15000 * m.autoRetries;
+        m.retryAt = Date.now() + delay;
+        setTimeout(() => { if (!pipelines.has(id)) runPipeline(id); }, delay);
+      }
       await saveMeeting(m);
     } finally {
       pipelines.delete(id);
@@ -965,6 +990,7 @@ async function startRecording() {
     durationMs: 0,
     engine: settings.engine,
     speakers: settings.engine !== 'device' && settings.speakers !== false,
+    type: settings.lastType || 'general',
     status: 'recording',
     segments: [],
     marks: [],
@@ -1205,16 +1231,17 @@ function updateProcView(m) {
   const segErr = m.segments.find((s) => s.status === 'error');
   if (m.engine === 'device') setStep('step-transcribe', 'done', TXT.dictation);
   else if (total && done === total) setStep('step-transcribe', 'done', `${total} trams`);
-  else if (segErr && m.status === 'error') setStep('step-transcribe', 'error', segErr.error);
+  else if (segErr && m.status === 'error') setStep('step-transcribe', 'error', friendlyError(segErr.error));
   else setStep('step-transcribe', 'active', total ? `${done} de ${total} trams` : 'Preparant…');
 
   if (m.summary) setStep('step-summary', 'done', 'Fet');
-  else if (m.stage === 'summary') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? m.error : 'Escrivint el resum…');
+  else if (m.stage === 'summary') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : 'Escrivint el resum…');
+  else if (m.stage === 'translate') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : 'Traduint el resum…');
   else setStep('step-summary', '', '');
 
   $('#step-email').hidden = m.email.status === 'off' || (!emailEnabled() && m.email.status !== 'sent');
   if (m.email.status === 'sent') setStep('step-email', 'done', settings.email);
-  else if (m.email.status === 'error') setStep('step-email', 'error', m.email.error);
+  else if (m.email.status === 'error') setStep('step-email', 'error', friendlyError(m.email.error));
   else if (m.stage === 'email') setStep('step-email', 'active', `Enviant a ${settings.email}…`);
   else setStep('step-email', '', '');
 }
@@ -1229,8 +1256,12 @@ async function showResult(id) {
   const st = $('#result-status');
   if (m.status === 'error') {
     st.className = 'banner err';
-    st.innerHTML = `No s'ha pogut completar: ${escapeHtml(m.error)} <button class="link" id="btn-retry">Reintenta</button>`;
-    $('#btn-retry').onclick = () => { resetQuota(); showView('proc'); updateProcView(m); runPipeline(id); };
+    const auto = m.retryAt && m.retryAt > Date.now();
+    st.innerHTML = `<b>${escapeHtml(friendlyError(m.error))}</b><br>`
+      + (auto ? 'Ho tornem a provar automàticament d\'aquí a uns segons… ' : 'No s\'ha perdut res. ')
+      + `<button class="link" id="btn-retry">${auto ? 'Prova-ho ara' : 'Torna-ho a provar'}</button>`
+      + `<details class="tech"><summary>Detall tècnic</summary>${escapeHtml(m.error || '')}</details>`;
+    $('#btn-retry').onclick = () => { resetQuota(); m.autoRetries = 0; showView('proc'); updateProcView(m); runPipeline(id); };
   } else if (m.email.status === 'off') {
     st.className = 'banner ok';
     st.textContent = '✓ Resum llest';
@@ -1241,9 +1272,10 @@ async function showResult(id) {
       : `✓ Resum enviat a ${settings.email}`;
   } else {
     st.className = 'banner warn';
-    st.textContent = `No s'ha pogut enviar el correu: ${m.email.error || 'pendent'}. Toca «Torna a enviar».`;
+    st.textContent = `No s'ha pogut enviar el correu (${friendlyError(m.email.error || '')}). Toca «Torna a enviar».`;
   }
-  $('#result-summary').innerHTML = m.summary ? mdToHtml(m.summary) : '<p>Encara no hi ha resum.</p>';
+  resultLang = (m.translations && m.translations[settings.summaryLang]) ? settings.summaryLang : 'ca';
+  renderResultSummary(m);
   $('#result-transcript').innerHTML = (buildTranscript(m) || '(buida)').split('\n').map(speakerHtml).join('\n');
   $('#btn-resend').disabled = !m.summary;
   $('#btn-copy').disabled = !m.summary;
@@ -1251,6 +1283,10 @@ async function showResult(id) {
   await renderPhotos(m, $('#result-photos'));
   $('#result-photos-wrap').hidden = false;
   $('#btn-share').disabled = !m.summary;
+  $('#btn-pdf').disabled = !m.summary;
+  $('#lang-switch').hidden = !m.summary;
+  // Sense resum, només té sentit fer-ne un de nou: amaga la resta de botons.
+  ['#btn-mail', '#btn-share', '#btn-pdf', '#btn-copy', '#btn-resend'].forEach((sel) => { $(sel).hidden = !m.summary; });
 }
 
 async function renderHistory() {
@@ -1287,6 +1323,8 @@ async function refreshHomeBanners() {
   // Sense clau: només la benvinguda. Amb clau: només la part de gravar.
   $('#setup-banner').hidden = miss.length === 0;
   $('#home-main').hidden = miss.length > 0;
+  renderTypeChips();
+  renderHome();
   const all = await db.all('meetings');
   const pending = all.filter((m) => m.status === 'error' || (m.status === 'done' && m.email.status === 'error'));
   const working = all.filter((m) => pipelines.has(m.id));
@@ -1335,6 +1373,8 @@ function fillSettings() {
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   $('#set-speakers').checked = settings.speakers !== false;
+  $('#set-summary-lang').value = settings.summaryLang || 'ca';
+  $('#backup-info').textContent = settings.lastBackup ? `Última còpia: ${fmtDate(settings.lastBackup)}` : 'Encara no has fet cap còpia.';
   syncEngineFields();
   $('#settings-msg').textContent = '';
 }
@@ -1351,6 +1391,7 @@ function readSettingsForm() {
     v: 2,
     keepAudio: $('#set-keep-audio').checked,
     speakers: $('#set-speakers').checked,
+    summaryLang: $('#set-summary-lang').value,
   };
 }
 function syncEngineFields() {
@@ -1432,6 +1473,410 @@ async function testEmail() {
     msg.textContent = `✗ ${e.message}`;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Tipus de reunió (adapten el resum)
+// ---------------------------------------------------------------------------
+const MEETING_TYPES = {
+  general: { icon: '💬', label: 'General', prompt: '' },
+  equip: { icon: '👥', label: "Reunió d'equip", prompt: "Posa èmfasi en l'estat de cada projecte o àrea, els bloquejos i qui fa què. A «Punts tractats» agrupa per projecte o àrea." },
+  comercial: { icon: '🤝', label: 'Comercial / client', prompt: "Afegeix just després de «## Resum» una secció «## Client i necessitats» (qui és, què necessita, pressupost, terminis i objeccions). A «Temes oberts i propers passos» deixa clar el següent pas comercial, qui el fa i quan." },
+  u1: { icon: '🙋', label: '1 a 1', prompt: "Centra't en el feedback, els objectius, les preocupacions i els acords entre les dues persones. Sigues discret i respectuós amb els temes personals." },
+  entrevista: { icon: '🎤', label: 'Entrevista', prompt: "Afegeix just després de «## Resum» una secció «## Perfil i respostes clau» amb les respostes rellevants de la persona entrevistada, punts forts i dubtes, sense judicis de valor no fonamentats." },
+  formacio: { icon: '🎓', label: 'Formació / classe', prompt: "Afegeix just després de «## Resum» una secció «## Conceptes clau» amb el que s'ha explicat, ordenat i didàctic." },
+  projecte: { icon: '📈', label: 'Seguiment de projecte', prompt: "Afegeix just després de «## Resum» una secció «## Estat del projecte» (avenços, fites, riscos i calendari)." },
+};
+function renderTypeChips() {
+  const box = $('#type-chips');
+  if (!box || box.childElementCount) { updateTypeChips(); return; }
+  for (const [key, t] of Object.entries(MEETING_TYPES)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'type-chip';
+    b.dataset.type = key;
+    b.textContent = `${t.icon} ${t.label}`;
+    b.onclick = () => { saveSettings({ lastType: key }); updateTypeChips(); };
+    box.appendChild(b);
+  }
+  updateTypeChips();
+}
+function updateTypeChips() {
+  document.querySelectorAll('.type-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === (settings.lastType || 'general'))));
+}
+
+// ---------------------------------------------------------------------------
+// Idiomes del resum (el català és l'original; la resta són traduccions)
+// ---------------------------------------------------------------------------
+const L10N = {
+  ca: { name: 'català', locale: 'ca-ES', subject: 'Resum', doubt: '[dubte de comprensió]', minutes: 'Acta de reunió', date: 'Data', duration: 'Durada', type: 'Tipus', context: 'Context i assistents', who: 'Responsable', task: 'Tasca', due: 'Termini', page: 'Pàgina', emailFooter: 'Transcripció completa adjunta. Generat automàticament per Xiu-xiu.' },
+  es: { name: 'castellà', locale: 'es-ES', subject: 'Resumen', doubt: '[duda de comprensión]', minutes: 'Acta de reunión', date: 'Fecha', duration: 'Duración', type: 'Tipo', context: 'Contexto y asistentes', who: 'Responsable', task: 'Tarea', due: 'Plazo', page: 'Página', emailFooter: 'Transcripción completa adjunta. Generado automáticamente por Xiu-xiu.' },
+  en: { name: 'anglès', locale: 'en-GB', subject: 'Summary', doubt: '[unclear]', minutes: 'Meeting minutes', date: 'Date', duration: 'Duration', type: 'Type', context: 'Context and attendees', who: 'Owner', task: 'Task', due: 'Due', page: 'Page', emailFooter: 'Full transcript attached. Automatically generated by Xiu-xiu.' },
+};
+let resultLang = 'ca';
+function getSummary(m, lang = 'ca') {
+  if (lang === 'ca' || !m.translations || !m.translations[lang]) return m.summary || '';
+  return m.translations[lang];
+}
+async function translateSummary(m, lang) {
+  const L = L10N[lang];
+  const system = `Ets un traductor professional. Tradueix al ${L.name} l'acta de reunió en Markdown que et donaré. Mantén exactament la mateixa estructura Markdown (títols #, ##, llistes, caselles [ ], negretes), els noms propis, les xifres i les dates. Tradueix també els títols de les seccions. Les marques «[dubte de comprensió]» tradueix-les com «${L.doubt}». Respon només amb l'acta traduïda, sense cap comentari.`;
+  const text = await gemini([{ text: m.summary }], { system, maxTokens: 16384, thinking: 0 });
+  const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
+  if (!clean) throw new Error('La traducció ha sortit buida');
+  m.translations = { ...(m.translations || {}), [lang]: clean };
+  await saveMeeting(m);
+  return clean;
+}
+function renderResultSummary(m) {
+  $('#result-summary').innerHTML = m.summary ? mdToHtml(getSummary(m, resultLang)) : '<p>Encara no hi ha resum.</p>';
+  document.querySelectorAll('#lang-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === resultLang)));
+}
+document.querySelectorAll('#lang-switch button').forEach((b) => {
+  b.onclick = async () => {
+    const m = await getMeeting(viewingId);
+    if (!m || !m.summary) return;
+    const lang = b.dataset.lang;
+    if (lang !== 'ca' && !(m.translations && m.translations[lang])) {
+      b.disabled = true;
+      const prev = b.textContent;
+      b.textContent = '…';
+      try { await translateSummary(m, lang); }
+      catch (e) { toast(`No s'ha pogut traduir: ${friendlyError(e.message)}`, 5000); return; }
+      finally { b.disabled = false; b.textContent = prev; }
+    }
+    resultLang = lang;
+    renderResultSummary(m);
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Errors entenedors (el detall tècnic queda amagat)
+// ---------------------------------------------------------------------------
+function friendlyError(raw) {
+  const t = String(raw || '');
+  if (/quota/i.test(t) && /esgotat/i.test(t)) return t;
+  if (/clau de Gemini no és vàlida|API key not valid|API_KEY_INVALID/i.test(t)) return 'La clau de Google no és vàlida. Revisa-la a ⚙️ Configuració.';
+  if (/denegat|PERMISSION|403/i.test(t)) return "Google no ha permès l'accés amb aquesta clau. Revisa-la a ⚙️ Configuració.";
+  if (/Sense connexió|Failed to fetch|NetworkError|Load failed|s'ha tallat|network/i.test(t)) return 'No hi ha connexió a internet. Ho tornarem a provar quan hi hagi cobertura.';
+  if (/massa peticions|429|RESOURCE_EXHAUSTED/i.test(t)) return 'Google està molt saturat ara mateix.';
+  if (/Gemini 5\d\d|50[0-4]|UNAVAILABLE|INTERNAL/i.test(t)) return 'Els servidors de Google tenen problemes ara mateix.';
+  if (/no ha acceptat|INVALID_ARGUMENT|Gemini 400/i.test(t)) return 'Google no ha pogut processar la reunió.';
+  if (/bloquejat|SAFETY|no ha respost/i.test(t)) return 'Google no ha volgut generar aquest contingut.';
+  if (/No s'ha captat cap paraula/i.test(t)) return "No s'ha captat cap paraula a la gravació.";
+  if (/script|Apps Script|correu/i.test(t)) return t;
+  return 'Hi ha hagut un problema inesperat.';
+}
+
+// ---------------------------------------------------------------------------
+// Pantalla d'inici: últimes reunions i tasques
+// ---------------------------------------------------------------------------
+async function renderHome() {
+  if (!$('#home-recent')) return;
+  const all = (await db.all('meetings')).sort((a, b) => b.startedAt - a.startedAt);
+  const recent = all.slice(0, 3);
+  const ul = $('#recent-list');
+  ul.innerHTML = '';
+  for (const m of recent) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.className = 'item';
+    const t = MEETING_TYPES[m.type || 'general'] || MEETING_TYPES.general;
+    const title = m.summary ? summaryTitle(m) : (m.title || 'Reunió');
+    const state = pipelines.has(m.id) || m.status === 'processing' ? ' · processant…' : m.status === 'error' ? ' · ⚠ cal revisar' : '';
+    b.innerHTML = `<div class="t">${t.icon} ${escapeHtml(title)}</div><div class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${state}</div>`;
+    b.onclick = () => showResult(m.id);
+    li.appendChild(b);
+    ul.appendChild(li);
+  }
+  $('#home-recent').hidden = !recent.length;
+  const last = all.find((m) => m.summary);
+  const tasks = last ? parseTasks(last.summary).slice(0, 6) : [];
+  const tl = $('#recent-tasks');
+  tl.innerHTML = '';
+  for (const t of tasks) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="box"></span><div>${t.who ? `<b>${escapeHtml(t.who)}</b>: ` : ''}${markDoubts(escapeHtml(t.task))}${t.due ? ` <span class="due">${escapeHtml(t.due)}</span>` : ''}</div>`;
+    tl.appendChild(li);
+  }
+  $('#home-tasks').hidden = !tasks.length;
+  if (last) $('#home-tasks-title').textContent = `Tasques · ${last.summary ? summaryTitle(last) : ''}`;
+  // Recordatori de còpia de seguretat
+  const oldBackup = Date.now() - (settings.lastBackup || 0) > 14 * 86400000;
+  $('#backup-reminder').hidden = !(all.length >= 3 && oldBackup);
+}
+
+// ---------------------------------------------------------------------------
+// Còpia de seguretat (configuració + reunions + fotos) en un fitxer
+// ---------------------------------------------------------------------------
+function base64ToBlob(b64, type) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type });
+}
+async function shareOrDownload(blob, filename, title) {
+  const file = new File([blob], filename, { type: blob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title }); return 'shared'; }
+    catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  return 'downloaded';
+}
+async function exportBackup() {
+  const msg = $('#backup-msg');
+  msg.textContent = 'Preparant la còpia…';
+  const meetings = await db.all('meetings');
+  const photos = {};
+  for (const m of meetings) {
+    for (const ph of m.photos || []) {
+      const blob = await db.get('audio', ph.key);
+      if (blob) photos[ph.key] = await blobToBase64(blob);
+    }
+  }
+  const data = {
+    app: 'xiu-xiu', format: 1, exportedAt: new Date().toISOString(), appVersion: APP_VERSION,
+    settings, recentEmails: recentEmails(), meetings, photos,
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const name = `xiu-xiu-copia-${new Date().toISOString().slice(0, 10)}.json`;
+  const r = await shareOrDownload(blob, name, 'Còpia de seguretat de Xiu-xiu');
+  if (r === 'cancelled') { msg.textContent = 'Còpia cancel·lada.'; return; }
+  saveSettings({ lastBackup: Date.now() });
+  $('#backup-info').textContent = `Última còpia: ${fmtDate(settings.lastBackup)}`;
+  msg.textContent = `✓ Còpia feta (${meetings.length} reunions). Guarda el fitxer en un lloc privat: inclou les teves claus.`;
+}
+async function importBackup(file) {
+  const msg = $('#backup-msg');
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { msg.textContent = '✗ Aquest fitxer no és una còpia de Xiu-xiu.'; return; }
+  if (!data || data.app !== 'xiu-xiu' || !Array.isArray(data.meetings)) { msg.textContent = '✗ Aquest fitxer no és una còpia de Xiu-xiu.'; return; }
+  if (!confirm(`Recuperar la còpia del ${fmtDate(data.exportedAt)}?\n\n${data.meetings.length} reunions i la configuració (clau, correu, script…). Les reunions que ja tens no s'esborren.`)) return;
+  let added = 0;
+  for (const m of data.meetings) {
+    if (await db.get('meetings', m.id)) continue;
+    if (m.status === 'processing' || m.status === 'recording') { m.status = 'error'; m.error = "Recuperada d'una còpia: s'havia quedat a mitges"; }
+    await db.put('meetings', m);
+    added++;
+  }
+  for (const [key, b64] of Object.entries(data.photos || {})) await db.put('audio', base64ToBlob(b64, 'image/jpeg'), key);
+  if (data.settings) {
+    const { lastBackup, ...rest } = data.settings;
+    saveSettings({ ...rest, v: settings.v });
+  }
+  if (Array.isArray(data.recentEmails)) rememberEmails(data.recentEmails);
+  meetingCache.clear();
+  fillSettings();
+  msg.textContent = `✓ Recuperat: ${added} reunions noves i la configuració.`;
+  toast('✓ Còpia recuperada');
+}
+$('#btn-backup').onclick = () => exportBackup().catch((e) => { $('#backup-msg').textContent = `✗ ${e.message}`; });
+$('#btn-restore').onclick = () => $('#restore-input').click();
+$('#restore-input').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importBackup(f); };
+$('#btn-backup-now').onclick = () => { showView('settings'); setTimeout(() => $('#backup-section').scrollIntoView({ behavior: 'smooth' }), 100); };
+
+// ---------------------------------------------------------------------------
+// PDF amb el disseny de Xiu-xiu
+// ---------------------------------------------------------------------------
+let pdfLibPromise = null;
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src; el.onload = resolve; el.onerror = () => reject(new Error(`No s'ha pogut carregar ${src}`));
+    document.head.appendChild(el);
+  });
+}
+function loadPdfLib() {
+  if (!pdfLibPromise) pdfLibPromise = loadScript('lib/jspdf.umd.min.js').then(() => loadScript('lib/jspdf.plugin.autotable.min.js')).then(() => window.jspdf.jsPDF);
+  return pdfLibPromise;
+}
+// Les fonts estàndard del PDF només admeten caràcters occidentals (Windows-1252).
+const CP1252_EXTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
+function pdfText(t) {
+  return String(t)
+    .replace(/[☐☑✓✔]/g, '').replace(/→/g, '->').replace(/≈/g, '~')
+    .replace(/\p{Extended_Pictographic}️?/gu, '')
+    .replace(/[^\u0000-ÿ]/g, (c) => (CP1252_EXTRA.includes(c) ? c : (c.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\u0000-ÿ]/g, '') || '')))
+    .replace(/\s+/g, ' ').trim();
+}
+async function imageDataUrl(url) {
+  const blob = await (await fetch(url)).blob();
+  return new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob); });
+}
+async function makePdf(m, lang) {
+  const JsPDF = await loadPdfLib();
+  const L = L10N[lang] || L10N.ca;
+  const md = getSummary(m, lang);
+  const doc = new JsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, M = 16, maxW = W - 2 * M, BOTTOM = 280;
+  const ACCENT = [30, 64, 175], INK = [17, 24, 39], MUTED = [100, 116, 139], DOUBT = [180, 83, 9];
+  let y = 0;
+  const ensure = (h) => { if (y + h > BOTTOM) { doc.addPage(); y = 18; } };
+
+  // Capçalera
+  doc.setFillColor(...ACCENT); doc.rect(0, 0, W, 26, 'F');
+  try { doc.addImage(await imageDataUrl('icons/icon-192.png'), 'PNG', M, 5, 16, 16); } catch { /* sense icona */ }
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.text('Xiu-xiu', M + 20, 13.5);
+  doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.text('by Oriolbop', M + 20, 19);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(pdfText(L.minutes), W - M, 15, { align: 'right' });
+  y = 38;
+
+  // Títol i dades
+  const title = pdfText(summaryTitle(m, md));
+  doc.setTextColor(...INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+  const tl = doc.splitTextToSize(title, maxW); doc.text(tl, M, y); y += tl.length * 7.5;
+  const when = new Date(m.startedAt).toLocaleString(L.locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const meta = [`${L.date}: ${when}`, `${L.duration}: ${fmtDuration(m.durationMs || 0)}`];
+  if (m.type && m.type !== 'general' && MEETING_TYPES[m.type]) meta.push(`${L.type}: ${MEETING_TYPES[m.type].label}`);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+  const ml = doc.splitTextToSize(pdfText(meta.join('   ·   ')), maxW); doc.text(ml, M, y + 1); y += ml.length * 4.6 + 1;
+  if (m.context) { const cl = doc.splitTextToSize(pdfText(`${L.context}: ${m.context}`), maxW); doc.text(cl, M, y + 1); y += cl.length * 4.6 + 1; }
+  doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.4); doc.line(M, y + 2, W - M, y + 2); y += 9;
+
+  // Text amb etiqueta inicial en negreta («**Nom**: text»)
+  const rich = (raw, x, width, { size = 10.5, color = INK, lead = 5 } = {}) => {
+    let label = '', rest = raw;
+    const lm = raw.match(/^\*\*(.+?)\*\*\s*:?\s*(.*)$/);
+    if (lm) { label = pdfText(lm[1]) + ': '; rest = lm[2]; }
+    rest = pdfText(rest.replace(/\*\*/g, '').replace(/(^|\s)\*(\S.*?)\*/g, '$1$2'));
+    const doubt = /\[(dubte de comprensi|duda de comprensi|unclear)/i.test(rest);
+    doc.setFontSize(size);
+    let lw = 0;
+    if (label) { doc.setFont('helvetica', 'bold'); lw = doc.getTextWidth(label); }
+    doc.setFont('helvetica', 'normal');
+    const firstW = Math.max(20, width - lw);
+    const words = rest.split(' ');
+    const lines = []; let cur = '', limit = firstW;
+    for (const w of words) {
+      const test = cur ? `${cur} ${w}` : w;
+      if (doc.getTextWidth(test) > limit && cur) { lines.push(cur); cur = w; limit = width; } else cur = test;
+    }
+    if (cur || !lines.length) lines.push(cur);
+    ensure(lines.length * lead + 1);
+    if (label) { doc.setFont('helvetica', 'bold'); doc.setTextColor(...INK); doc.text(label, x, y); }
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...(doubt ? DOUBT : color));
+    lines.forEach((ln, i) => doc.text(ln, i === 0 ? x + lw : x, y + i * lead));
+    y += lines.length * lead + 1.2;
+  };
+
+  const lines = md.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trimEnd();
+    let mm;
+    if (!line.trim() || /^#\s+/.test(line)) { i++; continue; }
+    if ((mm = line.match(/^#{2,3}\s+(.*)$/))) {
+      const heading = mm[1];
+      // Secció de tasques: com a taula
+      if (/^(Tasques|Tareas|Tasks|Action items)/i.test(heading)) {
+        const block = [line];
+        i++;
+        while (i < lines.length && !/^#{1,3}\s+/.test(lines[i])) block.push(lines[i++]);
+        const tasks = parseTasks(block.join('\n'));
+        ensure(16); y += 2;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(...ACCENT); doc.text(pdfText(heading), M, y);
+        doc.setDrawColor(...ACCENT); doc.setLineWidth(0.3); doc.line(M, y + 1.8, W - M, y + 1.8); y += 7;
+        if (tasks.length) {
+          doc.autoTable({
+            startY: y, margin: { left: M, right: M, bottom: 297 - BOTTOM },
+            head: [['', L.who, L.task, L.due].map(pdfText)],
+            body: tasks.map((t) => ['', pdfText(t.who || '—'), pdfText(t.task), pdfText(t.due || '')]),
+            styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 2.2, textColor: INK, lineColor: [226, 232, 240], lineWidth: 0.2, valign: 'middle' },
+            headStyles: { fillColor: [239, 246, 255], textColor: ACCENT, fontStyle: 'bold' },
+            columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 34, fontStyle: 'bold' }, 3: { cellWidth: 30 } },
+            didDrawCell: (d) => {
+              if (d.section === 'body' && d.column.index === 0) {
+                doc.setDrawColor(...MUTED); doc.setLineWidth(0.3);
+                doc.rect(d.cell.x + 2.4, d.cell.y + d.cell.height / 2 - 1.6, 3.2, 3.2);
+              }
+            },
+          });
+          y = doc.lastAutoTable.finalY + 6;
+        } else {
+          rich('—', M, maxW);
+          y += 2;
+        }
+        continue;
+      }
+      ensure(14); y += 2;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(...ACCENT); doc.text(pdfText(heading), M, y);
+      doc.setDrawColor(...ACCENT); doc.setLineWidth(0.3); doc.line(M, y + 1.8, W - M, y + 1.8); y += 7;
+    } else if ((mm = line.match(/^(\s*)[-*•]\s+(?:\[[ xX]?\]\s*)?(.*)$/))) {
+      const nested = mm[1].replace(/\t/g, '    ').length >= 2;
+      const x = M + (nested ? 10 : 4);
+      ensure(6);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...ACCENT);
+      doc.text(nested ? '–' : '•', x - 3.5, y);
+      rich(mm[2], x, W - M - x);
+    } else if ((mm = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/))) {
+      const x = M + 6;
+      ensure(6);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...ACCENT); doc.text(`${mm[2]}.`, M, y);
+      rich(mm[3], x, W - M - x);
+    } else {
+      rich(line, M, maxW);
+      y += 1;
+    }
+    i++;
+  }
+
+  // Peu de pàgina
+  const n = doc.getNumberOfPages();
+  for (let p = 1; p <= n; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3); doc.line(M, 287, W - M, 287);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...MUTED); doc.text('Xiu-xiu', M, 291.5);
+    const brandW = doc.getTextWidth('Xiu-xiu') + 1.5;
+    doc.setFont('helvetica', 'italic'); doc.text('by Oriolbop', M + brandW, 291.5);
+    doc.setFont('helvetica', 'normal'); doc.text(`${L.page} ${p} / ${n}`, W - M, 291.5, { align: 'right' });
+  }
+  return doc.output('blob');
+}
+$('#btn-pdf').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m || !m.summary) return;
+  const btn = $('#btn-pdf');
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Preparant…';
+  try {
+    const blob = await makePdf(m, resultLang);
+    const name = `${summaryTitle(m, getSummary(m, resultLang)).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'Acta'} - ${new Date(m.startedAt).toISOString().slice(0, 10)}.pdf`;
+    await shareOrDownload(blob, name, summaryTitle(m));
+  } catch (e) {
+    toast(`No s'ha pogut fer el PDF: ${e.message}`, 5000);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Avís de versió nova
+// ---------------------------------------------------------------------------
+async function checkForUpdate() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const info = await res.json();
+    if (Number(info.v) > APP_VERSION) {
+      $('#update-notes').textContent = info.notes ? ` ${info.notes}` : '';
+      $('#update-banner').hidden = false;
+    }
+  } catch { /* sense connexió */ }
+}
+$('#btn-update').onclick = async () => {
+  if (rec.meeting) { toast('Acaba la reunió abans d\'actualitzar'); return; }
+  $('#btn-update').textContent = 'Actualitzant…';
+  try { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch { /* res */ }
+  location.reload();
+};
+setTimeout(checkForUpdate, 3000);
+setInterval(checkForUpdate, 30 * 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
 
 // ---------------------------------------------------------------------------
 // Esdeveniments
@@ -1525,7 +1970,7 @@ $('#btn-share-send').onclick = async () => {
     return;
   }
   const m = await getMeeting(viewingId);
-  const e = buildEmail(m);
+  const e = buildEmail(m, resultLang);
   const payload = { subject: e.subject, html: e.html, text: e.text, recipients: list, external: true };
   if ($('#share-transcript').checked) { payload.transcript = e.transcript; payload.filename = e.filename; }
   const btn = $('#btn-share-send');
@@ -1554,8 +1999,9 @@ $('#btn-share-mail').onclick = async () => {
   if (!list) return;
   rememberEmails(list);
   const m = await getMeeting(viewingId);
-  const subject = `Resum: ${summaryTitle(m)} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`;
-  location.href = `mailto:${list.map(encodeURIComponent).join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mdToPlain(m.summary))}`;
+  const md = getSummary(m, resultLang);
+  const subject = `${L10N[resultLang].subject}: ${summaryTitle(m, md)} (${new Date(m.startedAt).toLocaleDateString(L10N[resultLang].locale)})`;
+  location.href = `mailto:${list.map(encodeURIComponent).join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mdToPlain(md))}`;
 };
 
 // Obre l'app de correu amb el resum ja escrit (no depèn de l'script de Google).
@@ -1568,7 +2014,7 @@ $('#btn-mail').onclick = async () => {
     btn.disabled = true;
     btn.textContent = 'Enviant…';
     try {
-      const r = await sendEmail(buildEmail(m), { noFallback: true });
+      const r = await sendEmail(buildEmail(m, resultLang), { noFallback: true });
       m.email = { status: 'sent', at: Date.now(), confirmed: r.confirmed };
       await saveMeeting(m);
       toast(`✓ Resum enviat a ${settings.email}`);
@@ -1582,15 +2028,17 @@ $('#btn-mail').onclick = async () => {
     return;
   }
   // Sense script: obre l'app de correu del mòbil amb el resum ja escrit.
-  const subject = `Resum: ${summaryTitle(m)} (${new Date(m.startedAt).toLocaleDateString('ca-ES')})`;
-  const body = mdToPlain(m.summary);
+  const md = getSummary(m, resultLang);
+  const subject = `${L10N[resultLang].subject}: ${summaryTitle(m, md)} (${new Date(m.startedAt).toLocaleDateString(L10N[resultLang].locale)})`;
+  const body = mdToPlain(md);
   location.href = `mailto:${encodeURIComponent(settings.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
 $('#btn-copy').onclick = async () => {
   const m = await getMeeting(viewingId);
   // Amb format (per enganxar a un correu) i en text pla com a alternativa.
-  const html = `<div style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.5">${mdToHtml(m.summary, EMAIL_STYLE)}</div>`;
-  const plain = mdToPlain(m.summary);
+  const md = getSummary(m, resultLang);
+  const html = `<div style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.5">${mdToHtml(md, EMAIL_STYLE)}</div>`;
+  const plain = mdToPlain(md);
   try {
     if (window.ClipboardItem && navigator.clipboard.write) {
       await navigator.clipboard.write([new ClipboardItem({

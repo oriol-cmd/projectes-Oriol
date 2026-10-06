@@ -25,6 +25,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
   </header>
+  <div id="update-banner" class="update-banner" hidden>
+    <span>✨ <b>Nova versió de Xiu-xiu.</b><span id="update-notes"></span></span>
+    <button id="btn-update" class="btn small primary" type="button">Actualitza</button>
+  </div>
 
   <main>
     <!-- INICI -->
@@ -52,6 +56,12 @@
       </div>
       <div id="home-main">
       <div id="pending-banner" class="banner" hidden></div>
+      <div id="backup-reminder" class="banner" hidden>💾 Fa temps que no fas una còpia de seguretat de les teves reunions. <button class="link" id="btn-backup-now" type="button">Fes-la ara</button></div>
+
+      <div class="field">
+        <span>Tipus de reunió</span>
+        <div id="type-chips" class="type-chips" role="group" aria-label="Tipus de reunió"></div>
+      </div>
 
       <label class="field">
         <span>Títol de la reunió <em>(opcional)</em></span>
@@ -70,6 +80,15 @@
         <p class="fineprint intro-tip">👋 Per saber qui diu què, comenceu presentant-vos («Soc l'Oriol…») i toqueu «Presentacions fetes».</p>
       </div>
       <p class="fineprint">Deixa el mòbil damunt la taula, amb l'app oberta. La pantalla es mantindrà encesa mentre grava.</p>
+
+      <section id="home-tasks" class="home-block" hidden>
+        <h3 id="home-tasks-title">Tasques</h3>
+        <ul id="recent-tasks" class="task-list"></ul>
+      </section>
+      <section id="home-recent" class="home-block" hidden>
+        <h3>Últimes reunions <button class="link small-link" data-goto="history" type="button">Veure-les totes</button></h3>
+        <ul id="recent-list" class="history"></ul>
+      </section>
       </div>
     </section>
 
@@ -106,6 +125,11 @@
     <!-- RESULTAT -->
     <section id="view-result" class="view" hidden>
       <div id="result-status" class="banner"></div>
+      <div id="lang-switch" class="seg" role="group" aria-label="Idioma del resum" hidden>
+        <button type="button" data-lang="ca">Català</button>
+        <button type="button" data-lang="es">Castellano</button>
+        <button type="button" data-lang="en">English</button>
+      </div>
       <article id="result-summary" class="summary"></article>
       <div id="result-photos-wrap" class="photos-wrap" hidden>
         <div id="result-photos" class="photos"></div>
@@ -123,6 +147,7 @@
           <button id="btn-share-mail" class="btn ghost">o obre-ho al correu del mòbil</button>
           <p id="share-msg" class="fineprint"></p>
         </div>
+        <button id="btn-pdf" class="btn secondary wide">📄 Descarrega o comparteix en PDF</button>
         <button id="btn-copy" class="btn secondary">Copia el resum</button>
         <button id="btn-resend" class="btn secondary">Torna a enviar</button>
         <button id="btn-redo" class="btn secondary">Refés el resum</button>
@@ -177,6 +202,12 @@
         </select></label>
 
       <h3>Resum</h3>
+      <label class="field"><span>Idioma dels resums</span>
+        <select id="set-summary-lang">
+          <option value="ca">Català</option>
+          <option value="es">Castellano</option>
+          <option value="en">English</option>
+        </select></label>
       <label class="field"><span>Instruccions extra per als resums <em>(opcional)</em></span>
         <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
 
@@ -187,6 +218,16 @@
         <label class="check"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
         <label class="check"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
       </details>
+
+      <h3 id="backup-section">Còpia de seguretat</h3>
+      <p class="fineprint" style="text-align:left;margin-top:0">Guarda la configuració i totes les reunions en un fitxer (p. ex. a iCloud Drive o Google Drive) per recuperar-les si canvies de mòbil o reinstal·les l'app.</p>
+      <div class="row2">
+        <button class="btn secondary small" id="btn-backup" type="button">💾 Desa una còpia</button>
+        <button class="btn secondary small" id="btn-restore" type="button">📂 Recupera una còpia</button>
+      </div>
+      <p id="backup-info" class="fineprint" style="text-align:left"></p>
+      <p id="backup-msg" class="fineprint" style="text-align:left"></p>
+      <input id="restore-input" type="file" accept="application/json,.json" hidden>
 
       <div class="settings-actions">
         <button class="btn primary" id="btn-save-settings">Desa</button>
