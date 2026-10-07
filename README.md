@@ -101,7 +101,7 @@ Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada».
 ## Veus fluixes i noms difícils
 
 - **Amplifica les veus fluixes o llunyanes** (Ajustos > Transcripció, activat de sèrie): abans d'enviar cada tros a Gemini, l'app puja el volum de les parts fluixes, treu el brunzit greu i dona claredat a la veu.
-- **Transcripció més precisa** (activat de sèrie): fa servir Gemini Flash en comptes de Flash-Lite. Si s'esgota la quota, passa sol a Flash-Lite.
+- **Transcripció més precisa** (desactivat de sèrie): fa servir Gemini Flash en comptes de Flash-Lite. Entén millor les veus difícils, però costa uns 10 cops més i la quota gratuïta de Flash és molt petita (pot deixar el resum sense Flash). Si s'esgota, passa sol a Flash-Lite.
 - **Noms i paraules que surten sovint**: escriu-hi noms de persones, empreses, llocs i sigles perquè surtin ben escrits a la transcripció i al resum.
 - Consell: posa el mòbil al mig de la taula, a prop de qui parla més fluix, i no el tapis.
 

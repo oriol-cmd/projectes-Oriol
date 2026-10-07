@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -15,14 +15,14 @@ const DEFAULTS = {
   extra: '',
   vocab: '',
   boost: true,
-  precise: true,
+  precise: false,
   liveSec: 60, // cada quants segons apareix text nou en directe
   speakers: true, // identifica qui parla a partir de les presentacions inicials
   summaryLang: 'ca', // idioma per defecte dels resums: ca | es | en
   lastType: 'general', // últim tipus de reunió triat
   lastBackup: 0, // data de l'última còpia de seguretat
   source: 'mic', // 'mic' | 'call' (videotrucada a l'ordinador)
-  v: 2,
+  v: 3,
   keepAudio: false,
 };
 
@@ -32,6 +32,7 @@ function loadSettings() {
   catch { s = { ...DEFAULTS }; }
   if (s.engine !== 'device') s.engine = 'audio';
   if (!s.v || s.v < 2) { s.liveSec = 60; s.v = 2; } // trams més llargs: la quota gratuïta és limitada
+  if (s.v < 3) { s.precise = false; s.v = 3; } // Flash per transcriure: opcional (gasta quota i costa més)
   delete s.geminiModel;
   return s;
 }
@@ -330,7 +331,7 @@ async function readGeminiStream(res, onText) {
 // thinking: límit de «pensament» (tokens) per anar més de pressa · onText: resposta en directe
 async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thinking = null, onText = null } = {}) {
   const spent = exhaustedModels();
-  const chain = task === 'transcribe' && settings.precise !== false ? GEMINI_MODELS.transcribePrecise : GEMINI_MODELS[task];
+  const chain = task === 'transcribe' && settings.precise === true ? GEMINI_MODELS.transcribePrecise : GEMINI_MODELS[task];
   const models = chain.filter((x) => !missingModels.has(x) && !spent.includes(x));
   if (!models.length) throw new FatalError(QUOTA_MSG);
   let lastErr;
@@ -1595,7 +1596,7 @@ function fillSettings() {
   $('#set-extra').value = settings.extra;
   $('#set-vocab').value = settings.vocab || '';
   $('#set-boost').checked = settings.boost !== false;
-  $('#set-precise').checked = settings.precise !== false;
+  $('#set-precise').checked = settings.precise === true;
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   $('#set-speakers').checked = settings.speakers !== false;
@@ -1617,7 +1618,7 @@ function readSettingsForm() {
     boost: $('#set-boost').checked,
     precise: $('#set-precise').checked,
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
-    v: 2,
+    v: 3,
     keepAudio: $('#set-keep-audio').checked,
     speakers: $('#set-speakers').checked,
     summaryLang: $('#set-summary-lang').value,
