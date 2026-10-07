@@ -381,6 +381,20 @@
     </div>
   </div>
 
+  <!-- Importar: resum o només text -->
+  <div id="import-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Què vols fer amb els àudios?">
+      <div class="sheet-grip"></div>
+      <h3 id="import-sheet-title">Què vols fer amb l'àudio?</h3>
+      <div class="sheet-list">
+        <button id="btn-import-summary" class="sheet-row" type="button">✨ Fes-ne el resum<br><small>Resum curt amb els punts clau i les tasques</small></button>
+        <button id="btn-import-text" class="sheet-row" type="button">📝 Només el text<br><small>Transcripció neta, per copiar-la a un document o passar-la a un assistent</small></button>
+      </div>
+      <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
   <!-- Més opcions -->
   <div id="more-sheet" class="sheet" hidden>
     <div class="sheet-backdrop" data-close-sheet></div>

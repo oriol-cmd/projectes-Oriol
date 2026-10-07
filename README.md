@@ -141,6 +141,8 @@ Pots triar **diversos fitxers alhora** (fins a 30): es transcriuen per ordre de 
 
 Als àudios importats, Xiu-xiu millora el so abans de transcriure'ls (si duren menys de 15 minuts) i en fa un **resum curt**: resum, una línia per àudio, punts clau i tasques. Si el vols complet, desmarca «Resum curt per als àudios importats» a Ajustos > Resums.
 
+En importar, Xiu-xiu et pregunta què vols: **«Fes-ne el resum»** o **«Només el text»**. «Només el text» et dona la transcripció neta (sense crosses ni repeticions, amb puntuació i paràgrafs, però sense escurçar res), per copiar-la a un document o passar-la a un assistent com Claude. Si després vols el resum, toca «⋯ > Refés el resum».
+
 ### Videotrucades a l'ordinador
 Obre Xiu-xiu a l'ordinador amb **Chrome o Edge** i tria **«🖥️ Videotrucada»**. En començar, el navegador et demana què vols compartir: tria la **pestanya** de Meet, Teams o Zoom web (o **tota la pantalla**, a Windows, si fas servir l'aplicació d'escriptori) i marca **«Comparteix també l'àudio»**. Xiu-xiu grava el so de la trucada i el teu micròfon alhora. (Al Mac, Chrome només pot gravar el so d'una pestanya, no el d'aplicacions.)
 

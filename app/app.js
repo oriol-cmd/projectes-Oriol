@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -654,6 +654,16 @@ const PER_AUDIO = `## Àudio per àudio
 
 `;
 
+// «Només el text»: la transcripció neta com a document (es pot copiar, compartir i enviar).
+function textDocument(m) {
+  const files = importList(m);
+  const title = m.title || (files.length === 1 && files[0].name ? files[0].name.replace(/\.[^.]+$/, '') : 'Transcripció');
+  const body = m.segments.slice().sort((a, b) => a.idx - b.idx).map((s) => (s.text || '')
+    .replace(/^\[Àudio (\d+) de (\d+): ([^\]]*)\]\n?/, (x, i, n, name) => `## Àudio ${i}${name ? ` · ${name}` : ''}\n\n`)
+    .trim()).filter(Boolean).join('\n\n');
+  return `# ${title}\n\n${body || '(Sense veu)'}`;
+}
+
 function buildTranscript(m) {
   if (m.engine === 'device') return (m.liveText || '').trim();
   return m.segments
@@ -881,7 +891,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
   if (pipelines.has(id)) return pipelines.get(id);
   const p = (async () => {
     const m = await getMeeting(id);
-    if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; }
+    if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; m.textOnly = false; }
     m.status = 'processing';
     m.error = '';
     await saveMeeting(m);
@@ -901,7 +911,11 @@ function runPipeline(id, { redoSummary = false } = {}) {
         const failed = m.segments.filter((s) => s.status !== 'done');
         if (failed.length) throw new Error(failed[0].error || 'Hi ha trams sense transcriure');
       }
-      // 2. Resum
+      // 2. Resum (o, si només es vol el text, el text net de la transcripció)
+      if (!m.summary && m.textOnly) {
+        m.summary = textDocument(m);
+        await saveMeeting(m);
+      }
       if (!m.summary) {
         m.stage = 'summary'; updateProcView(m);
         let last = 0;
@@ -918,7 +932,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
       }
       // 2b. Traducció a l'idioma per defecte (si no és el català)
       const lang = settings.summaryLang || 'ca';
-      if (lang !== 'ca' && !(m.translations && m.translations[lang])) {
+      if (!m.textOnly && lang !== 'ca' && !(m.translations && m.translations[lang])) {
         m.stage = 'translate'; updateProcView(m);
         await translateSummary(m, lang);
       }
@@ -2340,8 +2354,9 @@ async function transcribeImportFile(m, blob, f, label) {
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
     "Si parlen diverses persones, comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
-    "Cada 5 minuts aproximadament, afegeix una línia amb el temps de la gravació entre claudàtors, p. ex. [05:00], [10:00].",
+    m.textOnly ? '' : "Cada 5 minuts aproximadament, afegeix una línia amb el temps de la gravació entre claudàtors, p. ex. [05:00], [10:00].",
     "Escriu només la transcripció, sense títols, comentaris ni resums. Si no hi ha veu, respon només: [silenci]",
+    m.textOnly ? "Fes una transcripció NETA, perquè es pugui llegir i fer servir com a text: treu les crosses (eh, mmm, o sigui…), les repeticions i les frases que es tallen i es tornen a començar; posa bé la puntuació i separa-ho en paràgrafs. NO resumeixis, NO escurcis el contingut i NO canviïs el sentit ni l'ordre del que es diu: s'ha de conservar tot el que es demana o s'explica, amb tots els detalls. No posis marques de temps." : '',
     "Escolta amb atenció també les veus fluixes, llunyanes o que parlen alhora, i transcriu-les igualment.",
     "Fes servir el context de la conversa per entendre paraules mal pronunciades o tallades, però només si n'estàs raonablement segur. Escriu bé els noms propis, xifres, dates i imports.",
     "Si només parla una persona (p. ex. una nota de veu), no cal posar-hi nom a cada línia: separa'l en paràgrafs per idees.",
@@ -2396,7 +2411,7 @@ async function transcribeImportFile(m, blob, f, label) {
   }
   throw new FatalError(`Google no accepta el format de «${f.name || 'fitxer'}». Prova d'exportar-lo en MP3 o M4A. (${lastErr ? lastErr.message : ''})`);
 }
-async function importFiles(list) {
+async function importFiles(list, { textOnly = false } = {}) {
   const miss = missingSetup();
   if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); return; }
   if (!list.length) return;
@@ -2418,6 +2433,7 @@ async function importFiles(list) {
     startedAt: Math.min(...files.map((f) => f.lastModified || Date.now())),
     durationMs: durations.reduce((a, b) => a + b, 0),
     engine: 'import',
+    textOnly,
     importFiles: files.map((f, i) => ({ key: `${id}:import:${i}`, name: f.name, mime: importMime(f), durationMs: durations[i] })),
     importName: files.map((f) => f.name).join(', ').slice(0, 200),
     type: settings.lastType || 'general',
@@ -2436,7 +2452,16 @@ async function importFiles(list) {
   runPipeline(m.id);
 }
 $('#btn-import').onclick = () => $('#import-input').click();
-$('#import-input').onchange = (e) => { const fs = [...e.target.files]; e.target.value = ''; importFiles(fs); };
+let pendingImport = [];
+$('#import-input').onchange = (e) => {
+  pendingImport = [...e.target.files];
+  e.target.value = '';
+  if (!pendingImport.length) return;
+  $('#import-sheet-title').textContent = pendingImport.length > 1 ? `Què vols fer amb els ${pendingImport.length} àudios?` : "Què vols fer amb l'àudio?";
+  openSheet('#import-sheet');
+};
+$('#btn-import-summary').onclick = () => { closeSheets(); importFiles(pendingImport); pendingImport = []; };
+$('#btn-import-text').onclick = () => { closeSheets(); importFiles(pendingImport, { textOnly: true }); pendingImport = []; };
 
 // ---------------------------------------------------------------------------
 // Pregunta a les reunions
