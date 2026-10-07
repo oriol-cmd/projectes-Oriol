@@ -69,7 +69,7 @@
             <button type="button" data-source="call">🖥️ Videotrucada <small>(ordinador)</small></button>
           </div>
           <p id="source-hint" class="fineprint" hidden>Només a l'ordinador. Grava el so d'una pestanya (Meet, Teams o Zoom al navegador) o de tot l'ordinador, i també el teu micròfon. Quan t'ho demani, marca <b>«Comparteix també l'àudio»</b>.</p>
-          <button id="btn-import" class="btn secondary small import-btn" type="button">📂 Importa un àudio o vídeo</button>
+          <button id="btn-import" class="btn secondary small import-btn" type="button">📂 Importa àudios o vídeos</button>
           <p id="call-mobile-note" class="call-note" hidden>🖥️ <b>Gravar videotrucades</b> (Meet, Teams, Zoom) <b>només és possible des de l'ordinador</b>: obre Xiu-xiu amb Chrome o Edge i tria «Videotrucada». Des del mòbil, posa la trucada amb l'altaveu en un altre aparell i grava-la aquí.</p>
         </div>
 
@@ -417,7 +417,7 @@
   </nav>
 
   <input id="photo-input" type="file" accept="image/*" multiple hidden>
-  <input id="import-input" type="file" accept="audio/*,video/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.flac,.mp4,.mov,.webm" hidden>
+  <input id="import-input" type="file" multiple accept="audio/*,video/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.flac,.mp4,.mov,.webm" hidden>
   <div id="toast" class="toast" hidden></div>
   <script src="app.js"></script>
 </body>

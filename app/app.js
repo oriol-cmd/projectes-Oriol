@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -713,7 +713,12 @@ async function summarize(m, onText = null) {
   if (m.context) info.push(`Context i assistents: ${m.context}`);
   if (m.group) info.push(`Grup de treball o projecte: ${m.group}`);
   if (m.source === 'call') info.push("És una videotrucada: s'ha gravat el so de la trucada i el micròfon de l'usuari.");
-  if (m.engine === 'import') info.push("La reunió prové d'un fitxer d'àudio o vídeo importat.");
+  if (m.engine === 'import') {
+    const n = importList(m).length;
+    info.push(n > 1
+      ? `La reunió prové de ${n} gravacions importades (p. ex. notes de veu), en ordre; la transcripció les separa amb «[Àudio X de ${n}]». Fes-ne UN sol resum conjunt.`
+      : "La reunió prové d'un fitxer d'àudio o vídeo importat.");
+  }
   if (m.type && m.type !== 'general' && MEETING_TYPES[m.type]) {
     info.push(`Tipus de reunió: ${MEETING_TYPES[m.type].label}. ${MEETING_TYPES[m.type].prompt}`);
   }
@@ -854,7 +859,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
     try {
       // 1. Transcripció
       if (m.engine === 'import') {
-        if (!(m.segments[0] && m.segments[0].status === 'done')) {
+        if (!m.segments.length || m.segments.some((x) => x.status !== 'done')) {
           m.stage = 'transcribe'; updateProcView(m);
           await transcribeImport(m);
         }
@@ -905,7 +910,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
       delete m.retryAt;
       await saveMeeting(m);
       if (m.refIdx != null && !settings.keepAudio) await db.del('audio', audioKey(m.id, m.refIdx));
-      if (m.engine === 'import' && !settings.keepAudio) await db.del('audio', `${m.id}:import`);
+      if (m.engine === 'import' && !settings.keepAudio) for (const f of importList(m)) await db.del('audio', f.key);
     } catch (e) {
       m.status = 'error';
       m.error = e.message;
@@ -1418,7 +1423,8 @@ function updateProcView(m) {
   const segErr = m.segments.find((s) => s.status === 'error');
   if (m.engine === 'device') setStep('step-transcribe', 'done', TXT.dictation);
   else if (m.engine === 'import') {
-    if (m.segments[0] && m.segments[0].status === 'done') setStep('step-transcribe', 'done', 'Fitxer transcrit');
+    const n = importList(m).length;
+    if (m.segments.length && m.segments.every((x) => x.status === 'done')) setStep('step-transcribe', 'done', n > 1 ? `${n} àudios transcrits` : 'Fitxer transcrit');
     else if (m.status === 'error' && m.stage === 'transcribe') setStep('step-transcribe', 'error', friendlyError(m.error));
     else setStep('step-transcribe', 'active', m.importProgress || 'Transcrivint el fitxer… (pot trigar uns minuts)');
   }
@@ -1516,7 +1522,7 @@ async function deleteMeeting(m) {
   if (!confirm('Esborrar aquesta reunió (resum, transcripció i fotos)?')) return false;
   for (const s of m.segments || []) await db.del('audio', audioKey(m.id, s.idx));
   for (const ph of m.photos || []) await db.del('audio', ph.key);
-  await db.del('audio', `${m.id}:import`);
+  if (m.engine === 'import') for (const f of importList(m)) await db.del('audio', f.key);
   await db.del('meetings', m.id);
   meetingCache.delete(m.id);
   addTombstone(m.id);
@@ -2261,40 +2267,71 @@ async function uploadToGemini(blob, mime, name) {
   if (!file || file.state === 'FAILED') throw new Error('Google no ha pogut processar el fitxer');
   return file.uri;
 }
+// Fitxers d'una reunió importada (abans només n'hi havia un).
+function importList(m) {
+  return m.importFiles && m.importFiles.length
+    ? m.importFiles
+    : [{ key: `${m.id}:import`, name: m.importName, mime: m.importMime }];
+}
 async function transcribeImport(m) {
-  const blob = await db.get('audio', `${m.id}:import`);
-  if (!blob) throw new FatalError("No s'ha trobat el fitxer importat. Torna'l a importar.");
+  const files = importList(m);
+  if (m.segments.length !== files.length) m.segments = files.map((f, i) => ({ idx: i, startMs: 0, status: 'pending', text: '' }));
+  for (let i = 0; i < files.length; i++) {
+    const seg = m.segments[i];
+    if (seg.status === 'done') continue;
+    const f = files[i];
+    const blob = await db.get('audio', f.key);
+    if (!blob) throw new FatalError(`No s'ha trobat el fitxer «${f.name || 'importat'}». Torna'l a importar.`);
+    const label = files.length > 1 ? `Àudio ${i + 1} de ${files.length}: ` : '';
+    try {
+      const text = await transcribeImportFile(m, blob, f, label);
+      seg.text = files.length > 1 ? `[Àudio ${i + 1} de ${files.length}: ${f.name || ''}]\n${text}` : text;
+      seg.status = 'done';
+      delete seg.error;
+    } catch (e) {
+      seg.status = 'error';
+      seg.error = e.message;
+      await saveMeeting(m);
+      throw e;
+    }
+    delete m.importProgress;
+    await saveMeeting(m);
+    updateProcView(m);
+  }
+}
+async function transcribeImportFile(m, blob, f, label) {
+  const progress = (t) => { m.importProgress = label + t; updateProcView(m); };
   const prompt = [
     "Transcriu literalment aquesta gravació d'una reunió o conversa.",
+    label ? "És una de diverses gravacions de la mateixa reunió o conversa (p. ex. notes de veu)." : '',
     settings.lang === 'auto'
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
     "Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
     "Cada 5 minuts aproximadament, afegeix una línia amb el temps de la gravació entre claudàtors, p. ex. [05:00], [10:00].",
-    "Escriu només la transcripció, sense títols, comentaris ni resums.",
+    "Escriu només la transcripció, sense títols, comentaris ni resums. Si no hi ha veu, respon només: [silenci]",
+    "Escolta amb atenció també les veus fluixes o llunyanes.",
     "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió].",
     m.context ? `Context (per escriure bé noms i termes): ${m.context}` : '',
+    settings.vocab ? `Noms i paraules que surten sovint (escriu-los exactament així): ${settings.vocab}` : '',
   ].filter(Boolean).join('\n');
+  const clean = (t) => (/^\[silenci\]$/i.test(t.trim()) ? '' : t.trim());
 
-  const primary = m.importMime || 'audio/mp4';
+  const primary = f.mime || 'audio/mp4';
   const mimes = [...new Set([primary, ...(primary === 'audio/mp4' ? ['video/mp4', 'audio/aac'] : primary === 'audio/ogg' ? ['audio/opus'] : [])])];
   let lastErr;
   for (const mime of mimes) {
     try {
       let part;
       if (blob.size <= 14e6) {
-        m.importProgress = 'Transcrivint el fitxer…'; updateProcView(m);
+        progress('Transcrivint…');
         part = { inlineData: { mimeType: mime, data: await blobToBase64(blob) } };
       } else {
-        m.importProgress = `Pujant el fitxer a Google (${Math.round(blob.size / 1e6)} MB)…`; updateProcView(m);
-        part = { fileData: { mimeType: mime, fileUri: await uploadToGemini(blob, mime, m.importName) } };
-        m.importProgress = 'Transcrivint el fitxer… (pot trigar uns minuts)'; updateProcView(m);
+        progress(`Pujant el fitxer a Google (${Math.round(blob.size / 1e6)} MB)…`);
+        part = { fileData: { mimeType: mime, fileUri: await uploadToGemini(blob, mime, f.name) } };
+        progress('Transcrivint… (pot trigar uns minuts)');
       }
-      const text = await gemini([part, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 });
-      m.segments = [{ idx: 0, startMs: 0, status: 'done', text: text.trim() }];
-      delete m.importProgress;
-      await saveMeeting(m);
-      return;
+      return clean(await gemini([part, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 }));
     } catch (e) {
       lastErr = e;
       if (!(e instanceof UnsupportedAudioError)) throw e;
@@ -2302,30 +2339,36 @@ async function transcribeImport(m) {
   }
   // Últim recurs per a fitxers petits: convertir-los a WAV al mòbil.
   if (blob.size <= 25e6) {
-    m.importProgress = 'Convertint el fitxer…'; updateProcView(m);
+    progress('Convertint el fitxer…');
     const wav = await toWav(blob);
-    const text = await gemini([{ inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } }, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 });
-    m.segments = [{ idx: 0, startMs: 0, status: 'done', text: text.trim() }];
-    delete m.importProgress;
-    await saveMeeting(m);
-    return;
+    return clean(await gemini([{ inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } }, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 }));
   }
-  throw new FatalError(`Google no accepta aquest format de fitxer. Prova d'exportar-lo en MP3 o M4A. (${lastErr ? lastErr.message : ''})`);
+  throw new FatalError(`Google no accepta el format de «${f.name || 'fitxer'}». Prova d'exportar-lo en MP3 o M4A. (${lastErr ? lastErr.message : ''})`);
 }
-async function importFile(file) {
+async function importFiles(list) {
   const miss = missingSetup();
   if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); return; }
-  if (file.size > 1.9e9) { toast('El fitxer és massa gran (màxim 2 GB).', 5000); return; }
+  if (!list.length) return;
+  if (list.length > 30) { toast('Com a màxim 30 fitxers alhora.', 5000); return; }
+  const big = list.find((f) => f.size > 1.9e9);
+  if (big) { toast(`«${big.name}» és massa gran (màxim 2 GB).`, 5000); return; }
+  // Ordre: pel nom (les notes de veu porten la data i l'hora al nom).
+  const files = list.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const id = uid();
+  const durations = [];
+  for (const f of files) durations.push(await mediaDuration(f));
+  const title = $('#meeting-title').value.trim()
+    || (files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : '');
   const m = {
-    id: uid(),
-    title: $('#meeting-title').value.trim() || file.name.replace(/\.[^.]+$/, ''),
+    id,
+    title,
     context: $('#meeting-context').value.trim(),
     group: $('#meeting-group').value.trim(),
-    startedAt: file.lastModified || Date.now(),
-    durationMs: await mediaDuration(file),
+    startedAt: Math.min(...files.map((f) => f.lastModified || Date.now())),
+    durationMs: durations.reduce((a, b) => a + b, 0),
     engine: 'import',
-    importMime: importMime(file),
-    importName: file.name,
+    importFiles: files.map((f, i) => ({ key: `${id}:import:${i}`, name: f.name, mime: importMime(f), durationMs: durations[i] })),
+    importName: files.map((f) => f.name).join(', ').slice(0, 200),
     type: settings.lastType || 'general',
     status: 'processing',
     segments: [],
@@ -2333,7 +2376,7 @@ async function importFile(file) {
     summary: '',
     email: { status: 'pending' },
   };
-  await db.put('audio', file, `${m.id}:import`);
+  for (let i = 0; i < files.length; i++) await db.put('audio', files[i], m.importFiles[i].key);
   await saveMeeting(m);
   $('#meeting-title').value = ''; $('#meeting-context').value = ''; $('#meeting-group').value = '';
   viewingId = m.id;
@@ -2342,7 +2385,7 @@ async function importFile(file) {
   runPipeline(m.id);
 }
 $('#btn-import').onclick = () => $('#import-input').click();
-$('#import-input').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); };
+$('#import-input').onchange = (e) => { const fs = [...e.target.files]; e.target.value = ''; importFiles(fs); };
 
 // ---------------------------------------------------------------------------
 // Pregunta a les reunions

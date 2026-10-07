@@ -135,7 +135,9 @@ Qualsevol persona pot fer servir l'app amb el mateix enllaç: **https://oriol-cm
 - **Errors entenedors**: si alguna cosa falla, l'app ho explica clarament i ho torna a provar sola (el detall tècnic queda amagat).
 
 ### Importar àudios i vídeos
-A la pantalla de gravar, **«📂 Importa un àudio o vídeo»** fa el resum d'una gravació que ja tens: una nota de veu, un àudio de WhatsApp (desa'l abans a *Fitxers*), una gravació de Zoom o Teams, un MP3, M4A, WAV, OGG, MP4… Els fitxers grans es pugen a Google per transcriure'ls.
+A la pantalla de gravar, **«📂 Importa àudios o vídeos»** fa el resum d'una gravació que ja tens: una nota de veu, un àudio de WhatsApp (desa'l abans a *Fitxers*), una gravació de Zoom o Teams, un MP3, M4A, WAV, OGG, MP4… Els fitxers grans es pugen a Google per transcriure'ls.
+
+Pots triar **diversos fitxers alhora** (fins a 30): es transcriuen per ordre de nom (les notes de veu porten la data i l'hora al nom) i se'n fa **un sol resum conjunt**.
 
 ### Videotrucades a l'ordinador
 Obre Xiu-xiu a l'ordinador amb **Chrome o Edge** i tria **«🖥️ Videotrucada»**. En començar, el navegador et demana què vols compartir: tria la **pestanya** de Meet, Teams o Zoom web (o **tota la pantalla**, a Windows, si fas servir l'aplicació d'escriptori) i marca **«Comparteix també l'àudio»**. Xiu-xiu grava el so de la trucada i el teu micròfon alhora. (Al Mac, Chrome només pot gravar el so d'una pestanya, no el d'aplicacions.)
