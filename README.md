@@ -98,6 +98,13 @@ Per saber qui diu què (i a qui toca cada tasca):
 
 Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada». Es pot desactivar a *Configuració > Avançat*. Enviar la mostra amb cada tram fa que el cost de transcripció sigui aproximadament el doble (uns 10 € al mes per 15 h setmanals).
 
+## Veus fluixes i noms difícils
+
+- **Amplifica les veus fluixes o llunyanes** (Ajustos > Transcripció, activat de sèrie): abans d'enviar cada tros a Gemini, l'app puja el volum de les parts fluixes, treu el brunzit greu i dona claredat a la veu.
+- **Transcripció més precisa** (activat de sèrie): fa servir Gemini Flash en comptes de Flash-Lite. Si s'esgota la quota, passa sol a Flash-Lite.
+- **Noms i paraules que surten sovint**: escriu-hi noms de persones, empreses, llocs i sigles perquè surtin ben escrits a la transcripció i al resum.
+- Consell: posa el mòbil al mig de la taula, a prop de qui parla més fluix, i no el tapis.
+
 ## Enviar el resum a altres persones
 
 A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les adreces (o tries les que ja has fet servir) i el resum els arriba amb format, enviat des del teu compte. Pots adjuntar-hi la transcripció. Les respostes et tornen a tu.

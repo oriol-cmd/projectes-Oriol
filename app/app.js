@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -13,6 +13,9 @@ const DEFAULTS = {
   geminiKey: '',
   lang: 'auto',
   extra: '',
+  vocab: '',
+  boost: true,
+  precise: true,
   liveSec: 60, // cada quants segons apareix text nou en directe
   speakers: true, // identifica qui parla a partir de les presentacions inicials
   summaryLang: 'ca', // idioma per defecte dels resums: ca | es | en
@@ -271,6 +274,8 @@ const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
 // transcripció (moltes peticions) i reservem Flash per al resum (una per reunió).
 const GEMINI_MODELS = {
   transcribe: ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'],
+  // Més precís per a veus difícils; si s'esgota la quota, passa sol a Flash-Lite.
+  transcribePrecise: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
   summary: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
 };
 const missingModels = new Set();
@@ -325,7 +330,8 @@ async function readGeminiStream(res, onText) {
 // thinking: límit de «pensament» (tokens) per anar més de pressa · onText: resposta en directe
 async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thinking = null, onText = null } = {}) {
   const spent = exhaustedModels();
-  const models = GEMINI_MODELS[task].filter((x) => !missingModels.has(x) && !spent.includes(x));
+  const chain = task === 'transcribe' && settings.precise !== false ? GEMINI_MODELS.transcribePrecise : GEMINI_MODELS[task];
+  const models = chain.filter((x) => !missingModels.has(x) && !spent.includes(x));
   if (!models.length) throw new FatalError(QUOTA_MSG);
   let lastErr;
   for (let mi = 0; mi < models.length; mi++) {
@@ -426,7 +432,9 @@ async function toWav(blob) {
   src.buffer = decoded;
   src.connect(off.destination);
   src.start();
-  const pcm = (await off.startRendering()).getChannelData(0);
+  return pcmToWav((await off.startRendering()).getChannelData(0), rate);
+}
+function pcmToWav(pcm, rate) {
   const buf = new ArrayBuffer(44 + pcm.length * 2);
   const v = new DataView(buf);
   const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
@@ -441,11 +449,44 @@ async function toWav(blob) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
+// Millora l'àudio per a veus fluixes o llunyanes: treu el brunzit greu, comprimeix
+// (puja les parts fluixes i frena les fortes) i normalitza el volum. Torna un WAV
+// mono de 16 kHz (la mateixa resolució amb què l'escolta Gemini).
+async function enhanceAudio(blob) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  let decoded;
+  try { decoded = await ctx.decodeAudioData(await blob.arrayBuffer()); }
+  finally { ctx.close && ctx.close(); }
+  const rate = 16000;
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
+  const src = off.createBufferSource();
+  src.buffer = decoded;
+  const hp = off.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 90;
+  const presence = off.createBiquadFilter(); // dona claredat a la veu
+  presence.type = 'peaking'; presence.frequency.value = 2500; presence.Q.value = 0.8; presence.gain.value = 4;
+  const comp = off.createDynamicsCompressor();
+  comp.threshold.value = -42; comp.knee.value = 18; comp.ratio.value = 6;
+  comp.attack.value = 0.005; comp.release.value = 0.35;
+  src.connect(hp).connect(presence).connect(comp).connect(off.destination);
+  src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  // Normalitza: el volum mitjà de les parts amb so cap a -20 dBFS (amb límit de guany).
+  let sum = 0, n = 0;
+  for (let i = 0; i < pcm.length; i++) { const a = Math.abs(pcm[i]); if (a > 0.003) { sum += a * a; n++; } }
+  const rms = n ? Math.sqrt(sum / n) : 0;
+  const gain = rms ? Math.min(12, 0.1 / rms) : 1;
+  for (let i = 0; i < pcm.length; i++) pcm[i] = Math.tanh(pcm[i] * gain); // límit suau, sense distorsió forta
+  return pcmToWav(pcm, rate);
+}
+const enhancedRef = new Map(); // àudio de presentacions -> versió millorada
+
 const LANG_NAMES = { ca: 'català', es: 'castellà', en: 'anglès' };
 let forceWav = false;
 
 // ref: { blob, text } = àudio de les presentacions (mostra de veus) · isRef: és el tram de presentacions
-async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false } = {}) {
+async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false, boost = false, call = false } = {}) {
   const speakerRules = !speakers ? [
     'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
   ] : isRef ? [
@@ -458,9 +499,10 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     "Fes servir només noms de persones que s'hagin presentat. Si no pots saber amb seguretat qui parla, posa «Persona no identificada:».",
   ];
   const prompt = [
-    isRef || !ref
-      ? "Transcriu literalment aquest àudio, que és un tram d'una reunió gravada amb un mòbil damunt la taula."
-      : "Transcriu literalment un tram d'una reunió gravada amb un mòbil damunt la taula.",
+    (isRef || !ref ? "Transcriu literalment aquest àudio, que és un tram d'una reunió" : "Transcriu literalment un tram d'una reunió")
+      + (call ? ' feta per videotrucada.' : ' gravada amb un mòbil damunt la taula.'),
+    "Escolta amb molta atenció TOTES les veus, també les que sonen fluixes, llunyanes o de fons, i les que se superposen: transcriu-les igualment. Que una veu soni baixa no vol dir que no sigui important.",
+    "Fes servir el context de la conversa per entendre paraules mal pronunciades o tallades, però només si n'estàs raonablement segur.",
     settings.lang === 'auto'
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
@@ -468,7 +510,8 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     "Si no hi ha veu, respon només: [silenci]",
     "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió] en aquell punt. Exemple: «quedem dijous [dubte de comprensió] a les deu».",
     context ? `Context de la reunió (per escriure bé noms i termes): ${context}` : '',
-    prevText ? `Final del tram anterior (només per continuïtat, no el repeteixis): «${prevText.slice(-300)}»` : '',
+    settings.vocab ? `Noms i paraules que surten sovint (escriu-los exactament així quan els sentis): ${settings.vocab}` : '',
+    prevText ? `Final del tram anterior (només per continuïtat i per saber de què es parla; no el repeteixis): «${prevText.slice(-800)}»` : '',
   ].filter(Boolean).join('\n');
 
   const audioPart = async (b) => ({ inlineData: { mimeType: (b.type || 'audio/mp4').split(';')[0], data: await blobToBase64(b) } });
@@ -477,16 +520,27 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     await audioPart(b),
     { text: prompt },
   ], { task: 'transcribe', thinking: 0 }); // transcriure no requereix «pensar»: més ràpid
-  const refBlob = ref && ref.blob ? ref.blob : null;
+  let refBlob = ref && ref.blob ? ref.blob : null;
   let text;
-  if (!forceWav) {
+  if (boost) {
+    try {
+      const b = await enhanceAudio(blob);
+      if (refBlob) {
+        const k = ref.key || refBlob;
+        if (!enhancedRef.has(k)) { if (enhancedRef.size > 4) enhancedRef.clear(); enhancedRef.set(k, await enhanceAudio(refBlob)); }
+        refBlob = enhancedRef.get(k);
+      }
+      blob = b;
+    } catch { /* si no es pot descodificar, s'envia l'original */ }
+  }
+  if (!forceWav || blob.type === 'audio/wav') {
     try { text = await send(blob, refBlob); }
     catch (e) {
       if (!(e instanceof UnsupportedAudioError)) throw e;
       forceWav = true;
     }
   }
-  if (text === undefined) text = await send(await toWav(blob), refBlob ? await toWav(refBlob) : null);
+  if (text === undefined) text = await send(blob.type === 'audio/wav' ? blob : await toWav(blob), refBlob ? (refBlob.type === 'audio/wav' ? refBlob : await toWav(refBlob)) : null);
   text = text.trim();
   return /^\[silenci\]$/i.test(text) ? '' : text;
 }
@@ -508,10 +562,10 @@ function kickQueue(meetingId) {
         if (m.speakers && m.refIdx != null && !isRef) {
           const refSeg = m.segments.find((s) => s.idx === m.refIdx);
           const refBlob = await db.get('audio', audioKey(m.id, m.refIdx));
-          if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text };
+          if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx) };
         }
         try {
-          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers });
+          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call' });
           seg.status = 'done';
           delete seg.error;
           // L'àudio de les presentacions es guarda fins al final: és la mostra de veus.
@@ -540,7 +594,7 @@ function kickQueue(meetingId) {
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT = `Ets un secretari de reunions excel·lent. Reps la transcripció automàtica d'una reunió (gravada amb un mòbil damunt la taula) i n'has de fer l'acta-resum.
 
-La transcripció pot indicar qui parla al principi de cada línia («Nom: …»), identificat per la veu a partir de les presentacions de l'inici. Fes-ho servir per atribuir a cada persona les seves opinions, propostes, decisions i, sobretot, les TASQUES (qui s'encarrega de què). Si una línia diu «Persona no identificada» o no hi ha noms, dedueix pel context qui diu què només quan sigui raonablement clar; si no, no atribueixis la tasca a ningú i afegeix-hi [dubte de comprensió]. La transcripció pot tenir errors de reconeixement: corregeix errors evidents i no t'inventis res.
+La transcripció pot indicar qui parla al principi de cada línia («Nom: …»), identificat per la veu a partir de les presentacions de l'inici. Fes-ho servir per atribuir a cada persona les seves opinions, propostes, decisions i, sobretot, les TASQUES (qui s'encarrega de què). Si una línia diu «Persona no identificada» o no hi ha noms, dedueix pel context qui diu què només quan sigui raonablement clar; si no, no atribueixis la tasca a ningú i afegeix-hi [dubte de comprensió]. La transcripció pot tenir errors de reconeixement (paraules que sonen semblant, noms mal escrits, frases tallades): llegeix-la sencera abans d'escriure, entén de què es parla i corregeix els errors evidents pel context (p. ex. un nom que surt escrit de maneres diferents és la mateixa persona). No t'inventis res.
 
 La transcripció marca amb [dubte de comprensió] les parts que no s'han entès bé. Si un nom, xifra, data o idea que poses al resum ve d'una part marcada, o te'n falta informació per entendre-la, afegeix-hi just al costat [dubte de comprensió]. No elimines aquests dubtes ni els resolguis inventant.
 
@@ -663,6 +717,7 @@ async function summarize(m, onText = null) {
     info.push(`Tipus de reunió: ${MEETING_TYPES[m.type].label}. ${MEETING_TYPES[m.type].prompt}`);
   }
   if (m.marks && m.marks.length) info.push(`L'usuari ha marcat com a moments importants (temps de gravació): ${m.marks.map(fmtClock).join(', ')}. Dona-hi especial atenció.`);
+  if (settings.vocab) info.push(`Noms i paraules habituals (escriu-los així): ${settings.vocab}`);
   if (settings.extra) info.push(`Instruccions addicionals de l'usuari: ${settings.extra}`);
 
   // Fotos de documents (p. ex. notes escrites a mà) com a context.
@@ -1003,7 +1058,7 @@ function finishSegment(r, chunks, startMs, peak) {
   const type = r.mimeType || rec.mime || 'audio/mp4';
   segmentChain = segmentChain.then(async () => {
     const blob = new Blob(chunks, { type });
-    if (m && peak < SILENCE_PEAK) {
+    if (m && peak < (settings.boost !== false ? SILENCE_PEAK / 2.5 : SILENCE_PEAK)) {
       // Tram en silenci: no cal enviar-lo.
       m.segments.push({ idx: m.segments.length, startMs, status: 'done', text: '', silent: true });
       await saveMeeting(m);
@@ -1538,6 +1593,9 @@ function fillSettings() {
   $('#set-gemini-key').value = settings.geminiKey;
   $('#set-lang').value = settings.lang;
   $('#set-extra').value = settings.extra;
+  $('#set-vocab').value = settings.vocab || '';
+  $('#set-boost').checked = settings.boost !== false;
+  $('#set-precise').checked = settings.precise !== false;
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   $('#set-speakers').checked = settings.speakers !== false;
@@ -1555,6 +1613,9 @@ function readSettingsForm() {
     geminiKey: $('#set-gemini-key').value.trim(),
     lang: $('#set-lang').value,
     extra: $('#set-extra').value.trim(),
+    vocab: $('#set-vocab').value.trim(),
+    boost: $('#set-boost').checked,
+    precise: $('#set-precise').checked,
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
     v: 2,
     keepAudio: $('#set-keep-audio').checked,

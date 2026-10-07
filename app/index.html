@@ -244,13 +244,20 @@
             <option value="audio">Gemini (text cada ~1 min, molt precís)</option>
             <option value="device">Dictat del mòbil (a l'instant, menys precís)</option>
           </select></label>
-        <label class="field last"><span>Idioma de les reunions</span>
+        <label class="field"><span>Idioma de les reunions</span>
           <select id="set-lang">
             <option value="auto">Automàtic (català / castellà barrejats)</option>
             <option value="ca">Català</option>
             <option value="es">Castellà</option>
             <option value="en">Anglès</option>
           </select></label>
+        <label class="field"><span>Noms i paraules que surten sovint</span>
+          <textarea id="set-vocab" rows="2" placeholder="p. ex. Montse Puig, Jordi, Esportec, pavelló, PAE, subvenció Leader"></textarea></label>
+        <p class="fineprint left">Ajuda a escriure bé noms de persones, empreses, llocs i sigles.</p>
+        <div data-engine="audio">
+          <label class="check"><input id="set-boost" type="checkbox"> Amplifica les veus fluixes o llunyanes</label>
+          <label class="check last"><input id="set-precise" type="checkbox"> Transcripció més precisa (model Flash; gasta més quota)</label>
+        </div>
       </div>
 
       <h3>✉️ Correu i Google Sheets <em class="opt">opcional</em></h3>
