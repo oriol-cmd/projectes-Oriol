@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1017,7 +1017,7 @@ function finishSegment(r, chunks, startMs, peak) {
       updateRecProgress();
     }
     // Continua amb el següent tram si encara gravem.
-    if (rec.meeting === m && !rec.stopping && rec.stream && rec.recorder === r) startSegment();
+    if (rec.meeting === m && !rec.stopping && !rec.paused && rec.stream && rec.recorder === r) startSegment();
   });
 }
 
@@ -1165,16 +1165,37 @@ function setRecStateUi() {
   $('#rec-state-text').textContent = rec.paused ? 'En pausa' : 'Gravant';
 }
 
-function togglePause() {
-  if (!rec.meeting) return;
-  rec.paused = !rec.paused;
-  if (rec.meeting.engine !== 'device') {
+// Pausa: tanca el tram en curs (queda desat i es transcriu). En continuar,
+// comprova que el micròfon segueixi viu (el mòbil el pot tallar si es bloqueja)
+// i comença un tram nou.
+async function togglePause() {
+  if (!rec.meeting || rec.resuming) return;
+  if (rec.meeting.engine === 'device') {
+    rec.paused = !rec.paused;
+    if (rec.speech) { if (rec.paused) rec.speech.stop(); else { try { rec.speech.start(); } catch { /* ja actiu */ } } }
+  } else if (!rec.paused) {
+    rec.paused = true;
     const r = rec.recorder;
-    if (rec.paused && r && r.state === 'recording') r.pause();
-    else if (!rec.paused && r && r.state === 'paused') r.resume();
-    else if (!rec.paused && rec.stream && (!r || r.state === 'inactive')) startSegment();
-  } else if (rec.speech) {
-    if (rec.paused) rec.speech.stop(); else { try { rec.speech.start(); } catch { /* ja actiu */ } }
+    if (r && r.state !== 'inactive') { if (r.state === 'paused') r.resume(); r.stop(); }
+  } else {
+    rec.resuming = true;
+    $('#btn-pause').disabled = true;
+    try {
+      await segmentChain;
+      if (rec.audioCtx && rec.audioCtx.state !== 'running') await rec.audioCtx.resume().catch(() => {});
+      const alive = rec.stream && rec.stream.getAudioTracks().length && rec.stream.getAudioTracks().every((t) => t.readyState === 'live');
+      if (!alive) await openMic();
+      rec.paused = false;
+      rec.lastTick = performance.now();
+      if (!rec.recorder || rec.recorder.state === 'inactive') startSegment();
+      else if (rec.recorder.state === 'paused') rec.recorder.resume();
+    } catch (e) {
+      const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+      toast(denied ? TXT.micDenied : (e && e.message) || "No s'ha pogut reprendre la gravació.", 7000);
+    } finally {
+      rec.resuming = false;
+      $('#btn-pause').disabled = false;
+    }
   }
   $('#btn-pause').textContent = rec.paused ? 'Continua' : 'Pausa';
   setRecStateUi();
