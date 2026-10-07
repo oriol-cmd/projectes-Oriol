@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -16,6 +16,7 @@ const DEFAULTS = {
   vocab: '',
   boost: true,
   precise: false,
+  shortImports: true,
   liveSec: 60, // cada quants segons apareix text nou en directe
   speakers: true, // identifica qui parla a partir de les presentacions inicials
   summaryLang: 'ca', // idioma per defecte dels resums: ca | es | en
@@ -626,6 +627,33 @@ Escriu SEMPRE en català, en Markdown, amb exactament aquesta estructura:
 
 Si una secció no té contingut, escriu "- Cap." Sigues concret i útil: el lector no ha assistit a la reunió i ha de poder actuar amb aquest resum. No afegeixis cap text abans del títol ni després de l'última secció.`;
 
+// Resum curt per als àudios importats (notes de veu, àudios de WhatsApp…).
+const SHORT_PROMPT = `Ets un assistent que resumeix gravacions de veu (notes de veu, àudios de WhatsApp, trucades curtes). Reps la transcripció automàtica i n'has de fer un resum CURT i fàcil de llegir.
+
+La transcripció pot tenir errors de reconeixement: llegeix-la sencera, entén de què es parla i corregeix els errors evidents pel context. No t'inventis res. Si un nom, xifra o data ve d'una part marcada amb [dubte de comprensió], posa-hi al costat [dubte de comprensió].
+
+Escriu SEMPRE en català, en Markdown, amb exactament aquesta estructura:
+
+# <Títol breu>
+
+## Resum
+2-4 frases amb el més important.
+
+<<PER_AUDIO>>## Punts clau
+- Màxim 5 punts, d'una línia cadascun.
+
+## Tasques
+- [ ] **Responsable**: tasca concreta — termini (si s'ha dit)
+
+## Dubtes de comprensió
+- Només si n'hi ha d'importants; si no, escriu "- Cap."
+
+Si «Tasques» no té contingut, escriu "- Cap." Sigues breu: tot el resum ha de poder-se llegir en menys d'un minut. No afegeixis res abans del títol ni després de l'última secció.`;
+const PER_AUDIO = `## Àudio per àudio
+- **Àudio 1**: una sola frase amb què diu. (Fes una línia per a cada àudio, en ordre.)
+
+`;
+
 function buildTranscript(m) {
   if (m.engine === 'device') return (m.liveText || '').trim();
   return m.segments
@@ -716,8 +744,8 @@ async function summarize(m, onText = null) {
   if (m.engine === 'import') {
     const n = importList(m).length;
     info.push(n > 1
-      ? `La reunió prové de ${n} gravacions importades (p. ex. notes de veu), en ordre; la transcripció les separa amb «[Àudio X de ${n}]». Fes-ne UN sol resum conjunt.`
-      : "La reunió prové d'un fitxer d'àudio o vídeo importat.");
+      ? `Són ${n} gravacions importades (p. ex. notes de veu), en ordre; la transcripció les separa amb «[Àudio X de ${n}]». Fes-ne UN sol resum conjunt.`
+      : "És un fitxer d'àudio o vídeo importat.");
   }
   if (m.type && m.type !== 'general' && MEETING_TYPES[m.type]) {
     info.push(`Tipus de reunió: ${MEETING_TYPES[m.type].label}. ${MEETING_TYPES[m.type].prompt}`);
@@ -733,6 +761,8 @@ async function summarize(m, onText = null) {
     const blob = await db.get('audio', ph.key);
     if (blob) photoParts.push({ inlineData: { mimeType: 'image/jpeg', data: await blobToBase64(blob) } });
   }
+  // Àudios importats: resum curt (si no hi ha fotos, que demanen la secció de documents).
+  const short = m.engine === 'import' && settings.shortImports !== false && !photoParts.length;
   if (photoParts.length) {
     info.push(`S'adjunten ${photoParts.length} foto${photoParts.length > 1 ? 's' : ''} de documents mostrats o comentats a la reunió (sovint escrits a mà), en aquest ordre: ${photos.map((ph, i) => `foto ${i + 1}${ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
 Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
@@ -740,7 +770,7 @@ Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres,
 
   const text = await gemini(
     [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }, ...photoParts],
-    { system: SYSTEM_PROMPT, maxTokens: 16384, thinking: 2048, onText },
+    { system: short ? SHORT_PROMPT.replace('<<PER_AUDIO>>', importList(m).length > 1 ? PER_AUDIO : '') : SYSTEM_PROMPT, maxTokens: 16384, thinking: 2048, onText },
   );
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
   if (!clean) throw new Error('Gemini ha retornat un resum buit');
@@ -1603,6 +1633,7 @@ function fillSettings() {
   $('#set-vocab').value = settings.vocab || '';
   $('#set-boost').checked = settings.boost !== false;
   $('#set-precise').checked = settings.precise === true;
+  $('#set-short-imports').checked = settings.shortImports !== false;
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   $('#set-speakers').checked = settings.speakers !== false;
@@ -1623,6 +1654,7 @@ function readSettingsForm() {
     vocab: $('#set-vocab').value.trim(),
     boost: $('#set-boost').checked,
     precise: $('#set-precise').checked,
+    shortImports: $('#set-short-imports').checked,
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
     v: 3,
     keepAudio: $('#set-keep-audio').checked,
@@ -2307,15 +2339,34 @@ async function transcribeImportFile(m, blob, f, label) {
     settings.lang === 'auto'
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
-    "Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
+    "Si parlen diverses persones, comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
     "Cada 5 minuts aproximadament, afegeix una línia amb el temps de la gravació entre claudàtors, p. ex. [05:00], [10:00].",
     "Escriu només la transcripció, sense títols, comentaris ni resums. Si no hi ha veu, respon només: [silenci]",
-    "Escolta amb atenció també les veus fluixes o llunyanes.",
+    "Escolta amb atenció també les veus fluixes, llunyanes o que parlen alhora, i transcriu-les igualment.",
+    "Fes servir el context de la conversa per entendre paraules mal pronunciades o tallades, però només si n'estàs raonablement segur. Escriu bé els noms propis, xifres, dates i imports.",
+    "Si només parla una persona (p. ex. una nota de veu), no cal posar-hi nom a cada línia: separa'l en paràgrafs per idees.",
     "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió].",
     m.context ? `Context (per escriure bé noms i termes): ${m.context}` : '',
     settings.vocab ? `Noms i paraules que surten sovint (escriu-los exactament així): ${settings.vocab}` : '',
   ].filter(Boolean).join('\n');
   const clean = (t) => (/^\[silenci\]$/i.test(t.trim()) ? '' : t.trim());
+
+  // Àudios curts: millora el so (veus fluixes, soroll) i envia'ls en WAV.
+  const dur = f.durationMs || 0;
+  if (settings.boost !== false && (dur > 0 ? dur <= 15 * 60000 && blob.size <= 60e6 : blob.size <= 5e6)) {
+    try {
+      progress('Millorant el so…');
+      const wav = await enhanceAudio(blob);
+      let part;
+      if (wav.size <= 14e6) part = { inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } };
+      else { progress('Pujant el fitxer a Google…'); part = { fileData: { mimeType: 'audio/wav', fileUri: await uploadToGemini(wav, 'audio/wav', f.name) } }; }
+      progress('Transcrivint…');
+      return clean(await gemini([part, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 }));
+    } catch (e) {
+      if (e instanceof FatalError) throw e; // clau, quota…
+      // si no s'ha pogut descodificar o millorar, s'envia l'original
+    }
+  }
 
   const primary = f.mime || 'audio/mp4';
   const mimes = [...new Set([primary, ...(primary === 'audio/mp4' ? ['video/mp4', 'audio/aac'] : primary === 'audio/ogg' ? ['audio/opus'] : [])])];
