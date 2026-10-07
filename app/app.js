@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -918,32 +918,57 @@ function stopExtraStreams() {
   (rec.extraStreams || []).forEach((st) => st.getTracks().forEach((t) => t.stop()));
   rec.extraStreams = [];
 }
+// Obre el micròfon. Si el dispositiu no accepta les opcions (o un altre programa
+// el té ocupat), ho torna a provar amb la configuració més simple.
+async function getMicStream() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+    });
+  } catch (e) {
+    if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
+    await sleep(300);
+    try { return await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e2) {
+      if (e2 && (e2.name === 'NotAllowedError' || e2.name === 'SecurityError')) throw e2;
+      const err = new Error(MIC_BUSY);
+      err.name = 'MicBusy';
+      throw err;
+    }
+  }
+}
+const MIC_BUSY = "No s'ha pogut obrir el micròfon: potser el té ocupat un altre programa o no n'hi ha cap de connectat. Tanca altres apps que el facin servir i torna-ho a provar.";
+
 async function openMic() {
   stopExtraStreams();
-  const micStream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-  });
   if (rec.meeting && rec.meeting.source === 'call') {
-    // Videotrucada: barreja el so de la pestanya/ordinador amb el micròfon.
+    // Videotrucada: primer el so de la trucada (mentre el clic encara compta),
+    // després el micròfon, i ho barreja tot.
     let display;
     try {
       display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, systemAudio: 'include', selfBrowserSurface: 'exclude' });
-    } catch (e) { micStream.getTracks().forEach((t) => t.stop()); throw new Error("Cal triar la pestanya o la pantalla de la videotrucada per poder-la gravar."); }
+    } catch (e) { throw new Error("Cal triar la pestanya o la pantalla de la videotrucada per poder-la gravar."); }
     if (!display.getAudioTracks().length) {
-      display.getTracks().forEach((t) => t.stop()); micStream.getTracks().forEach((t) => t.stop());
+      display.getTracks().forEach((t) => t.stop());
       throw new Error("No s'ha compartit l'àudio. Torna-ho a provar i marca «Comparteix també l'àudio» (de la pestanya o del sistema).");
+    }
+    let micStream = null;
+    try { micStream = await getMicStream(); }
+    catch (e) {
+      if (e && e.name !== 'MicBusy' && e.name !== 'NotAllowedError') { display.getTracks().forEach((t) => t.stop()); throw e; }
+      toast("No s'ha pogut fer servir el micròfon: es grava només el so de la trucada (la teva veu potser no hi sortirà).", 9000);
     }
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
     const dest = rec.audioCtx.createMediaStreamDestination();
     rec.audioCtx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(dest);
-    rec.audioCtx.createMediaStreamSource(micStream).connect(dest);
+    if (micStream) rec.audioCtx.createMediaStreamSource(micStream).connect(dest);
     display.getVideoTracks().forEach((t) => { t.enabled = false; });
     display.getAudioTracks().forEach((t) => { t.onended = () => { if (rec.meeting && !rec.stopping) toast("S'ha deixat de compartir la videotrucada. Toca «Acaba la reunió» o torna a començar.", 7000); }; });
-    rec.extraStreams = [display, micStream];
+    rec.extraStreams = micStream ? [display, micStream] : [display];
     rec.stream = dest.stream;
   } else {
-    rec.stream = micStream;
+    rec.stream = await getMicStream();
     rec.stream.getAudioTracks().forEach((t) => { t.onended = () => { if (!document.hidden) recoverMic(); }; });
   }
   try {
