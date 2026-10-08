@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -958,11 +958,13 @@ function runPipeline(id, { redoSummary = false } = {}) {
     } catch (e) {
       m.status = 'error';
       m.error = e.message;
-      // Errors temporals (connexió, Google saturat…): ho tornem a provar sols, fins a 3 cops.
+      // Errors temporals (connexió, Google saturat o caigut…): ho tornem a provar sols,
+      // cada cop esperant més (fins a ~1 hora en total), per si la caiguda de Google dura.
       delete m.retryAt;
-      if (!(e instanceof FatalError) && (m.autoRetries || 0) < 3) {
+      const RETRY_DELAYS = [15000, 60000, 3 * 60000, 8 * 60000, 15 * 60000, 30 * 60000];
+      if (!(e instanceof FatalError) && (m.autoRetries || 0) < RETRY_DELAYS.length) {
+        const delay = RETRY_DELAYS[m.autoRetries || 0];
         m.autoRetries = (m.autoRetries || 0) + 1;
-        const delay = 15000 * m.autoRetries;
         m.retryAt = Date.now() + delay;
         setTimeout(() => { if (!pipelines.has(id)) runPipeline(id); }, delay);
       }
@@ -1499,8 +1501,9 @@ async function showResult(id) {
   if (m.status === 'error') {
     st.className = 'banner err';
     const auto = m.retryAt && m.retryAt > Date.now();
+    const mins = auto ? Math.ceil((m.retryAt - Date.now()) / 60000) : 0;
     st.innerHTML = `<b>${escapeHtml(friendlyError(m.error))}</b><br>`
-      + (auto ? 'Ho tornem a provar automàticament d\'aquí a uns segons… ' : 'No s\'ha perdut res. ')
+      + (auto ? `Ho tornem a provar automàticament ${mins > 1 ? `d'aquí a ${mins} minuts` : "d'aquí a uns segons"}… ` : 'No s\'ha perdut res. ')
       + `<button class="link" id="btn-retry">${auto ? 'Prova-ho ara' : 'Torna-ho a provar'}</button>`
       + `<details class="tech"><summary>Detall tècnic</summary>${escapeHtml(m.error || '')}</details>`;
     $('#btn-retry').onclick = () => { resetQuota(); m.autoRetries = 0; showView('proc'); updateProcView(m); runPipeline(id); };
@@ -1841,7 +1844,7 @@ function friendlyError(raw) {
   if (/denegat|PERMISSION|403/i.test(t)) return "Google no ha permès l'accés amb aquesta clau. Revisa-la a ⚙️ Configuració.";
   if (/Sense connexió|Failed to fetch|NetworkError|Load failed|s'ha tallat|network/i.test(t)) return 'No hi ha connexió a internet. Ho tornarem a provar quan hi hagi cobertura.';
   if (/massa peticions|429|RESOURCE_EXHAUSTED/i.test(t)) return 'Google està molt saturat ara mateix.';
-  if (/Gemini 5\d\d|50[0-4]|UNAVAILABLE|INTERNAL/i.test(t)) return 'Els servidors de Google tenen problemes ara mateix.';
+  if (/Gemini 5\d\d|\b50[0-4]\b|UNAVAILABLE|INTERNAL/i.test(t)) return "Els servidors de Google (Gemini) no responen ara mateix. No s'ha perdut res: ho anirem tornant a provar sols.";
   if (/no ha acceptat|INVALID_ARGUMENT|Gemini 400/i.test(t)) return 'Google no ha pogut processar la reunió.';
   if (/bloquejat|SAFETY|no ha respost/i.test(t)) return 'Google no ha volgut generar aquest contingut.';
   if (/No s'ha captat cap paraula/i.test(t)) return "No s'ha captat cap paraula a la gravació.";

@@ -1,5 +1,5 @@
 // Guarda l'app per obrir-la ràpid i sense cobertura. Les crides a les APIs no es toquen.
-const CACHE = 'reunions-v44';
+const CACHE = 'reunions-v45';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'lib/jspdf.umd.min.js', 'lib/jspdf.plugin.autotable.min.js'];
 
 self.addEventListener('install', (e) => {
