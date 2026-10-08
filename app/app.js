@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -281,7 +281,7 @@ const GEMINI_MODELS = {
   summary: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
 };
 const missingModels = new Set();
-const QUOTA_MSG = "S'ha esgotat la quota gratuïta de Gemini d'avui (es renova cap a les 9 del matí). Ho reprendrà sol; si fas moltes reunions, mira «Quota» al README.";
+const QUOTA_MSG = "S'ha esgotat la quota gratuïta de Gemini d'avui (es renova cap a les 9 del matí). Ho reprendrà sol quan obris l'app un altre dia (o toca «Torna-ho a provar»); si fas moltes reunions, mira «Quota» al README.";
 
 // La quota diària de Google es renova a mitjanit de Califòrnia.
 const quotaDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -299,6 +299,13 @@ function markExhausted(model) {
 }
 
 const noThinkingCfg = new Set(); // models que no accepten thinkingConfig
+// Avisa (com a molt un cop per minut) que Google va lent i que seguim provant.
+let slowNoticeAt = 0;
+function noteGeminiSlow() {
+  if (Date.now() - slowNoticeAt < 60000 || !['proc', 'rec', 'result'].includes(currentView)) return;
+  slowNoticeAt = Date.now();
+  toast('Els servidors de Google van lents ara mateix: ho seguim provant…', 5000);
+}
 
 // Llegeix una resposta en streaming (SSE) de Gemini i va cridant onText amb el text acumulat.
 async function readGeminiStream(res, onText) {
@@ -406,7 +413,7 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
         await sleep(Math.min(30, m ? Number(m[1]) + 1 : 5 * 2 ** attempt) * 1000);
         continue;
       }
-      if (res.status >= 500) { lastErr = new Error(`Gemini ${res.status}`); if (hasNext) break; await sleep(3000 * 2 ** attempt); continue; }
+      if (res.status >= 500) { lastErr = new Error(`Gemini ${res.status}`); if (hasNext) break; noteGeminiSlow(); await sleep(3000 * 2 ** attempt); continue; }
       throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
     }
   }
@@ -426,8 +433,9 @@ function blobToBase64(blob) {
 async function toWav(blob) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   const ctx = new Ctx();
-  const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
-  ctx.close && ctx.close();
+  let decoded;
+  try { decoded = await ctx.decodeAudioData(await blob.arrayBuffer()); }
+  finally { ctx.close && ctx.close(); }
   const rate = 16000;
   const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
   const src = off.createBufferSource();
@@ -891,10 +899,13 @@ function runPipeline(id, { redoSummary = false } = {}) {
   if (pipelines.has(id)) return pipelines.get(id);
   const p = (async () => {
     const m = await getMeeting(id);
+    if (!m) return; // s'ha esborrat
     if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; m.textOnly = false; }
     m.status = 'processing';
     m.error = '';
     await saveMeeting(m);
+    // Si s'estava mirant aquesta reunió amb l'error, mostra el progrés del nou intent.
+    if (currentView === 'result' && viewingId === id) showView('proc');
     updateProcView(m);
     try {
       // 1. Transcripció
@@ -958,6 +969,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
     } catch (e) {
       m.status = 'error';
       m.error = e.message;
+      if (/quota/i.test(e.message || '')) m.quotaDay = quotaDay();
       // Errors temporals (connexió, Google saturat o caigut…): ho tornem a provar sols,
       // cada cop esperant més (fins a ~1 hora en total), per si la caiguda de Google dura.
       delete m.retryAt;
@@ -1121,26 +1133,44 @@ async function startPeakMeter(src) {
 }
 
 function startSegment() {
+  if (!rec.stream || rec.stream.active === false) return false;
   const options = rec.mime ? { mimeType: rec.mime, audioBitsPerSecond: 64000 } : { audioBitsPerSecond: 64000 };
   const r = new MediaRecorder(rec.stream, options);
   const chunks = [];
   const segStart = rec.activeMs;
+  const m = rec.meeting; // la reunió d'aquest tram (encara que s'aturi abans que acabi de desar-se)
   r.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-  r.onstop = () => finishSegment(r, chunks, segStart, rec.segPeak);
+  r.onstop = () => {
+    const peak = r.xxPeak != null ? r.xxPeak : rec.segPeak;
+    // Primer arrenca el tram següent (perquè no es perdin paraules), després desa aquest.
+    if (rec.meeting === m && !rec.stopping && !rec.paused && rec.recorder === r) {
+      try { startSegment(); } catch { recoverMic(); }
+    }
+    finishSegment(m, r, chunks, segStart, peak);
+    if (r.xxDone) r.xxDone();
+  };
+  r.xxStopped = new Promise((res) => { r.xxDone = res; });
   r.onerror = () => { if (!rec.stopping) recoverMic(); };
   rec.recorder = r;
   rec.segStartMs = segStart;
   rec.segPeak = rec.analyser ? 0 : 1; // sense mesurador, suposem que hi ha veu
   rec.quietMs = 0;
   r.start();
+  return true;
+}
+// Atura una gravadora i recorda el volum màxim que ha tingut el seu tram.
+function stopRecorder(r) {
+  if (!r || r.state === 'inactive') return;
+  r.xxPeak = rec.segPeak;
+  if (r.state === 'paused') r.resume();
+  r.stop();
 }
 
 let segmentChain = Promise.resolve();
 const SILENCE_PEAK = 0.03;
-function finishSegment(r, chunks, startMs, peak) {
-  const m = rec.meeting;
+function finishSegment(m, r, chunks, startMs, peak) {
   const type = r.mimeType || rec.mime || 'audio/mp4';
-  segmentChain = segmentChain.then(async () => {
+  segmentChain = segmentChain.catch(() => {}).then(async () => {
     const blob = new Blob(chunks, { type });
     if (m && peak < (settings.boost !== false ? SILENCE_PEAK / 2.5 : SILENCE_PEAK)) {
       // Tram en silenci: no cal enviar-lo.
@@ -1155,13 +1185,14 @@ function finishSegment(r, chunks, startMs, peak) {
       kickQueue(m.id);
       updateRecProgress();
     }
-    // Continua amb el següent tram si encara gravem.
-    if (rec.meeting === m && !rec.stopping && !rec.paused && rec.stream && rec.recorder === r) startSegment();
+  }).catch((e) => {
+    // No deixis que un error en desar un tram aturi tota la gravació.
+    toast(`No s'ha pogut desar un tros de la gravació (${e && e.message ? e.message : e}). Continuem gravant.`, 6000);
   });
 }
 
 function rotateSegment() {
-  if (rec.recorder && rec.recorder.state !== 'inactive') rec.recorder.stop();
+  stopRecorder(rec.recorder);
 }
 
 async function recoverMic() {
@@ -1169,11 +1200,21 @@ async function recoverMic() {
   rec.recovering = true;
   try {
     const old = rec.recorder;
-    if (old && old.state !== 'inactive') { rec.recorder = null; old.stop(); }
+    if (old && old.state !== 'inactive') { rec.recorder = null; stopRecorder(old); }
+    if (rec.meeting.source === 'call') {
+      // La captura de la trucada només es pot tornar a demanar amb un clic.
+      rec.paused = true;
+      $('#btn-pause').textContent = 'Continua';
+      setRecStateUi();
+      toast("S'ha aturat la captura de la videotrucada. Toca «Continua» i torna a triar la pestanya de la trucada.", 9000);
+      return;
+    }
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
     stopExtraStreams();
     await segmentChain;
+    if (!rec.meeting || rec.stopping) return;
     await openMic();
+    if (!rec.meeting || rec.stopping) { rec.stream && rec.stream.getTracks().forEach((t) => t.stop()); stopExtraStreams(); return; }
     if (!rec.paused) startSegment();
     toast('Micròfon reconnectat');
   } catch (e) {
@@ -1237,11 +1278,15 @@ async function startRecording() {
       rec.meeting = m; // openMic necessita saber la font (micròfon o videotrucada)
       await openMic();
     }
-    Object.assign(rec, { meeting: m, activeMs: 0, paused: false, stopping: false, levels: [] });
+    Object.assign(rec, { meeting: m, activeMs: 0, paused: false, stopping: false, levels: [], avgLevel: null, quietMs: 0, resuming: false, recovering: false });
     await saveMeeting(m);
-    if (m.engine !== 'device') startSegment(); else startSpeech();
+    if (m.engine !== 'device') { if (!startSegment()) throw new Error("No s'ha pogut començar a gravar l'àudio."); } else startSpeech();
   } catch (e) {
     rec.meeting = null;
+    // Allibera el micròfon i la captura de pantalla si ja s'havien obert.
+    rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
+    stopExtraStreams();
+    rec.stream = null;
     const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
     toast(denied ? TXT.micDenied : e.message, 7000);
     return;
@@ -1249,7 +1294,11 @@ async function startRecording() {
 
   const hasWake = await requestWakeLock();
   $('#rec-warning').hidden = false;
-  if (!hasWake) $('#rec-warning').textContent = TXT.noWake;
+  $('#rec-warning').textContent = m.source === 'call'
+    ? "Pots anar a la pestanya de la videotrucada: Xiu-xiu continua gravant. No tanquis aquesta pestanya ni deixis de compartir."
+    : CAN_CAPTURE_CALL
+      ? 'No tanquis aquesta pestanya mentre gravis.'
+      : (hasWake ? "No bloquegis el mòbil ni canviïs d'app: el mòbil atura el micròfon de les webs en segon pla." : TXT.noWake);
   $('#rec-title').textContent = m.title || fmtDate(m.startedAt);
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
@@ -1314,16 +1363,22 @@ async function togglePause() {
     if (rec.speech) { if (rec.paused) rec.speech.stop(); else { try { rec.speech.start(); } catch { /* ja actiu */ } } }
   } else if (!rec.paused) {
     rec.paused = true;
-    const r = rec.recorder;
-    if (r && r.state !== 'inactive') { if (r.state === 'paused') r.resume(); r.stop(); }
+    stopRecorder(rec.recorder);
   } else {
     rec.resuming = true;
     $('#btn-pause').disabled = true;
     try {
+      // En videotrucada, el que cal que segueixi viu és la captura de la trucada.
+      const tracks = rec.meeting.source === 'call'
+        ? (rec.extraStreams || []).flatMap((st) => st.getAudioTracks())
+        : (rec.stream ? rec.stream.getAudioTracks() : []);
+      const alive = tracks.length && tracks.some((t) => t.readyState === 'live')
+        && (rec.meeting.source !== 'call' || (rec.extraStreams[0] && rec.extraStreams[0].getAudioTracks().some((t) => t.readyState === 'live')));
+      if (!alive) await openMic(); // ara, mentre el clic encara compta (cal per tornar a triar la pestanya)
+      if (rec.recorder && rec.recorder.xxStopped && rec.recorder.state === 'inactive') await rec.recorder.xxStopped;
       await segmentChain;
+      if (!rec.meeting || rec.stopping) return;
       if (rec.audioCtx && rec.audioCtx.state !== 'running') await rec.audioCtx.resume().catch(() => {});
-      const alive = rec.stream && rec.stream.getAudioTracks().length && rec.stream.getAudioTracks().every((t) => t.readyState === 'live');
-      if (!alive) await openMic();
       rec.paused = false;
       rec.lastTick = performance.now();
       if (!rec.recorder || rec.recorder.state === 'inactive') startSegment();
@@ -1349,12 +1404,14 @@ async function stopRecording() {
   $('#btn-stop').disabled = true;
   try {
     if (m.engine !== 'device') {
-      if (rec.recorder && rec.recorder.state !== 'inactive') {
-        if (rec.recorder.state === 'paused') rec.recorder.resume();
-        rec.recorder.stop();
+      const r = rec.recorder;
+      if (r && r.state !== 'inactive') {
+        stopRecorder(r);
+        // Espera que la gravadora lliuri l'últim tros (amb un límit, per si de cas).
+        await Promise.race([r.xxStopped, sleep(5000)]);
       }
       await sleep(50);
-      await segmentChain;
+      await segmentChain.catch(() => {});
     } else if (rec.speech) {
       rec.speech.onend = null;
       rec.speech.stop();
@@ -1364,7 +1421,9 @@ async function stopRecording() {
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
     stopExtraStreams();
     if (rec.wakeLock) { rec.wakeLock.release().catch(() => {}); rec.wakeLock = null; }
-    Object.assign(rec, { meeting: null, stream: null, recorder: null, speech: null, analyser: null });
+    try { rec.peakNode && rec.peakNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
+    if (rec.audioCtx && rec.audioCtx.state === 'running') rec.audioCtx.suspend().catch(() => {});
+    Object.assign(rec, { meeting: null, stream: null, recorder: null, speech: null, analyser: null, peakNode: null, mixer: null });
     $('#btn-stop').disabled = false;
   }
   m.durationMs = rec.activeMs;
@@ -1671,7 +1730,13 @@ async function resumeUnfinished() {
       if (!hasContent) m.error = "La gravació es va interrompre abans de desar àudio";
       await saveMeeting(m);
     }
-    if (m.status === 'processing' || (m.status === 'done' && m.email.status === 'error')) runPipeline(m.id);
+    // Errors pendents de reintent (l'app es va tancar abans) o de quota d'un altre dia.
+    const retryDue = m.status === 'error' && ((m.retryAt && m.retryAt <= Date.now() + 1000) || (m.quotaDay && m.quotaDay !== quotaDay()));
+    if (m.status === 'error' && m.retryAt && m.retryAt > Date.now()) {
+      setTimeout(() => { if (!pipelines.has(m.id)) runPipeline(m.id); }, m.retryAt - Date.now());
+    }
+    if (retryDue && m.quotaDay && m.quotaDay !== quotaDay()) { delete m.quotaDay; m.autoRetries = 0; }
+    if (m.status === 'processing' || retryDue || (m.status === 'done' && m.email.status === 'error')) runPipeline(m.id);
   }
   refreshHomeBanners();
 }
@@ -1882,7 +1947,8 @@ function friendlyError(raw) {
   const t = String(raw || '');
   if (/quota/i.test(t) && /esgotat/i.test(t)) return t;
   if (/clau de Gemini no és vàlida|API key not valid|API_KEY_INVALID/i.test(t)) return 'La clau de Google no és vàlida. Revisa-la a ⚙️ Configuració.';
-  if (/denegat|PERMISSION|403/i.test(t)) return "Google no ha permès l'accés amb aquesta clau. Revisa-la a ⚙️ Configuració.";
+  if (/No s'ha trobat el fitxer|no accepta (el|aquest) format|massa gran/i.test(t)) return t;
+  if (/denegat|PERMISSION_DENIED|Gemini 403/i.test(t)) return "Google no ha permès l'accés amb aquesta clau. Revisa-la a ⚙️ Configuració.";
   if (/Sense connexió|Failed to fetch|NetworkError|Load failed|s'ha tallat|network/i.test(t)) return 'No hi ha connexió a internet. Ho tornarem a provar quan hi hagi cobertura.';
   if (/massa peticions|429|RESOURCE_EXHAUSTED/i.test(t)) return 'Google està molt saturat ara mateix.';
   if (/Gemini 5\d\d|\b50[0-4]\b|UNAVAILABLE|INTERNAL/i.test(t)) return "Els servidors de Google (Gemini) no responen ara mateix. No s'ha perdut res: ho anirem tornant a provar sols.";
@@ -2413,17 +2479,17 @@ async function transcribeImportFile(m, blob, f, label) {
   // Àudios curts: millora el so (veus fluixes, soroll) i envia'ls en WAV.
   const dur = f.durationMs || 0;
   if (settings.boost !== false && (dur > 0 ? dur <= 15 * 60000 && blob.size <= 60e6 : blob.size <= 5e6)) {
-    try {
-      progress('Millorant el so…');
-      const wav = await enhanceAudio(blob);
+    let wav = null;
+    try { progress('Millorant el so…'); wav = await enhanceAudio(blob); }
+    catch { wav = null; } // no s'ha pogut descodificar: s'envia l'original
+    if (wav) try {
       let part;
       if (wav.size <= 14e6) part = { inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } };
       else { progress('Pujant el fitxer a Google…'); part = { fileData: { mimeType: 'audio/wav', fileUri: await uploadToGemini(wav, 'audio/wav', f.name) } }; }
       progress('Transcrivint…');
       return clean(await gemini([part, { text: prompt }], { task: 'transcribe', thinking: 0, maxTokens: 65536 }));
     } catch (e) {
-      if (e instanceof FatalError) throw e; // clau, quota…
-      // si no s'ha pogut descodificar o millorar, s'envia l'original
+      if (!(e instanceof UnsupportedAudioError)) throw e; // errors de Google: no tornis a enviar el mateix
     }
   }
 
@@ -2465,6 +2531,7 @@ async function importFiles(list, { textOnly = false } = {}) {
   // Ordre: pel nom (les notes de veu porten la data i l'hora al nom).
   const files = list.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   const id = uid();
+  if (files.length > 2) toast(`Preparant ${files.length} fitxers…`, 3000);
   const durations = [];
   for (const f of files) durations.push(await mediaDuration(f));
   const title = $('#meeting-title').value.trim()

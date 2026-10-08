@@ -1,1 +1,1 @@
-{ "v": 46, "notes": "Videotrucades: arreglat un error greu que feia que no es gravés res." }
+{ "v": 47, "notes": "Revisió general: gravació més robusta (sense talls entre trams), reintents en tornar a obrir l'app i avisos quan Google va lent." }
