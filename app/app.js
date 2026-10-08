@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1048,6 +1048,8 @@ const MIC_BUSY = "No s'ha pogut obrir el micròfon: potser el té ocupat un altr
 
 async function openMic() {
   stopExtraStreams();
+  try { rec.peakNode && rec.peakNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
+  rec.peakNode = null; rec.mixer = null;
   if (rec.meeting && rec.meeting.source === 'call') {
     // Videotrucada: primer el so de la trucada (mentre el clic encara compta),
     // després el micròfon, i ho barreja tot.
@@ -1067,9 +1069,15 @@ async function openMic() {
     }
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
+    // Barreja: so de la trucada + micròfon -> mixer -> (gravació i mesurador).
+    // El mesurador s'ha de connectar al mixer: si es llegeix del flux de sortida
+    // del mateix AudioContext, Chrome hi dona silenci i tot semblava mut.
     const dest = rec.audioCtx.createMediaStreamDestination();
-    rec.audioCtx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(dest);
-    if (micStream) rec.audioCtx.createMediaStreamSource(micStream).connect(dest);
+    const mixer = rec.audioCtx.createGain();
+    rec.audioCtx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(mixer);
+    if (micStream) rec.audioCtx.createMediaStreamSource(micStream).connect(mixer);
+    mixer.connect(dest);
+    rec.mixer = mixer;
     display.getVideoTracks().forEach((t) => { t.enabled = false; });
     display.getAudioTracks().forEach((t) => { t.onended = () => { if (rec.meeting && !rec.stopping) toast("S'ha deixat de compartir la videotrucada. Toca «Acaba la reunió» o torna a començar.", 7000); }; });
     rec.extraStreams = micStream ? [display, micStream] : [display];
@@ -1081,11 +1089,35 @@ async function openMic() {
   try {
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
-    const src = rec.audioCtx.createMediaStreamSource(rec.stream);
+    const src = rec.meeting && rec.meeting.source === 'call' && rec.mixer ? rec.mixer : rec.audioCtx.createMediaStreamSource(rec.stream);
     rec.analyser = rec.audioCtx.createAnalyser();
     rec.analyser.fftSize = 1024;
     src.connect(rec.analyser);
+    await startPeakMeter(src);
   } catch { rec.analyser = null; }
+}
+
+// Mesura el volum màxim de manera contínua (al fil d'àudio). El rellotge de la
+// pàgina va molt més lent quan la pestanya no es veu (p. ex. mentre mires Meet),
+// i amb mostres tan espaiades un tram amb veu podia semblar silenci i perdre's.
+const PEAK_WORKLET = `class P extends AudioWorkletProcessor{constructor(){super();this.s=0;this.n=0;this.m=0;this.c=0}
+process(i){const ch=i[0]&&i[0][0];if(ch){for(let k=0;k<ch.length;k++){this.s+=ch[k]*ch[k]}this.n+=ch.length;
+if(this.n>=1024){const v=Math.min(1,Math.sqrt(this.s/this.n)*6);if(v>this.m)this.m=v;this.s=0;this.n=0}
+if(++this.c>=94){this.port.postMessage(this.m);this.m=0;this.c=0}}return true}}registerProcessor('xx-peak',P);`;
+async function startPeakMeter(src) {
+  rec.peakNode = null;
+  try {
+    if (!window.AudioWorkletNode || !rec.audioCtx.audioWorklet) return;
+    if (!rec.audioCtx.xxPeak) {
+      const url = URL.createObjectURL(new Blob([PEAK_WORKLET], { type: 'text/javascript' }));
+      rec.audioCtx.xxPeak = rec.audioCtx.audioWorklet.addModule(url);
+    }
+    await rec.audioCtx.xxPeak;
+    const node = new AudioWorkletNode(rec.audioCtx, 'xx-peak', { numberOfOutputs: 0 });
+    node.port.onmessage = (e) => { if (!rec.paused) rec.segPeak = Math.max(rec.segPeak || 0, e.data); };
+    src.connect(node);
+    rec.peakNode = node;
+  } catch { /* sense mesurador continu: es fa servir el del rellotge */ }
 }
 
 function startSegment() {
@@ -1419,9 +1451,18 @@ document.addEventListener('visibilitychange', async () => {
   if (!rec.wakeLock || rec.wakeLock.released) await requestWakeLock();
   if (rec.audioCtx && rec.audioCtx.state !== 'running') rec.audioCtx.resume().catch(() => {});
   if (rec.meeting.engine !== 'device' && !rec.paused) {
-    const trackDead = !rec.stream || rec.stream.getAudioTracks().some((t) => t.readyState === 'ended');
-    const recDead = !rec.recorder || rec.recorder.state === 'inactive';
-    if (trackDead || recDead) recoverMic();
+    const dead = () => {
+      const tracks = rec.meeting && rec.meeting.source === 'call'
+        ? (rec.extraStreams || []).flatMap((st) => st.getAudioTracks())
+        : (rec.stream ? rec.stream.getAudioTracks() : []);
+      return !tracks.length || tracks.every((t) => t.readyState === 'ended');
+    };
+    if (dead()) { recoverMic(); return; }
+    // Entre tram i tram la gravadora està un moment aturada: comprova-ho al cap d'una estona.
+    if (!rec.recorder || rec.recorder.state === 'inactive') {
+      await sleep(2000);
+      if (rec.meeting && !rec.paused && !rec.stopping && rec.stream && (!rec.recorder || rec.recorder.state === 'inactive')) startSegment();
+    }
   }
 });
 window.addEventListener('beforeunload', (e) => { if (rec.meeting) { e.preventDefault(); e.returnValue = ''; } });
