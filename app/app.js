@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -786,9 +786,11 @@ async function summarize(m, onText = null) {
 Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
   }
 
+  const review = m.type === 'revisio';
+  if (review && m.reviewFor && m.reviewFor.name) info.push(`La revisió és per a: ${m.reviewFor.name}.`);
   const text = await gemini(
     [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }, ...photoParts],
-    { system: short ? SHORT_PROMPT.replace('<<PER_AUDIO>>', importList(m).length > 1 ? PER_AUDIO : '') : SYSTEM_PROMPT, maxTokens: 16384, thinking: 2048, onText },
+    { system: review ? REVIEW_PROMPT + (photoParts.length ? "\n\nLes fotos adjuntes són de la feina revisada: fes-les servir per situar bé cada correcció (pàgina, apartat, text exacte). Si cal, afegeix una secció «## Documents comentats»." : '') : short ? SHORT_PROMPT.replace('<<PER_AUDIO>>', importList(m).length > 1 ? PER_AUDIO : '') : SYSTEM_PROMPT, maxTokens: 16384, thinking: 2048, onText },
   );
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
   if (!clean) throw new Error('Gemini ha retornat un resum buit');
@@ -843,10 +845,12 @@ function buildEmail(m, lang = settings.summaryLang || 'ca') {
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1f2937;max-width:680px">
 <p style="margin:0 0 14px;color:#64748b;font-size:13px">${escapeHtml(when)} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${escapeHtml(typeLabel)}</p>
 ${mdToHtml(md, EMAIL_STYLE)}
-<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">${L.emailFooter}</p>
+<p style="margin:24px 0 0;color:#94a3b8;font-size:12px">${m.type === 'revisio' ? L.reviewFooter : L.emailFooter}</p>
 </div>`;
   return {
-    subject: `${L.subject}: ${title} (${new Date(m.startedAt).toLocaleDateString(L.locale)})`,
+    subject: m.type === 'revisio'
+      ? `${L.review}: ${title.replace(/^(Revisió|Revisión|Review)\s*:\s*/i, '')}`
+      : `${L.subject}: ${title} (${new Date(m.startedAt).toLocaleDateString(L.locale)})`,
     html,
     text: md,
     transcript: buildTranscript(m),
@@ -1262,7 +1266,8 @@ async function startRecording() {
     startedAt: Date.now(),
     durationMs: 0,
     engine: settings.engine,
-    speakers: settings.engine !== 'device' && settings.speakers !== false,
+    speakers: settings.engine !== 'device' && settings.speakers !== false && settings.lastType !== 'revisio',
+    reviewFor: reviewForm(),
     type: settings.lastType || 'general',
     status: 'recording',
     segments: [],
@@ -1597,6 +1602,8 @@ async function showResult(id) {
   viewingId = id;
   if (m.status === 'processing' || pipelines.has(id)) { showView('proc'); updateProcView(m); return; }
   showView('result');
+  $('#btn-share-open').textContent = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
+    ? `✉️ Envia-ho a ${m.reviewFor.name}` : '↗ Comparteix el resum';
   const st = $('#result-status');
   if (m.status === 'error') {
     st.className = 'banner err';
@@ -1876,7 +1883,45 @@ const MEETING_TYPES = {
   entrevista: { icon: '🎤', label: 'Entrevista', prompt: "Afegeix just després de «## Resum» una secció «## Perfil i respostes clau» amb les respostes rellevants de la persona entrevistada, punts forts i dubtes, sense judicis de valor no fonamentats." },
   formacio: { icon: '🎓', label: 'Formació / classe', prompt: "Afegeix just després de «## Resum» una secció «## Conceptes clau» amb el que s'ha explicat, ordenat i didàctic." },
   projecte: { icon: '📈', label: 'Seguiment de projecte', prompt: "Afegeix just després de «## Resum» una secció «## Estat del projecte» (avenços, fites, riscos i calendari)." },
+  revisio: { icon: '📝', label: 'Revisió de feina', prompt: '' },
 };
+
+// Revisió de feina: l'usuari dicta correccions sobre la feina d'algú i en surt
+// un document net per enviar-li.
+const REVIEW_PROMPT = `Ets un assistent que converteix en un document de revisió clar i professional les notes de veu d'una persona que està repassant la feina d'un treballador o col·laborador (un document, un projecte, un informe, una obra…). Reps la transcripció automàtica del que ha anat dient mentre revisava.
+
+Regles:
+- Fes servir NOMÉS el que diu l'usuari: no t'inventis correccions, valoracions ni terminis.
+- Treu les crosses, repeticions i frases a mitges. Si l'usuari es corregeix a si mateix, queda't amb l'última versió. Si diu que alguna cosa no cal posar-la, no la posis.
+- Agrupa les correccions per apartat o part de la feina, en l'ordre en què apareixen a la feina (si l'usuari diu pàgines, apartats o seccions, fes-los servir).
+- Cada correcció ha de ser concreta i accionable: on és, què cal canviar i, si s'ha dit, com. Si l'usuari diu que és important o urgent, marca-la amb **(Important)** al principi.
+- Adreça't directament a la persona que ha fet la feina, en to respectuós, constructiu i directe. Fes servir el tracte que faci servir l'usuari (tu o vostè); si no és clar, fes servir tu.
+- La transcripció pot tenir errors de reconeixement: corregeix-los pel context. Si una correcció no s'entén, posa-la igualment amb [dubte de comprensió] perquè l'usuari ho revisi.
+
+Escriu en català, en Markdown, amb exactament aquesta estructura (si una secció no té contingut, ometre-la, excepte «Correccions a fer»):
+
+# Revisió: <què s'ha revisat>
+
+## Valoració general
+2-4 frases amb la impressió general i el més important a canviar.
+
+## Correccions a fer
+### <Apartat o part de la feina>
+- [ ] <on> — <què cal canviar> (<com, si s'ha dit>)
+
+## Suggeriments
+- Millores opcionals que l'usuari ha proposat, no obligatòries.
+
+## El que està bé
+- Aspectes positius que l'usuari ha destacat.
+
+## Dubtes a aclarir
+- Preguntes que l'usuari vol fer a la persona o coses que cal confirmar.
+
+## Termini
+- Quan s'han de tenir fetes les correccions, si s'ha dit.
+
+No afegeixis res abans del títol ni després de l'última secció.`;
 function renderTypeChips() {
   const box = $('#type-chips');
   if (!box || box.childElementCount) { updateTypeChips(); return; }
@@ -1892,16 +1937,38 @@ function renderTypeChips() {
   updateTypeChips();
 }
 function updateTypeChips() {
-  document.querySelectorAll('.type-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === (settings.lastType || 'general'))));
+  const type = settings.lastType || 'general';
+  document.querySelectorAll('.type-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
+  const review = type === 'revisio';
+  if ($('#review-fields')) $('#review-fields').hidden = !review;
+  const tips = document.querySelector('#view-home .tips');
+  if (tips) tips.hidden = review; // els consells de presentacions no hi fan res
+  const chip = document.querySelector(`.type-chip[data-type="${type}"]`);
+  if (chip && chip.parentElement) chip.parentElement.scrollLeft = Math.max(0, chip.offsetLeft - chip.parentElement.offsetLeft - 16);
+  $('#meeting-title').placeholder = review ? 'Què revises? p. ex. Memòria del projecte Mar' : 'p. ex. Comitè de direcció';
 }
+// Dades de la persona a qui va la revisió (només en mode «Revisió de feina»).
+function reviewForm() {
+  if (settings.lastType !== 'revisio') return null;
+  const name = $('#review-name').value.trim();
+  const email = $('#review-email').value.trim();
+  $('#review-name').value = ''; $('#review-email').value = '';
+  return name || email ? { name, email } : null;
+}
+$('#btn-review-mode').onclick = () => {
+  saveSettings({ lastType: 'revisio' });
+  updateTypeChips();
+  $('#review-fields').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => $('#review-name').focus(), 400);
+};
 
 // ---------------------------------------------------------------------------
 // Idiomes del resum (el català és l'original; la resta són traduccions)
 // ---------------------------------------------------------------------------
 const L10N = {
-  ca: { name: 'català', locale: 'ca-ES', subject: 'Resum', doubt: '[dubte de comprensió]', minutes: 'Acta de reunió', date: 'Data', duration: 'Durada', type: 'Tipus', context: 'Context i assistents', who: 'Responsable', task: 'Tasca', due: 'Termini', page: 'Pàgina', emailFooter: 'Transcripció completa adjunta. Generat automàticament per Xiu-xiu.' },
-  es: { name: 'castellà', locale: 'es-ES', subject: 'Resumen', doubt: '[duda de comprensión]', minutes: 'Acta de reunión', date: 'Fecha', duration: 'Duración', type: 'Tipo', context: 'Contexto y asistentes', who: 'Responsable', task: 'Tarea', due: 'Plazo', page: 'Página', emailFooter: 'Transcripción completa adjunta. Generado automáticamente por Xiu-xiu.' },
-  en: { name: 'anglès', locale: 'en-GB', subject: 'Summary', doubt: '[unclear]', minutes: 'Meeting minutes', date: 'Date', duration: 'Duration', type: 'Type', context: 'Context and attendees', who: 'Owner', task: 'Task', due: 'Due', page: 'Page', emailFooter: 'Full transcript attached. Automatically generated by Xiu-xiu.' },
+  ca: { name: 'català', locale: 'ca-ES', subject: 'Resum', review: 'Revisió', doubt: '[dubte de comprensió]', minutes: 'Acta de reunió', date: 'Data', duration: 'Durada', type: 'Tipus', context: 'Context i assistents', who: 'Responsable', task: 'Tasca', due: 'Termini', page: 'Pàgina', reviewFooter: 'Revisió preparada amb Xiu-xiu.', emailFooter: 'Transcripció completa adjunta. Generat automàticament per Xiu-xiu.' },
+  es: { name: 'castellà', locale: 'es-ES', subject: 'Resumen', review: 'Revisión', doubt: '[duda de comprensión]', minutes: 'Acta de reunión', date: 'Fecha', duration: 'Duración', type: 'Tipo', context: 'Contexto y asistentes', who: 'Responsable', task: 'Tarea', due: 'Plazo', page: 'Página', reviewFooter: 'Revisión preparada con Xiu-xiu.', emailFooter: 'Transcripción completa adjunta. Generado automáticamente por Xiu-xiu.' },
+  en: { name: 'anglès', locale: 'en-GB', subject: 'Summary', review: 'Review', doubt: '[unclear]', minutes: 'Meeting minutes', date: 'Date', duration: 'Duration', type: 'Type', context: 'Context and attendees', who: 'Owner', task: 'Task', due: 'Due', page: 'Page', reviewFooter: 'Review prepared with Xiu-xiu.', emailFooter: 'Full transcript attached. Automatically generated by Xiu-xiu.' },
 };
 let resultLang = 'ca';
 function getSummary(m, lang = 'ca') {
@@ -2231,7 +2298,18 @@ function closeSheets() {
   document.querySelectorAll('.sheet').forEach((el) => { el.hidden = true; });
   $('#share-panel').hidden = true;
 }
-$('#btn-share-open').onclick = () => { $('#share-msg').textContent = ''; openSheet('#share-sheet'); };
+$('#btn-share-open').onclick = async () => {
+  $('#share-msg').textContent = '';
+  openSheet('#share-sheet');
+  // Revisió de feina: deixa preparat l'enviament a la persona revisada.
+  const m = await getMeeting(viewingId);
+  if (m && m.reviewFor && m.reviewFor.email) {
+    $('#share-panel').hidden = false;
+    if (!$('#share-to').value.trim()) $('#share-to').value = m.reviewFor.email;
+    $('#share-transcript').checked = false;
+    renderRecentEmails();
+  }
+};
 $('#btn-more').onclick = () => openSheet('#more-sheet');
 document.querySelectorAll('[data-close-sheet]').forEach((el) => { el.onclick = closeSheets; });
 // Les accions marcades amb data-closes tanquen el full un cop tocades.
@@ -2545,6 +2623,7 @@ async function importFiles(list, { textOnly = false } = {}) {
     durationMs: durations.reduce((a, b) => a + b, 0),
     engine: 'import',
     textOnly,
+    reviewFor: reviewForm(),
     importFiles: files.map((f, i) => ({ key: `${id}:import:${i}`, name: f.name, mime: importMime(f), durationMs: durations[i] })),
     importName: files.map((f) => f.name).join(', ').slice(0, 200),
     type: settings.lastType || 'general',

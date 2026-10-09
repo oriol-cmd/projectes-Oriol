@@ -70,6 +70,7 @@
           </div>
           <p id="source-hint" class="fineprint" hidden>Només a l'ordinador. Grava el so d'una pestanya (Meet, Teams o Zoom al navegador) o de tot l'ordinador, i també el teu micròfon. Quan t'ho demani, marca <b>«Comparteix també l'àudio»</b>.</p>
           <button id="btn-import" class="btn secondary small import-btn" type="button">📂 Importa àudios o vídeos</button>
+          <button id="btn-review-mode" class="btn secondary small import-btn" type="button">📝 Revisa una feina (dicta correccions)</button>
           <p id="call-mobile-note" class="call-note" hidden>🖥️ <b>Gravar videotrucades</b> (Meet, Teams, Zoom) <b>només és possible des de l'ordinador</b>: obre Xiu-xiu amb Chrome o Edge i tria «Videotrucada». Des del mòbil, posa la trucada amb l'altaveu en un altre aparell i grava-la aquí.</p>
         </div>
 
@@ -77,6 +78,17 @@
           <div class="field">
             <span>Tipus de reunió</span>
             <div id="type-chips" class="type-chips" role="group" aria-label="Tipus de reunió"></div>
+          </div>
+          <div id="review-fields" hidden>
+            <p class="fineprint left review-help">Grava't mentre repasses la feina i digues el que cal canviar (on és, què i com). Xiu-xiu ho ordenarà en una llista de correccions neta per enviar-la a la persona.</p>
+            <label class="field">
+              <span>Per a qui és</span>
+              <input id="review-name" type="text" placeholder="p. ex. Marta" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>El seu correu <em>(opcional, per enviar-l'hi)</em></span>
+              <input id="review-email" type="email" placeholder="marta@exemple.cat" autocomplete="off">
+            </label>
           </div>
           <label class="field">
             <span>Títol <em>(opcional)</em></span>

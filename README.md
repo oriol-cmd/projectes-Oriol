@@ -105,6 +105,12 @@ Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada».
 - **Noms i paraules que surten sovint**: escriu-hi noms de persones, empreses, llocs i sigles perquè surtin ben escrits a la transcripció i al resum.
 - Consell: posa el mòbil al mig de la taula, a prop de qui parla més fluix, i no el tapis.
 
+## Revisar la feina d'algú
+
+A la pantalla Gravar, toca **«📝 Revisa una feina (dicta correccions)»**. Escriu per a qui és (i el seu correu, si vols enviar-l'hi) i què revises. Grava't mentre repasses la feina i digues el que cal canviar: on és (pàgina, apartat), què i com. Pots afegir fotos de la feina durant la revisió.
+
+En acabar, Xiu-xiu en fa un document net: valoració general, **correccions a fer** ordenades per apartat (marcant les importants), suggeriments, el que està bé, dubtes i termini. El botó **«✉️ Envia-ho a …»** ja porta el correu de la persona preparat (sense la transcripció).
+
 ## Enviar el resum a altres persones
 
 A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les adreces (o tries les que ja has fet servir) i el resum els arriba amb format, enviat des del teu compte. Pots adjuntar-hi la transcripció. Les respostes et tornen a tu.
