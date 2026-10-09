@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -499,6 +499,9 @@ let forceWav = false;
 async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false, boost = false, call = false } = {}) {
   const speakerRules = !speakers ? [
     'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
+  ] : !isRef && !ref ? [
+    // Sense mostra de veus (p. ex. en continuar una reunió un altre dia).
+    "Escriu només la transcripció, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts, si el pots saber pel context o pel tram anterior; si no, posa «Persona no identificada:».",
   ] : isRef ? [
     "Aquest és l'INICI de la reunió: normalment els participants es presenten dient el seu nom.",
     "Escriu només la transcripció, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»), fent servir el nom amb què cadascú s'ha presentat. Si algú no ha dit el nom, posa «Persona no identificada:».",
@@ -904,6 +907,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
   const p = (async () => {
     const m = await getMeeting(id);
     if (!m) return; // s'ha esborrat
+    if (m.needsResummary) { redoSummary = true; delete m.needsResummary; }
     if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; m.textOnly = false; }
     m.status = 'processing';
     m.error = '';
@@ -1253,11 +1257,13 @@ function startSpeech() {
   rec.speech = sr;
 }
 
-async function startRecording() {
+// cont: reunió ja feta que es vol continuar gravant (s'hi afegeix àudio i es refà el resum).
+async function startRecording(cont = null) {
   const miss = missingSetup();
   if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); showView('settings'); return; }
+  if (rec.meeting) return;
 
-  const m = {
+  const m = cont || {
     id: uid(),
     title: $('#meeting-title').value.trim(),
     context: $('#meeting-context').value.trim(),
@@ -1276,6 +1282,11 @@ async function startRecording() {
     email: { status: 'pending' },
   };
 
+  const prevStatus = m.status;
+  if (cont) {
+    // Al mòbil no es pot capturar una videotrucada: es continua amb el micròfon.
+    if (m.source === 'call' && !CAN_CAPTURE_CALL) m.source = 'mic';
+  }
   try {
     if (m.engine !== 'device') {
       rec.mime = pickMime();
@@ -1283,11 +1294,20 @@ async function startRecording() {
       rec.meeting = m; // openMic necessita saber la font (micròfon o videotrucada)
       await openMic();
     }
-    Object.assign(rec, { meeting: m, activeMs: 0, paused: false, stopping: false, levels: [], avgLevel: null, quietMs: 0, resuming: false, recovering: false });
+    if (cont) {
+      // Marca on comença la continuació i demana refer el resum en acabar.
+      const when = new Date().toLocaleString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      m.segments.push({ idx: m.segments.length, startMs: m.durationMs || 0, status: 'done', text: `[Continuació gravada el ${when}]` });
+      m.needsResummary = true;
+      m.status = 'recording';
+      m.error = '';
+    }
+    Object.assign(rec, { meeting: m, activeMs: cont ? (m.durationMs || 0) : 0, paused: false, stopping: false, levels: [], avgLevel: null, quietMs: 0, resuming: false, recovering: false });
     await saveMeeting(m);
     if (m.engine !== 'device') { if (!startSegment()) throw new Error("No s'ha pogut començar a gravar l'àudio."); } else startSpeech();
   } catch (e) {
     rec.meeting = null;
+    if (cont) m.status = prevStatus;
     // Allibera el micròfon i la captura de pantalla si ja s'havien obert.
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
     stopExtraStreams();
@@ -1602,6 +1622,8 @@ async function showResult(id) {
   viewingId = id;
   if (m.status === 'processing' || pipelines.has(id)) { showView('proc'); updateProcView(m); return; }
   showView('result');
+  $('#btn-continue').hidden = !(m.engine === 'audio' && m.status !== 'recording');
+  $('#btn-continue').textContent = m.type === 'revisio' ? '➕ Continua aquesta revisió' : '➕ Continua gravant aquí';
   $('#btn-share-open').textContent = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
     ? `✉️ Envia-ho a ${m.reviewFor.name}` : '↗ Comparteix el resum';
   const st = $('#result-status');
@@ -2983,6 +3005,7 @@ setInterval(() => { if (document.visibilityState === 'visible' && signedIn() && 
 // Esdeveniments
 // ---------------------------------------------------------------------------
 $('#btn-record').onclick = () => {
+  pendingContinue = null;
   // Videotrucades: abans de gravar, cal avisar els participants.
   if (CAN_CAPTURE_CALL && settings.source === 'call' && !missingSetup().length) {
     $('#consent-ok').checked = false;
@@ -2997,7 +3020,23 @@ $('#btn-consent-copy').onclick = async () => {
   try { await navigator.clipboard.writeText($('#consent-msg').textContent.trim()); toast('Missatge copiat: enganxa\'l al xat de la videotrucada'); }
   catch { toast("No s'ha pogut copiar. Selecciona el text i copia'l a mà."); }
 };
-$('#btn-consent-start').onclick = () => { closeSheets(); startRecording(); };
+let pendingContinue = null;
+$('#btn-consent-start').onclick = () => { closeSheets(); const c = pendingContinue; pendingContinue = null; startRecording(c); };
+// Continua gravant una reunió o revisió ja feta (un altre moment o un altre dia).
+$('#btn-continue').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m || rec.meeting) return;
+  if (pipelines.has(m.id) || m.status === 'processing') { toast("Espera que s'acabi de processar."); return; }
+  if (!confirm("Continuar gravant aquí? El que diguis s'afegirà a aquesta reunió i se'n refarà el resum amb tot.")) return;
+  if (m.source === 'call' && CAN_CAPTURE_CALL) {
+    pendingContinue = m;
+    $('#consent-ok').checked = false;
+    $('#btn-consent-start').disabled = true;
+    openSheet('#consent-sheet');
+    return;
+  }
+  startRecording(m);
+};
 $('#btn-pause').onclick = togglePause;
 $('#btn-stop').onclick = () => { if (confirm('Acabar la reunió i fer-ne el resum?')) stopRecording(); };
 $('#btn-mark').onclick = addMark;

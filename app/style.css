@@ -351,3 +351,4 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .consent-msg { padding: 12px 14px; font-size: 14px; white-space: pre-line; margin-bottom: 10px; }
 .consent-check { margin: 12px 2px; }
 #consent-sheet .btn { margin-bottom: 8px; }
+.continue-btn { margin-top: 10px; }

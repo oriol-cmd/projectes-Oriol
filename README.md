@@ -111,6 +111,8 @@ A la pantalla Gravar, toca **«📝 Revisa una feina (dicta correccions)»**. Es
 
 En acabar, Xiu-xiu en fa un document net: valoració general, **correccions a fer** ordenades per apartat (marcant les importants), suggeriments, el que està bé, dubtes i termini. El botó **«✉️ Envia-ho a …»** ja porta el correu de la persona preparat (sense la transcripció).
 
+Si no l'acabes d'una tirada, toca **«➕ Continua aquesta revisió»** (un altre moment o un altre dia): el que diguis s'afegeix al mateix document i se'n refà el resum amb tot. També funciona amb les reunions («➕ Continua gravant aquí»).
+
 ## Enviar el resum a altres persones
 
 A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les adreces (o tries les que ja has fet servir) i el resum els arriba amb format, enviat des del teu compte. Pots adjuntar-hi la transcripció. Les respostes et tornen a tu.
