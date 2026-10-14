@@ -98,6 +98,10 @@ Per saber qui diu què (i a qui toca cada tasca):
 
 Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada». Es pot desactivar a *Configuració > Avançat*. Enviar la mostra amb cada tram fa que el cost de transcripció sigui aproximadament el doble (uns 10 € al mes per 15 h setmanals).
 
+## Resum detallat o resumit
+
+De sèrie, Xiu-xiu fa una **acta detallada**: no és la transcripció literal, sinó tot el que s'ha parlat ben ordenat per temes (què ha dit cadascú, arguments, dades, dubtes i conclusions), més les decisions i les tasques. Si d'una reunió en vols només el més important, toca **⋯ > «Fes-ne una versió més resumida»** (i al revés). Per canviar-ho per a totes les reunions: Ajustos > Resums > «Com vols el resum».
+
 ## Veus fluixes i noms difícils
 
 - **Amplifica les veus fluixes o llunyanes** (Ajustos > Transcripció, activat de sèrie): abans d'enviar cada tros a Gemini, l'app puja el volum de les parts fluixes, treu el brunzit greu i dona claredat a la veu.

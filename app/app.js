@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -17,6 +17,7 @@ const DEFAULTS = {
   boost: true,
   precise: false,
   shortImports: true,
+  detail: 'full', // 'full' = acta detallada (tot el que s'ha parlat) · 'short' = resum
   liveSec: 60, // cada quants segons apareix text nou en directe
   speakers: true, // identifica qui parla a partir de les presentacions inicials
   summaryLang: 'ca', // idioma per defecte dels resums: ca | es | en
@@ -675,6 +676,15 @@ function textDocument(m) {
   return `# ${title}\n\n${body || '(Sense veu)'}`;
 }
 
+// Versió DETALLADA (de sèrie): no resumeix, ordena tot el que s'ha parlat.
+const DETAILED_PROMPT = SYSTEM_PROMPT
+  .replace("i n'has de fer l'acta-resum.", "i n'has de fer l'ACTA DETALLADA: no un resum, sinó tot el que s'ha parlat, ben ordenat i redactat. No és una transcripció literal: treu les repeticions, les crosses i les converses sense contingut, però CONSERVA tots els temes, arguments, propostes, opinions de cada persona, dades, xifres, exemples, dubtes i conclusions. La llargada ha de ser proporcional a la reunió: una reunió d'una hora pot ocupar diverses pàgines. Si dubtes entre treure un detall o deixar-lo, deixa'l.")
+  .replace(`## Punts tractats
+- **Tema**: explicació concisa del que s'ha dit, amb arguments i dades rellevants.`, `## Desenvolupament de la reunió
+Un apartat «### <Tema>» per a cada tema tractat, en l'ordre en què s'ha parlat. Dins de cada tema, explica amb detall i de manera ordenada tot el que s'ha dit: el context, què ha explicat o proposat cada persona (amb el seu nom si se sap), els arguments a favor i en contra, les dades i exemples, les preguntes i respostes, i com ha quedat el tema. Fes servir paràgrafs i llistes. No resumeixis en una sola línia el que s'ha parlat durant minuts.`)
+  .replace('Sigues concret i útil: el lector no ha assistit a la reunió i ha de poder actuar amb aquest resum.', "Sigues complet i concret: el lector no ha assistit a la reunió i, llegint aquesta acta, ha de saber TOT el que s'hi ha dit i ha de poder actuar.");
+const summaryStyle = (m) => m.detail || settings.detail || 'full';
+
 function buildTranscript(m) {
   if (m.engine === 'device') return (m.liveText || '').trim();
   return m.segments
@@ -783,7 +793,7 @@ async function summarize(m, onText = null) {
     if (blob) photoParts.push({ inlineData: { mimeType: 'image/jpeg', data: await blobToBase64(blob) } });
   }
   // Àudios importats: resum curt (si no hi ha fotos, que demanen la secció de documents).
-  const short = m.engine === 'import' && settings.shortImports !== false && !photoParts.length;
+  const short = m.engine === 'import' && settings.shortImports !== false && !photoParts.length && m.detail !== 'full';
   if (photoParts.length) {
     info.push(`S'adjunten ${photoParts.length} foto${photoParts.length > 1 ? 's' : ''} de documents mostrats o comentats a la reunió (sovint escrits a mà), en aquest ordre: ${photos.map((ph, i) => `foto ${i + 1}${ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
 Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
@@ -793,7 +803,7 @@ Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres,
   if (review && m.reviewFor && m.reviewFor.name) info.push(`La revisió és per a: ${m.reviewFor.name}.`);
   const text = await gemini(
     [{ text: `${info.join('\n')}\n\n<transcripcio>\n${transcript}\n</transcripcio>` }, ...photoParts],
-    { system: review ? REVIEW_PROMPT + (photoParts.length ? "\n\nLes fotos adjuntes són de la feina revisada: fes-les servir per situar bé cada correcció (pàgina, apartat, text exacte). Si cal, afegeix una secció «## Documents comentats»." : '') : short ? SHORT_PROMPT.replace('<<PER_AUDIO>>', importList(m).length > 1 ? PER_AUDIO : '') : SYSTEM_PROMPT, maxTokens: 16384, thinking: 2048, onText },
+    { system: review ? REVIEW_PROMPT + (photoParts.length ? "\n\nLes fotos adjuntes són de la feina revisada: fes-les servir per situar bé cada correcció (pàgina, apartat, text exacte). Si cal, afegeix una secció «## Documents comentats»." : '') : short ? SHORT_PROMPT.replace('<<PER_AUDIO>>', importList(m).length > 1 ? PER_AUDIO : '') : summaryStyle(m) === 'short' ? SYSTEM_PROMPT : DETAILED_PROMPT, maxTokens: 32768, thinking: 2048, onText },
   );
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
   if (!clean) throw new Error('Gemini ha retornat un resum buit');
@@ -1786,6 +1796,7 @@ function fillSettings() {
   $('#set-boost').checked = settings.boost !== false;
   $('#set-precise').checked = settings.precise === true;
   $('#set-short-imports').checked = settings.shortImports !== false;
+  $('#set-detail').value = settings.detail || 'full';
   $('#set-segment').value = settings.liveSec;
   $('#set-keep-audio').checked = settings.keepAudio;
   $('#set-speakers').checked = settings.speakers !== false;
@@ -1807,6 +1818,7 @@ function readSettingsForm() {
     boost: $('#set-boost').checked,
     precise: $('#set-precise').checked,
     shortImports: $('#set-short-imports').checked,
+    detail: $('#set-detail').value,
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
     v: 3,
     keepAudio: $('#set-keep-audio').checked,
@@ -2030,7 +2042,7 @@ function getSummary(m, lang = 'ca') {
 async function translateSummary(m, lang) {
   const L = L10N[lang];
   const system = `Ets un traductor professional. Tradueix al ${L.name} l'acta de reunió en Markdown que et donaré. Mantén exactament la mateixa estructura Markdown (títols #, ##, llistes, caselles [ ], negretes), els noms propis, les xifres i les dates. Tradueix també els títols de les seccions. Les marques «[dubte de comprensió]» tradueix-les com «${L.doubt}». Respon només amb l'acta traduïda, sense cap comentari.`;
-  const text = await gemini([{ text: m.summary }], { system, maxTokens: 16384, thinking: 0 });
+  const text = await gemini([{ text: m.summary }], { system, maxTokens: 32768, thinking: 0 });
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').trim();
   if (!clean) throw new Error('La traducció ha sortit buida');
   m.translations = { ...(m.translations || {}), [lang]: clean };
@@ -2362,7 +2374,15 @@ $('#btn-share-open').onclick = async () => {
     renderRecentEmails();
   }
 };
-$('#btn-more').onclick = () => openSheet('#more-sheet');
+$('#btn-more').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (m) {
+    const isShort = m.engine === 'import' && m.detail !== 'full' && settings.shortImports !== false ? true : summaryStyle(m) === 'short';
+    $('#btn-toggle-detail').hidden = m.type === 'revisio' || !!m.textOnly;
+    $('#btn-toggle-detail').textContent = isShort ? '📄 Fes-ne la versió detallada (tot el que s\'ha parlat)' : '✂️ Fes-ne una versió més resumida';
+  }
+  openSheet('#more-sheet');
+};
 document.querySelectorAll('[data-close-sheet]').forEach((el) => { el.onclick = closeSheets; });
 // Les accions marcades amb data-closes tanquen el full un cop tocades.
 document.querySelectorAll('.sheet [data-closes]').forEach((el) => el.addEventListener('click', () => setTimeout(closeSheets, 50)));
@@ -3247,6 +3267,16 @@ $('#btn-resend').onclick = async () => {
   await saveMeeting(m);
   showView('proc'); updateProcView(m);
   runPipeline(m.id);
+};
+$('#btn-toggle-detail').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m) return;
+  const isShort = m.engine === 'import' && m.detail !== 'full' && settings.shortImports !== false ? true : summaryStyle(m) === 'short';
+  m.detail = isShort ? 'full' : 'short';
+  await saveMeeting(m);
+  showView('proc');
+  updateProcView(m);
+  runPipeline(m.id, { redoSummary: true });
 };
 $('#btn-redo').onclick = async () => {
   if (!confirm('Tornar a generar el resum i enviar-lo de nou?')) return;

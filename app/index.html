@@ -287,6 +287,11 @@
             <option value="es">Castellano</option>
             <option value="en">English</option>
           </select></label>
+        <label class="field"><span>Com vols el resum</span>
+          <select id="set-detail">
+            <option value="full">Detallat: tot el que s'ha parlat, ben ordenat (recomanat)</option>
+            <option value="short">Resumit: només el més important</option>
+          </select></label>
         <label class="field"><span>Instruccions extra <em>(opcional)</em></span>
           <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
         <label class="check last"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
@@ -458,6 +463,7 @@
       <div class="sheet-list">
         <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
         <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📷 Afegeix una foto d'un document</button>
+        <button id="btn-toggle-detail" class="sheet-row" type="button" data-closes>✂️ Fes-ne una versió més resumida</button>
         <button id="btn-redo" class="sheet-row" type="button" data-closes>✨ Refés el resum</button>
         <button id="btn-resend" class="sheet-row" type="button" data-closes>🔁 Torna a enviar el correu automàtic</button>
         <button id="btn-delete" class="sheet-row danger-text" type="button" data-closes>🗑 Esborra aquesta reunió</button>
