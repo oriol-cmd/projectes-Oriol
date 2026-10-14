@@ -332,6 +332,13 @@
         <label class="check last"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
       </div>
 
+      <h3>Acta en PDF</h3>
+      <div class="card group">
+        <p class="fineprint left first">Crea plantilles amb el logotip i els colors de cada empresa o entitat. Quan facis el PDF de l'acta, triaràs quina vols fer servir.</p>
+        <div id="tpl-list" class="tpl-list"></div>
+        <button id="btn-tpl-new" class="btn secondary small" type="button">+ Nova plantilla</button>
+      </div>
+
       <h3>Transcripció</h3>
       <div class="card group">
         <label class="field"><span>Com es transcriu</span>
@@ -485,6 +492,53 @@
         <button id="btn-import-summary" class="sheet-row" type="button">✨ Fes-ne el resum<br><small>Resum curt amb els punts clau i les tasques</small></button>
         <button id="btn-import-text" class="sheet-row" type="button">📝 Només el text<br><small>Transcripció neta, per copiar-la a un document o passar-la a un assistent</small></button>
       </div>
+      <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+  <!-- Plantilla de l'acta (PDF) -->
+  <div id="tpl-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Plantilla de l'acta">
+      <div class="sheet-grip"></div>
+      <h3 id="tpl-sheet-title">Nova plantilla</h3>
+      <div class="card group">
+        <label class="field"><span>Nom de la plantilla</span>
+          <input id="tpl-name" type="text" placeholder="p. ex. Esportec, Ajuntament, Associació…" autocomplete="off"></label>
+        <div class="field">
+          <span class="field-label">Logotip</span>
+          <div class="tpl-logo-row">
+            <div class="tpl-logo-box"><img id="tpl-logo-prev" alt="" hidden><span id="tpl-logo-empty">Sense logotip</span></div>
+            <div class="tpl-logo-btns">
+              <button id="btn-tpl-logo" class="btn secondary small" type="button">Tria una imatge</button>
+              <button id="btn-tpl-logo-clear" class="link" type="button" hidden>Treu-la</button>
+            </div>
+          </div>
+          <input id="tpl-logo-input" type="file" accept="image/*" hidden>
+        </div>
+        <label class="field"><span>Nom de l'organització <em>(capçalera)</em></span>
+          <input id="tpl-org" type="text" placeholder="p. ex. Esportec SL" autocomplete="off"></label>
+        <div class="field">
+          <span class="field-label">Color principal</span>
+          <div class="tpl-colors" id="tpl-colors"></div>
+        </div>
+        <label class="field"><span>Peu de pàgina <em>(opcional)</em></span>
+          <input id="tpl-footer" type="text" placeholder="p. ex. Esportec SL · www.esportec.cat · Document intern" autocomplete="off"></label>
+        <label class="check last"><input id="tpl-default" type="checkbox"> Fes-la servir per defecte</label>
+      </div>
+      <button id="btn-tpl-save" class="btn primary full" type="button">Desa la plantilla</button>
+      <button id="btn-tpl-preview" class="btn secondary full tpl-gap" type="button">Veure'n un exemple en PDF</button>
+      <button id="btn-tpl-delete" class="btn ghost full danger-text" type="button" hidden>Esborra la plantilla</button>
+    </div>
+  </div>
+
+  <!-- Tria la plantilla en fer el PDF -->
+  <div id="pdf-pick-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Tria la plantilla">
+      <div class="sheet-grip"></div>
+      <h3>Amb quina plantilla vols l'acta?</h3>
+      <div id="pdf-pick-list" class="sheet-list"></div>
       <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
     </div>
   </div>

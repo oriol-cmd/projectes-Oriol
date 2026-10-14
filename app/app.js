@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 56;
+const APP_VERSION = 57;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1925,6 +1925,7 @@ function fillSettings() {
   $('#set-summary-lang').value = settings.summaryLang || 'ca';
   $('#backup-info').textContent = settings.lastBackup ? `Última còpia: ${fmtDate(settings.lastBackup)}` : 'Encara no has fet cap còpia.';
   syncEngineFields();
+  renderTplList();
   $('#settings-msg').textContent = '';
 }
 function readSettingsForm() {
@@ -2386,22 +2387,47 @@ async function imageDataUrl(url) {
   const blob = await (await fetch(url)).blob();
   return new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob); });
 }
-async function makePdf(m, lang) {
+const hexRgb = (h) => { const x = String(h || '').replace('#', ''); return x.length === 6 ? [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)) : null; };
+// tpl: plantilla de l'usuari ({ name, org, color, logo (dataURL), logoRatio, footer }) o null (estàndard)
+async function makePdf(m, lang, tpl = null) {
   const JsPDF = await loadPdfLib();
   const L = L10N[lang] || L10N.ca;
   const md = getSummary(m, lang);
   const doc = new JsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, M = 16, maxW = W - 2 * M, BOTTOM = 280;
-  const ACCENT = [30, 64, 175], INK = [17, 24, 39], MUTED = [100, 116, 139], DOUBT = [180, 83, 9];
+  const ACCENT = (tpl && hexRgb(tpl.color)) || [30, 64, 175], INK = [17, 24, 39], MUTED = [100, 116, 139], DOUBT = [180, 83, 9];
   let y = 0;
   const ensure = (h) => { if (y + h > BOTTOM) { doc.addPage(); y = 18; } };
 
   // Capçalera
-  doc.setFillColor(...ACCENT); doc.rect(0, 0, W, 26, 'F');
-  try { doc.addImage(await imageDataUrl('icons/icon-192.png'), 'PNG', M, 5, 16, 16); } catch { /* sense icona */ }
-  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.text('Xiu-xiu', M + 20, 13.5);
-  doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.text('by Oriolbop', M + 20, 19);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(pdfText(L.minutes), W - M, 15, { align: 'right' });
+  if (tpl) {
+    // Plantilla pròpia: capçalera blanca amb el logotip, el nom de l'organització i una línia de color.
+    let x = M;
+    if (tpl.logo) {
+      try {
+        const ratio = tpl.logoRatio || 1;
+        let h = 16, w = h * ratio;
+        if (w > 62) { w = 62; h = w / ratio; }
+        doc.addImage(tpl.logo, /^data:image\/png/.test(tpl.logo) ? 'PNG' : 'JPEG', M, 7 + (16 - h) / 2, w, h);
+        x = M + w + 5;
+      } catch { /* logotip il·legible */ }
+    }
+    if (tpl.org) {
+      doc.setTextColor(...INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(tpl.logo ? 12 : 16);
+      doc.text(pdfText(tpl.org), x, tpl.logo ? 16.5 : 17);
+    }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...ACCENT);
+    doc.text(pdfText(L.minutes).toUpperCase(), W - M, 13.5, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+    doc.text(pdfText(new Date(m.startedAt).toLocaleDateString(L.locale, { day: 'numeric', month: 'long', year: 'numeric' })), W - M, 19, { align: 'right' });
+    doc.setFillColor(...ACCENT); doc.rect(M, 27, W - 2 * M, 1.2, 'F');
+  } else {
+    doc.setFillColor(...ACCENT); doc.rect(0, 0, W, 26, 'F');
+    try { doc.addImage(await imageDataUrl('icons/icon-192.png'), 'PNG', M, 5, 16, 16); } catch { /* sense icona */ }
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.text('Xiu-xiu', M + 20, 13.5);
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.text('by Oriolbop', M + 20, 19);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(pdfText(L.minutes), W - M, 15, { align: 'right' });
+  }
   y = 38;
 
   // Títol i dades
@@ -2411,6 +2437,9 @@ async function makePdf(m, lang) {
   const when = new Date(m.startedAt).toLocaleString(L.locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const meta = [`${L.date}: ${when}`, `${L.duration}: ${fmtDuration(m.durationMs || 0)}`];
   if (m.type && m.type !== 'general' && MEETING_TYPES[m.type]) meta.push(`${L.type}: ${MEETING_TYPES[m.type].label}`);
+  // Si l'acta ja porta la línia de dades (actes professionals), s'aprofita aquella.
+  const mdMeta = (md.match(/^\*\*(Data|Fecha|Date):\*\*.*$/m) || [])[0];
+  if (mdMeta) meta.splice(0, meta.length, ...mdMeta.replace(/\*\*/g, '').split(/\s+·\s+/).map((x) => x.trim()));
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
   const ml = doc.splitTextToSize(pdfText(meta.join('   ·   ')), maxW); doc.text(ml, M, y + 1); y += ml.length * 4.6 + 1;
   if (m.context) { const cl = doc.splitTextToSize(pdfText(`${L.context}: ${m.context}`), maxW); doc.text(cl, M, y + 1); y += cl.length * 4.6 + 1; }
@@ -2420,7 +2449,7 @@ async function makePdf(m, lang) {
   const rich = (raw, x, width, { size = 10.5, color = INK, lead = 5 } = {}) => {
     let label = '', rest = raw;
     const lm = raw.match(/^\*\*(.+?)\*\*\s*:?\s*(.*)$/);
-    if (lm) { label = pdfText(lm[1]) + ': '; rest = lm[2]; }
+    if (lm) { label = pdfText(lm[1].replace(/\s*:\s*$/, '')) + ': '; rest = lm[2]; }
     rest = pdfText(rest.replace(/\*\*/g, '').replace(/(^|\s)\*(\S.*?)\*/g, '$1$2'));
     const doubt = /\[(dubte de comprensi|duda de comprensi|unclear)/i.test(rest);
     doc.setFontSize(size);
@@ -2447,7 +2476,7 @@ async function makePdf(m, lang) {
   while (i < lines.length) {
     const line = lines[i].trimEnd();
     let mm;
-    if (!line.trim() || /^#\s+/.test(line)) { i++; continue; }
+    if (!line.trim() || /^#\s+/.test(line) || /^\*\*(Data|Fecha|Date):\*\*/.test(line)) { i++; continue; }
     if ((mm = line.match(/^#{2,3}\s+(.*)$/))) {
       const heading = mm[1];
       // Secció de tasques: com a taula
@@ -2481,9 +2510,16 @@ async function makePdf(m, lang) {
         }
         continue;
       }
-      ensure(14); y += 2;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(...ACCENT); doc.text(pdfText(heading), M, y);
-      doc.setDrawColor(...ACCENT); doc.setLineWidth(0.3); doc.line(M, y + 1.8, W - M, y + 1.8); y += 7;
+      if (/^###\s/.test(line)) {
+        // Subapartat (p. ex. cada punt de l'ordre del dia): sense línia, color de text.
+        ensure(12); y += 2;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+        const hl = doc.splitTextToSize(pdfText(heading), maxW); doc.text(hl, M, y); y += hl.length * 5.2 + 1.5;
+      } else {
+        ensure(14); y += 2;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(...ACCENT); doc.text(pdfText(heading), M, y);
+        doc.setDrawColor(...ACCENT); doc.setLineWidth(0.3); doc.line(M, y + 1.8, W - M, y + 1.8); y += 7;
+      }
     } else if ((mm = line.match(/^(\s*)[-*•]\s+(?:\[[ xX]?\]\s*)?(.*)$/))) {
       const nested = mm[1].replace(/\t/g, '    ').length >= 2;
       const x = M + (nested ? 10 : 4);
@@ -2508,9 +2544,15 @@ async function makePdf(m, lang) {
   for (let p = 1; p <= n; p++) {
     doc.setPage(p);
     doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3); doc.line(M, 287, W - M, 287);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...MUTED); doc.text('Xiu-xiu', M, 291.5);
-    const brandW = doc.getTextWidth('Xiu-xiu') + 1.5;
-    doc.setFont('helvetica', 'italic'); doc.text('by Oriolbop', M + brandW, 291.5);
+    if (tpl) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MUTED);
+      const foot = pdfText(tpl.footer || tpl.org || '');
+      if (foot) doc.text(doc.splitTextToSize(foot, maxW - 30)[0], M, 291.5);
+    } else {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...MUTED); doc.text('Xiu-xiu', M, 291.5);
+      const brandW = doc.getTextWidth('Xiu-xiu') + 1.5;
+      doc.setFont('helvetica', 'italic'); doc.text('by Oriolbop', M + brandW, 291.5);
+    }
     doc.setFont('helvetica', 'normal'); doc.text(`${L.page} ${p} / ${n}`, W - M, 291.5, { align: 'right' });
   }
   return doc.output('blob');
@@ -2576,11 +2618,38 @@ $('#btn-wa').onclick = async () => {
 $('#btn-pdf').onclick = async () => {
   const m = await getMeeting(viewingId);
   if (!m || !m.summary) return;
-  const btn = $('#btn-pdf');
+  const tpls = settings.pdfTemplates || [];
+  if (tpls.length) { openPdfPicker(m); return; }
+  exportPdf(m, null, $('#btn-pdf'));
+};
+// Tria de plantilla en fer el PDF (la triada la darrera vegada surt primer).
+function openPdfPicker(m) {
+  const list = $('#pdf-pick-list');
+  list.textContent = '';
+  const tpls = settings.pdfTemplates || [];
+  const first = m.pdfTpl || settings.pdfDefault || '';
+  const options = [...tpls.map((t) => ({ id: t.id, t })), { id: '', t: null }]
+    .sort((a, b) => (b.id === first) - (a.id === first));
+  for (const o of options) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sheet-row tpl-row';
+    b.innerHTML = o.t
+      ? `<span class="tpl-sw" style="background:${escapeHtml(o.t.color || '#1f4bd8')}">${o.t.logo ? `<img src="${o.t.logo}" alt="">` : ''}</span><span><b>${escapeHtml(o.t.name || 'Plantilla')}</b>${o.id === first ? '<small>La darrera que has fet servir</small>' : ''}</span>`
+      : `<span class="tpl-sw xx"><img src="icons/icon.svg?v=2" alt=""></span><span><b>Xiu-xiu (estàndard)</b>${!first ? '<small>La darrera que has fet servir</small>' : ''}</span>`;
+    b.onclick = async () => {
+      m.pdfTpl = o.id;
+      await saveMeeting(m);
+      exportPdf(m, o.t, b);
+    };
+    list.appendChild(b);
+  }
+  openSheet('#pdf-pick-sheet');
+}
+async function exportPdf(m, tpl, btn) {
   const label = btn.innerHTML;
   btn.disabled = true; btn.textContent = 'Preparant l\'acta…';
   try {
-    const blob = await makePdf(m, resultLang);
+    const blob = await makePdf(m, resultLang, tpl);
     const name = `${summaryTitle(m, getSummary(m, resultLang)).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'Acta'} - ${new Date(m.startedAt).toISOString().slice(0, 10)}.pdf`;
     const r = await shareOrDownload(blob, name, summaryTitle(m));
     if (r !== 'cancelled') closeSheets();
@@ -2589,6 +2658,116 @@ $('#btn-pdf').onclick = async () => {
   } finally {
     btn.disabled = false; btn.innerHTML = label;
   }
+};
+
+// ---------------------------------------------------------------------------
+// Plantilles de l'acta en PDF (logotip, color, organització, peu)
+// ---------------------------------------------------------------------------
+const TPL_COLORS = ['#13265c', '#1f4bd8', '#0e7490', '#0f766e', '#15803d', '#b45309', '#b91c1c', '#7c3aed', '#be185d', '#334155'];
+let tplEdit = null; // plantilla que s'està editant
+function renderTplList() {
+  const box = $('#tpl-list');
+  if (!box) return;
+  box.textContent = '';
+  const tpls = settings.pdfTemplates || [];
+  if (!tpls.length) { box.innerHTML = '<p class="fineprint left">Encara no n\'has creat cap. De moment, les actes surten amb el disseny de Xiu-xiu.</p>'; return; }
+  for (const t of tpls) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sheet-row tpl-row';
+    b.innerHTML = `<span class="tpl-sw" style="background:${escapeHtml(t.color || '#1f4bd8')}">${t.logo ? `<img src="${t.logo}" alt="">` : ''}</span><span><b>${escapeHtml(t.name || 'Plantilla')}</b><small>${escapeHtml(t.org || '')}${settings.pdfDefault === t.id ? ' · per defecte' : ''}</small></span>`;
+    b.onclick = () => openTplEditor(t.id);
+    box.appendChild(b);
+  }
+}
+function renderTplColors() {
+  const box = $('#tpl-colors');
+  box.textContent = '';
+  for (const c of TPL_COLORS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tpl-color'; b.style.background = c;
+    b.setAttribute('aria-label', c); b.setAttribute('aria-pressed', String(tplEdit.color === c));
+    b.onclick = () => { tplEdit.color = c; renderTplColors(); };
+    box.appendChild(b);
+  }
+  const custom = document.createElement('input');
+  custom.type = 'color'; custom.className = 'tpl-color custom'; custom.value = tplEdit.color || '#1f4bd8';
+  custom.title = 'Un altre color';
+  custom.oninput = () => { tplEdit.color = custom.value; box.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false')); };
+  box.appendChild(custom);
+}
+function renderTplLogo() {
+  const has = !!tplEdit.logo;
+  $('#tpl-logo-prev').hidden = !has;
+  if (has) $('#tpl-logo-prev').src = tplEdit.logo;
+  $('#tpl-logo-empty').hidden = has;
+  $('#btn-tpl-logo-clear').hidden = !has;
+  $('#btn-tpl-logo').textContent = has ? 'Canvia la imatge' : 'Tria una imatge';
+}
+function openTplEditor(id = null) {
+  const found = (settings.pdfTemplates || []).find((t) => t.id === id);
+  tplEdit = found ? { ...found } : { id: uid(), name: '', org: '', color: '#13265c', logo: '', logoRatio: 1, footer: '' };
+  $('#tpl-sheet-title').textContent = found ? 'Edita la plantilla' : 'Nova plantilla';
+  $('#tpl-name').value = tplEdit.name;
+  $('#tpl-org').value = tplEdit.org;
+  $('#tpl-footer').value = tplEdit.footer;
+  $('#tpl-default').checked = settings.pdfDefault === tplEdit.id || (!found && !(settings.pdfTemplates || []).length);
+  $('#btn-tpl-delete').hidden = !found;
+  renderTplColors();
+  renderTplLogo();
+  openSheet('#tpl-sheet');
+}
+// Redueix el logotip (PNG, conserva la transparència) perquè ocupi poc.
+async function prepLogo(file) {
+  let src;
+  try { src = await createImageBitmap(file); } catch {
+    src = await new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error("No s'ha pogut llegir la imatge")); img.src = URL.createObjectURL(file); });
+  }
+  const scale = Math.min(1, 700 / Math.max(src.width, src.height));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(src.width * scale)); c.height = Math.max(1, Math.round(src.height * scale));
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  return { logo: c.toDataURL('image/png'), logoRatio: c.width / c.height };
+}
+function readTplForm() {
+  tplEdit.name = $('#tpl-name').value.trim() || $('#tpl-org').value.trim() || 'Plantilla';
+  tplEdit.org = $('#tpl-org').value.trim();
+  tplEdit.footer = $('#tpl-footer').value.trim();
+  return tplEdit;
+}
+$('#btn-tpl-new').onclick = () => openTplEditor();
+$('#btn-tpl-logo').onclick = () => $('#tpl-logo-input').click();
+$('#tpl-logo-input').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try { Object.assign(tplEdit, await prepLogo(f)); renderTplLogo(); } catch (err) { toast(err.message); }
+};
+$('#btn-tpl-logo-clear').onclick = () => { tplEdit.logo = ''; tplEdit.logoRatio = 1; renderTplLogo(); };
+$('#btn-tpl-save').onclick = () => {
+  const t = readTplForm();
+  const list = (settings.pdfTemplates || []).filter((x) => x.id !== t.id);
+  list.push(t);
+  const patch = { pdfTemplates: list };
+  if ($('#tpl-default').checked) patch.pdfDefault = t.id;
+  else if (settings.pdfDefault === t.id) patch.pdfDefault = '';
+  try { saveSettings(patch); } catch { toast("No s'ha pogut desar: el logotip és massa gran. Prova amb una imatge més petita.", 6000); return; }
+  closeSheets();
+  renderTplList();
+  toast('Plantilla desada');
+};
+$('#btn-tpl-delete').onclick = () => {
+  if (!confirm(`Esborrar la plantilla «${tplEdit.name || 'Plantilla'}»?`)) return;
+  const patch = { pdfTemplates: (settings.pdfTemplates || []).filter((x) => x.id !== tplEdit.id) };
+  if (settings.pdfDefault === tplEdit.id) patch.pdfDefault = '';
+  saveSettings(patch);
+  closeSheets();
+  renderTplList();
+};
+// Exemple: l'última reunió amb resum o, si no n'hi ha, una acta de mostra.
+$('#btn-tpl-preview').onclick = async () => {
+  const t = readTplForm();
+  const all = (await db.all('meetings')).filter((x) => x.summary).sort((a, b) => b.startedAt - a.startedAt);
+  const sample = all[0] || { id: 'mostra', startedAt: Date.now(), durationMs: 45 * 60000, type: 'general', summary: "# Reunió de mostra\n\n## Resum\nAixí es veurà l'acta amb aquesta plantilla.\n\n## Decisions\n- Aprovar el pressupost.\n\n## Tasques\n- [ ] **Marta**: enviar la proposta — divendres\n" };
+  exportPdf(sample, t, $('#btn-tpl-preview'));
 };
 
 // ---------------------------------------------------------------------------

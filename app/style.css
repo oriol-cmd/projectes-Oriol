@@ -509,3 +509,24 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .summary { border-top: 4px solid var(--accent-ink); }
 @media (prefers-color-scheme: dark) { .summary { border-top-color: var(--accent); } }
 .steps li.active { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+
+/* Plantilles de l'acta */
+.tpl-list { display: grid; gap: 8px; margin: 0 0 12px; }
+.tpl-row { display: flex; align-items: center; gap: 12px; }
+.tpl-row small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; }
+.tpl-sw { flex: none; width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border); }
+.tpl-sw img { max-width: 34px; max-height: 34px; background: #fff; border-radius: 4px; padding: 2px; object-fit: contain; }
+.tpl-sw.xx { background: var(--surface-2); }
+.tpl-sw.xx img { background: none; padding: 0; width: 30px; height: 30px; }
+.tpl-logo-row { display: flex; align-items: center; gap: 14px; }
+.tpl-logo-box { flex: none; width: 120px; height: 64px; border: 1px dashed var(--border); border-radius: 10px; background: #fff; display: grid; place-items: center; overflow: hidden; }
+.tpl-logo-box img { max-width: 108px; max-height: 52px; object-fit: contain; }
+.tpl-logo-box span { color: #94a3b8; font-size: 12px; }
+.tpl-logo-btns { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.tpl-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.tpl-color { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); cursor: pointer; padding: 0; }
+.tpl-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--text); }
+.tpl-color.custom { -webkit-appearance: none; appearance: none; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.tpl-color.custom::-webkit-color-swatch-wrapper { padding: 0; } .tpl-color.custom::-webkit-color-swatch { border: 0; border-radius: 50%; opacity: 0; }
+.tpl-gap { margin-top: 8px; }
+#tpl-sheet .group { margin-bottom: 12px; }

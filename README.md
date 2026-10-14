@@ -98,6 +98,10 @@ Per saber qui diu què (i a qui toca cada tasca):
 
 Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada». Es pot desactivar a *Configuració > Avançat*. Enviar la mostra amb cada tram fa que el cost de transcripció sigui aproximadament el doble (uns 10 € al mes per 15 h setmanals).
 
+## Acta en PDF amb el teu logotip
+
+A **Ajustos > Acta en PDF** pots crear **plantilles**: cadascuna amb el seu nom, **logotip** (qualsevol imatge), nom de l'organització, **color** i peu de pàgina. Per exemple, una per a cada empresa o entitat amb què treballes. Quan facis **Comparteix > Acta en PDF**, Xiu-xiu et pregunta quina plantilla vols (la darrera que has fet servir per a aquella reunió surt primer). L'opció «Xiu-xiu (estàndard)» sempre hi és.
+
 ## Reunions importants: acta professional
 
 Tria el tipus **«⭐ Reunió important»** i, si vols, dona-li l'**ordre del dia**: escriu-lo (un punt per línia) o toca **«📷 O afegeix-ne una foto o captura»** per fer una foto de la convocatòria en paper o triar una captura de pantalla (o totes dues coses). Xiu-xiu fa l'acta per fases, com un secretari:
