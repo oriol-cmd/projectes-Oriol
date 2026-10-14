@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1828,6 +1828,9 @@ async function checkGeminiKey(key) {
   if (res.ok) return { ok: true };
   const t = await res.text();
   if (/API_KEY_INVALID|API key not valid/i.test(t)) return { ok: false, msg: 'Aquesta clau no és vàlida. Torna a copiar-la de Google.' };
+  if (/SERVICE_DISABLED|has not been used|is disabled/i.test(t)) return { ok: false, msg: "La clau existeix però Google encara l'està activant. Espera un minut i torna a tocar «Enganxa la clau»." };
+  if (/location is not supported|User location/i.test(t)) return { ok: false, msg: 'Google diu que Gemini no està disponible des d\'on et connectes. Prova sense VPN.' };
+  if (res.status === 403) return { ok: false, msg: "Google no deixa fer servir aquesta clau. Si és un compte de la feina, prova de crear-la amb un Gmail personal." };
   return { ok: false, msg: `Google ha respost ${res.status}. Torna-ho a provar d'aquí a un moment.` };
 }
 
@@ -1839,7 +1842,9 @@ async function useWelcomeKey(raw) {
   const msg = $('#welcome-msg');
   const key = (raw || '').trim().replace(/^["']|["']$/g, '');
   if (!KEY_RE.test(key)) {
-    msg.textContent = key ? 'Això no sembla una clau de Google. Torna a copiar-la amb el botó de copiar de la pàgina de Google.' : 'Primer copia la clau a la pàgina de Google.';
+    msg.textContent = key
+      ? "Això no sembla una clau de Google (ha de començar per AIza o AQ. i ser llarga). Torna a la pàgina de Google i toca «Copy»."
+      : 'El porta-retalls és buit: primer copia la clau a la pàgina de Google (pas 2).';
     return;
   }
   msg.textContent = 'Comprovant la clau…';
@@ -1849,6 +1854,7 @@ async function useWelcomeKey(raw) {
   resetQuota();
   msg.textContent = '';
   $('#welcome-key').value = '';
+  try { localStorage.removeItem('kwStep'); } catch { /* res */ }
   toast('✓ Llest! Ja pots començar a gravar.', 4000);
   refreshHomeBanners();
 }
@@ -1863,6 +1869,30 @@ $('#btn-paste-key').onclick = async () => {
   }
 };
 $('#welcome-key').oninput = (e) => { if (KEY_RE.test(e.target.value.trim())) useWelcomeKey(e.target.value); };
+
+// Assistent pas a pas per crear la clau de Google.
+function kwGo(step) {
+  const kw = $('#kw');
+  if (!kw) return;
+  kw.dataset.step = String(step);
+  kw.querySelectorAll('.kw-step').forEach((el) => { el.hidden = el.dataset.kw !== String(step); });
+  try { localStorage.setItem('kwStep', String(step)); } catch { /* res */ }
+  if (step === 3) $('#welcome-msg').textContent = '';
+  kw.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+document.querySelectorAll('[data-kw-go]').forEach((b) => { b.onclick = () => kwGo(Number(b.dataset.kwGo)); });
+// En obrir Google, passa sol al pas següent (quan tornis, ja hi seràs).
+$('#kw-open').addEventListener('click', () => setTimeout(() => kwGo(2), 600));
+try { const st = Number(localStorage.getItem('kwStep')); if (st >= 1 && st <= 3) kwGo(st); } catch { /* res */ }
+// A l'ordinador, en tornar de Google prova d'agafar la clau copiada directament.
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || settings.geminiKey || IS_IOS || !$('#kw') || $('#setup-banner').hidden) return;
+  if (Number($('#kw').dataset.step) < 2) return;
+  try {
+    const t = (await navigator.clipboard.readText()).trim();
+    if (KEY_RE.test(t) && /^(AIza|AQ\.)/.test(t)) { kwGo(3); $('#welcome-key').value = t; useWelcomeKey(t); }
+  } catch { /* sense permís: l'usuari tocarà «Enganxa» */ }
+});
 
 async function testKeys() {
   resetQuota();

@@ -35,21 +35,62 @@
           <button class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>Entra amb Google</button>
           <p class="or"><span>o comença de zero</span></p>
         </div>
-        <p>Escolta les teves reunions, en mostra la transcripció en directe i en fa un resum ordenat amb les tasques de cadascú. Per començar, necessites una clau gratuïta de Google (1 minut):</p>
-        <div class="wstep">
-          <span class="wnum">1</span>
-          <div>
-            <a class="btn primary wbtn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Crea la meva clau a Google ↗</a>
-            <p class="fineprint">Entra amb el teu compte de Google (accepta les condicions si te les demana), toca <b>«Create API key»</b> i després <b>«Copy»</b>. Després torna aquí.</p>
-          </div>
-        </div>
-        <div class="wstep">
-          <span class="wnum">2</span>
-          <div>
+        <p>Escolta les teves reunions i en fa un resum ordenat amb les tasques de cadascú. Per començar només cal una <b>clau gratuïta de Google</b>. Són 3 passos i uns 2 minuts: t'hi acompanyo.</p>
+
+        <div id="kw" class="kw" data-step="1">
+          <div class="kw-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+
+          <section class="kw-step" data-kw="1">
+            <h3><span class="wnum">1</span> Obre la pàgina de Google</h3>
+            <p>S'obrirà <b>Google AI Studio</b>. Entra amb el teu compte de Google (el mateix del Gmail). <b>És gratis i no cal targeta.</b></p>
+            <div class="mock" aria-hidden="true">
+              <div class="mock-bar">aistudio.google.com/apikey</div>
+              <div class="mock-body">
+                <div class="mock-title">API keys</div>
+                <div class="mock-line"></div><div class="mock-line short"></div>
+                <div class="mock-btn hl">Create API key</div>
+              </div>
+            </div>
+            <a id="kw-open" class="btn primary wbtn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Obre Google AI Studio ↗</a>
+            <button class="link kw-skip" type="button" data-kw-go="3">Ja tinc una clau copiada</button>
+          </section>
+
+          <section class="kw-step" data-kw="2" hidden>
+            <h3><span class="wnum">2</span> Crea la clau i copia-la</h3>
+            <ol class="kw-list">
+              <li>Si et demana <b>acceptar les condicions</b>, marca-les i continua.</li>
+              <li>Toca el botó blau <b>«Create API key»</b> (o «Crear clave de API»).</li>
+              <li>Si et pregunta per un <b>projecte</b>, tria el que et proposi i continua.</li>
+              <li>Sortirà una clau llarga que comença per <b>AIza</b> o <b>AQ.</b> Toca <b>«Copy»</b> (o la icona 📋) per copiar-la.</li>
+            </ol>
+            <div class="mock" aria-hidden="true">
+              <div class="mock-bar">aistudio.google.com/apikey</div>
+              <div class="mock-body">
+                <div class="mock-title">API key created</div>
+                <div class="mock-key"><span>AIzaSyB7••••••••••••••••</span><b class="hl">Copy</b></div>
+              </div>
+            </div>
+            <details class="kw-help">
+              <summary>Em surt un error o no em deixa</summary>
+              <ul>
+                <li><b>«No disponible» o no em deixa entrar:</b> si fas servir un compte de la feina, pot ser que l'empresa ho tingui bloquejat. Prova amb un <b>Gmail personal</b>.</li>
+                <li><b>Ja havia creat una clau:</b> la veuràs a la llista. Toca-la i copia-la.</li>
+                <li><b>Tot surt en anglès:</b> és normal. Només cal el botó «Create API key» i després «Copy».</li>
+                <li><b>Al mòbil no veig el botó:</b> gira el mòbil o fes-ho des de l'ordinador i envia't la clau per correu.</li>
+              </ul>
+            </details>
+            <button class="btn primary wbtn" type="button" data-kw-go="3">Ja l'he copiada →</button>
+            <button class="link kw-skip" type="button" data-kw-go="1">← Enrere</button>
+          </section>
+
+          <section class="kw-step" data-kw="3" hidden>
+            <h3><span class="wnum">3</span> Enganxa-la aquí</h3>
+            <p id="kw-return" class="fineprint left">Torna a Xiu-xiu (a l'iPhone, llisca des de baix i tria Xiu-xiu) i toca el botó:</p>
             <button id="btn-paste-key" class="btn primary wbtn" type="button">📋 Enganxa la clau</button>
-            <input id="welcome-key" type="password" placeholder="o enganxa-la aquí" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <input id="welcome-key" type="password" placeholder="o enganxa-la aquí a mà" autocomplete="off" autocapitalize="off" spellcheck="false">
             <p id="welcome-msg" class="fineprint"></p>
-          </div>
+            <button class="link kw-skip" type="button" data-kw-go="2">← Enrere</button>
+          </section>
         </div>
         <p class="fineprint left">💾 Ja havies fet servir Xiu-xiu i tens una còpia de seguretat? <button class="link" id="btn-welcome-restore" type="button">Recupera-la</button></p>
         <p class="fineprint left">La clau és teva i es queda només en aquest mòbil: el cost o la quota gratuïta de Google van a càrrec teu. Les teves reunions no surten d'aquest mòbil, excepte cap a Google per transcriure-les i resumir-les.</p>

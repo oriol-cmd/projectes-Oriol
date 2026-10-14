@@ -352,3 +352,31 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .consent-check { margin: 12px 2px; }
 #consent-sheet .btn { margin-bottom: 8px; }
 .continue-btn { margin-top: 10px; }
+
+/* Assistent de la clau de Google */
+.kw { margin: 14px 0 6px; }
+.kw-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.kw-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--border, #cbd5e1); transition: all .2s; }
+.kw[data-step="1"] .kw-dots span:nth-child(1), .kw[data-step="2"] .kw-dots span:nth-child(-n+2), .kw[data-step="3"] .kw-dots span { background: var(--accent); }
+.kw-step h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 18px; text-transform: none; letter-spacing: 0; color: var(--text); }
+.kw-step h3 .wnum { margin-top: 0; }
+.kw-list { padding-left: 20px; margin: 8px 0 12px; }
+.kw-list li { margin: 6px 0; }
+.kw-skip { display: block; margin: 12px auto 0; }
+.kw-help { margin: 10px 0 14px; font-size: 14px; }
+.kw-help summary { cursor: pointer; color: var(--accent); }
+.kw-help ul { padding-left: 18px; margin: 8px 0 0; }
+.kw-help li { margin: 6px 0; font-size: 14px; }
+.mock { border: 1px solid var(--border, #e2e8f0); border-radius: 12px; overflow: hidden; margin: 12px 0 14px; background: var(--surface); box-shadow: var(--shadow); }
+.mock-bar { font-size: 11px; padding: 6px 10px; background: var(--bg); color: var(--muted, #64748b); border-bottom: 1px solid var(--border, #e2e8f0); font-family: ui-monospace, monospace; }
+.mock-body { padding: 14px; }
+.mock-title { font-weight: 700; margin-bottom: 10px; }
+.mock-line { height: 8px; border-radius: 4px; background: var(--bg); margin: 6px 0; }
+.mock-line.short { width: 60%; }
+.mock-btn { display: inline-block; margin-top: 10px; padding: 8px 14px; border-radius: 18px; background: #1a73e8; color: #fff; font-size: 14px; font-weight: 600; }
+.mock-key { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg); font-family: ui-monospace, monospace; font-size: 13px; }
+.mock-key b { font-family: system-ui, sans-serif; color: #1a73e8; padding: 4px 10px; border-radius: 14px; }
+.hl { position: relative; box-shadow: 0 0 0 3px rgba(26,115,232,.35); animation: kwpulse 1.6s ease-in-out infinite; }
+.hl::after { content: '👆'; position: absolute; right: -10px; bottom: -22px; font-size: 22px; }
+@keyframes kwpulse { 50% { box-shadow: 0 0 0 7px rgba(26,115,232,.15); } }
+@media (prefers-reduced-motion: reduce) { .hl { animation: none; } }
