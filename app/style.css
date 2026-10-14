@@ -90,7 +90,7 @@ main { max-width: 640px; margin: 0 auto; padding: 16px 16px 32px; }
 /* Formularis */
 .field { display: block; margin: 0 0 14px; }
 .field.last { margin-bottom: 0; }
-.field > span { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.field > span, .field > .field-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
 .field em { color: var(--muted); font-style: normal; font-weight: 400; }
 input[type=text], input[type=email], input[type=url], input[type=password], input[type=number], input[type=search], select, textarea {
   width: 100%; font: inherit; font-size: 16px; color: var(--text);
@@ -380,3 +380,6 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .hl::after { content: '👆'; position: absolute; right: -10px; bottom: -22px; font-size: 22px; }
 @keyframes kwpulse { 50% { box-shadow: 0 0 0 7px rgba(26,115,232,.15); } }
 @media (prefers-reduced-motion: reduce) { .hl { animation: none; } }
+
+.agenda-photo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0 4px; }
+.agenda-photo-row .fineprint { margin: 0; }

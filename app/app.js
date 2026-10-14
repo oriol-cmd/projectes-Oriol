@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -727,7 +727,7 @@ async function prepImage(file) {
   c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
   return new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.82));
 }
-async function addPhotos(m, files, atMs) {
+async function addPhotos(m, files, atMs, { agenda = false } = {}) {
   m.photos = m.photos || [];
   let added = 0;
   for (const f of files) {
@@ -736,7 +736,7 @@ async function addPhotos(m, files, atMs) {
       const blob = await prepImage(f);
       const key = `${m.id}:img:${uid()}`;
       await db.put('audio', blob, key);
-      m.photos.push({ key, atMs });
+      m.photos.push(agenda ? { key, atMs: null, agenda: true } : { key, atMs });
       added++;
     } catch (e) { toast(e.message); }
   }
@@ -823,7 +823,9 @@ async function proMinutes(m, info, photos, photoParts, onText) {
   progress("Analitzant l'ordre del dia de la reunió…");
   let plan;
   try {
-    plan = JSON.parse(strip(await gemini([{ text: `${head}\n\n${trans}` }], { system: PRO_PLAN_PROMPT, task: 'pro', thinking: 4096, maxTokens: 8192, json: true })));
+    const agendaImgs = photoParts.filter((_, k) => photos[k].agenda);
+    const imgNote = agendaImgs.length ? "\nS'adjunta una foto o captura de l'ORDRE DEL DIA previst (pot ser escrit a mà): llegeix-la i fes-la servir com a ordre del dia de l'usuari." : '';
+    plan = JSON.parse(strip(await gemini([{ text: `${head}${imgNote}\n\n${trans}` }, ...agendaImgs], { system: PRO_PLAN_PROMPT, task: 'pro', thinking: 4096, maxTokens: 8192, json: true })));
   } catch (e) {
     if (e instanceof FatalError) throw e;
     plan = null;
@@ -852,7 +854,7 @@ async function proMinutes(m, info, photos, photoParts, onText) {
     const it = items[i];
     const from = toMs(it.inici); const to = toMs(it.final);
     // Fotos fetes durant aquest punt (o afegides després).
-    const extra = photoParts.filter((_, k) => { const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
+    const extra = photoParts.filter((_, k) => { if (photos[k].agenda) return false; const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
     const ask = `${head}\n\nORDRE DEL DIA:\n${agendaList}\n\nRedacta ara NOMÉS el punt ${i + 1}: «${it.titol}»${it.inici ? ` (aprox. de ${it.inici} a ${it.final || 'final'})` : ''}${it.nota ? `. Nota: ${it.nota}` : ''}.${extra.length ? " Les fotos adjuntes són documents mostrats a la reunió: fes-les servir si tenen relació amb aquest punt." : ''}\n\n${trans}`;
     const t = strip(await gemini([{ text: ask }, ...extra], { system: PRO_SECTION_PROMPT, task: 'pro', thinking: 1024, maxTokens: 8192 }));
     sections[i] = /^###\s/.test(t) ? t : `### ${i + 1}. ${it.titol}\n\n${t}`;
@@ -907,7 +909,7 @@ async function summarize(m, onText = null) {
   // Àudios importats: resum curt (si no hi ha fotos, que demanen la secció de documents).
   const short = m.engine === 'import' && settings.shortImports !== false && !photoParts.length && m.detail !== 'full';
   if (photoParts.length) {
-    info.push(`S'adjunten ${photoParts.length} foto${photoParts.length > 1 ? 's' : ''} de documents mostrats o comentats a la reunió (sovint escrits a mà), en aquest ordre: ${photos.map((ph, i) => `foto ${i + 1}${ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
+    info.push(`S'adjunten ${photoParts.length} foto${photoParts.length > 1 ? 's' : ''} de documents mostrats o comentats a la reunió (sovint escrits a mà), en aquest ordre: ${photos.map((ph, i) => `foto ${i + 1}${ph.agenda ? " (ORDRE DEL DIA o convocatòria de la reunió: fes-la servir com a ordre del dia previst)" : ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
 Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
   }
 
@@ -1430,6 +1432,7 @@ async function startRecording(cont = null) {
       m.status = 'recording';
       m.error = '';
     }
+    if (!cont) await attachAgendaPhotos(m);
     Object.assign(rec, { meeting: m, activeMs: cont ? (m.durationMs || 0) : 0, paused: false, stopping: false, levels: [], avgLevel: null, quietMs: 0, resuming: false, recovering: false });
     await saveMeeting(m);
     if (m.engine !== 'device') { if (!startSegment()) throw new Error("No s'ha pogut començar a gravar l'àudio."); } else startSpeech();
@@ -2132,6 +2135,26 @@ function updateTypeChips() {
   if (chip && chip.parentElement) chip.parentElement.scrollLeft = Math.max(0, chip.offsetLeft - chip.parentElement.offsetLeft - 16);
   $('#meeting-title').placeholder = review ? 'Què revises? p. ex. Memòria del projecte Mar' : 'p. ex. Comitè de direcció';
 }
+// Fotos de l'ordre del dia triades abans de començar (paper, captura…).
+let pendingAgenda = [];
+function renderAgendaPhotos() {
+  const info = $('#agenda-photo-info');
+  if (!info) return;
+  info.textContent = pendingAgenda.length ? `✓ ${pendingAgenda.length === 1 ? '1 foto afegida' : `${pendingAgenda.length} fotos afegides`}` : '';
+  $('#agenda-photo-clear').hidden = !pendingAgenda.length;
+}
+$('#btn-agenda-photo').onclick = () => $('#agenda-photo-input').click();
+$('#agenda-photo-input').onchange = (e) => { pendingAgenda = [...pendingAgenda, ...e.target.files].slice(0, 5); e.target.value = ''; renderAgendaPhotos(); };
+$('#agenda-photo-clear').onclick = () => { pendingAgenda = []; renderAgendaPhotos(); };
+// Desa les fotos de l'ordre del dia a la reunió que comença.
+async function attachAgendaPhotos(m) {
+  if (!pendingAgenda.length || m.type !== 'important') return;
+  const files = pendingAgenda;
+  pendingAgenda = [];
+  renderAgendaPhotos();
+  await addPhotos(m, files, null, { agenda: true });
+}
+
 // Dades de la persona a qui va la revisió (només en mode «Revisió de feina»).
 function reviewForm() {
   if (settings.lastType !== 'revisio') return null;
@@ -2830,6 +2853,7 @@ async function importFiles(list, { textOnly = false } = {}) {
   };
   for (let i = 0; i < files.length; i++) await db.put('audio', files[i], m.importFiles[i].key);
   await saveMeeting(m);
+  await attachAgendaPhotos(m);
   $('#meeting-title').value = ''; $('#meeting-context').value = ''; $('#meeting-group').value = ''; $('#meeting-agenda').value = '';
   viewingId = m.id;
   showView('proc');

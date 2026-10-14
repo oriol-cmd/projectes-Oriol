@@ -100,7 +100,7 @@ Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada».
 
 ## Reunions importants: acta professional
 
-Tria el tipus **«⭐ Reunió important»** (i, si vols, escriu-hi l'**ordre del dia**, un punt per línia). Xiu-xiu fa l'acta per fases, com un secretari:
+Tria el tipus **«⭐ Reunió important»** i, si vols, dona-li l'**ordre del dia**: escriu-lo (un punt per línia) o toca **«📷 O afegeix-ne una foto o captura»** per fer una foto de la convocatòria en paper o triar una captura de pantalla (o totes dues coses). Xiu-xiu fa l'acta per fases, com un secretari:
 
 1. Treu l'**ordre del dia real** de la reunió (o fa servir el teu, i hi afegeix el que hagi sortit fora).
 2. **Redacta cada punt per separat i amb detall**: context, què ha dit cadascú, arguments, dades i conclusió.

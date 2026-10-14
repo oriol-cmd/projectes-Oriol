@@ -131,11 +131,17 @@
               <input id="review-email" type="email" placeholder="marta@exemple.cat" autocomplete="off">
             </label>
           </div>
-          <label id="agenda-field" class="field" hidden>
-            <span>Ordre del dia <em>(opcional, millora molt l'acta)</em></span>
+          <div id="agenda-field" class="field" hidden>
+            <label for="meeting-agenda" class="field-label">Ordre del dia <em>(opcional, millora molt l'acta)</em></label>
             <textarea id="meeting-agenda" rows="3" placeholder="Un punt per línia, p. ex.&#10;1. Pressupost 2027&#10;2. Contractacions&#10;3. Precs i preguntes"></textarea>
+            <div class="agenda-photo-row">
+              <button id="btn-agenda-photo" class="btn secondary small" type="button">📷 O afegeix-ne una foto o captura</button>
+              <span id="agenda-photo-info" class="fineprint"></span>
+              <button id="agenda-photo-clear" class="link" type="button" hidden>Treu-la</button>
+            </div>
+            <input id="agenda-photo-input" type="file" accept="image/*" multiple hidden>
             <small class="fineprint left">Xiu-xiu farà una acta professional: l'ordre del dia, cada punt redactat amb detall, acords i tasques. Triga una mica més.</small>
-          </label>
+          </div>
           <label class="field">
             <span>Títol <em>(opcional)</em></span>
             <input id="meeting-title" type="text" placeholder="p. ex. Comitè de direcció" autocomplete="off">
