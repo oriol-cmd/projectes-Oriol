@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -2163,6 +2163,12 @@ function reviewForm() {
   $('#review-name').value = ''; $('#review-email').value = '';
   return name || email ? { name, email } : null;
 }
+$('#btn-important-mode').onclick = () => {
+  saveSettings({ lastType: 'important' });
+  updateTypeChips();
+  $('#agenda-field').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast("⭐ Reunió important: en acabar en faràs l'acta professional. Si vols, posa-hi l'ordre del dia.", 4500);
+};
 $('#btn-review-mode').onclick = () => {
   saveSettings({ lastType: 'revisio' });
   updateTypeChips();
