@@ -13,6 +13,9 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg?v=2" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-180.png?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -99,25 +102,37 @@
 
       <div id="home-main">
         <div id="pending-banner" class="banner" hidden></div>
-        <div id="reconnect-banner" class="banner warn" hidden>☁️ La connexió amb Google ha caducat i les reunions no se sincronitzen. <button class="link" id="btn-reconnect" type="button">Torna a connectar</button></div>
-        <div id="backup-reminder" class="banner" hidden>💾 Fa temps que no fas una còpia de seguretat de les teves reunions. <button class="link" id="btn-backup-now" type="button">Fes-la ara</button></div>
+        <div id="reconnect-banner" class="banner warn" hidden>La connexió amb Google ha caducat i les reunions no se sincronitzen. <button class="link" id="btn-reconnect" type="button">Torna a connectar</button></div>
+        <div id="backup-reminder" class="banner" hidden>Fa temps que no fas una còpia de seguretat de les teves reunions. <button class="link" id="btn-backup-now" type="button">Fes-la ara</button></div>
 
-        <div class="record-hero">
+        <div class="home-head">
+          <p class="eyebrow" id="home-date"></p>
+          <h2>Nova sessió</h2>
+        </div>
+
+        <div class="mode-grid" role="radiogroup" aria-label="Què vols gravar?">
+          <button class="mode" type="button" role="radio" data-mode="general"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.3-4.4A8.5 8.5 0 1 1 20.5 11.5z"/></svg><b>Reunió</b><small>Resum detallat de tot el que s'ha parlat</small></button>
+          <button class="mode" type="button" role="radio" data-mode="important"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.2 5.8.9-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.9z"/></svg><b>Reunió important</b><small>Acta professional, punt per punt</small></button>
+          <button class="mode" type="button" role="radio" data-mode="revisio"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 8.5l2 2"/></svg><b>Revisió de feina</b><small>Dicta correccions i envia-les</small></button>
+        </div>
+
+        <div class="card record-card">
           <button id="btn-record" class="record-btn" aria-label="Comença a gravar"><span class="dot"></span></button>
-          <p class="hint">Toca per començar a gravar</p>
-          <div id="source-switch" class="seg source-seg" role="group" aria-label="Font de l'àudio" hidden>
-            <button type="button" data-source="mic">🎙 Micròfon</button>
-            <button type="button" data-source="call">🖥️ Videotrucada <small>(ordinador)</small></button>
+          <div class="record-text">
+            <b>Comença a gravar</b>
+            <span id="record-caption">Reunió · resum detallat</span>
           </div>
-          <p id="source-hint" class="fineprint" hidden>Només a l'ordinador. Grava el so d'una pestanya (Meet, Teams o Zoom al navegador) o de tot l'ordinador, i també el teu micròfon. Quan t'ho demani, marca <b>«Comparteix també l'àudio»</b>.</p>
-          <button id="btn-import" class="btn secondary small import-btn" type="button">📂 Importa àudios o vídeos</button>
-          <button id="btn-important-mode" class="btn secondary small import-btn" type="button">⭐ Reunió important (acta professional)</button>
-          <button id="btn-review-mode" class="btn secondary small import-btn" type="button">📝 Revisa una feina (dicta correccions)</button>
-          <p id="call-mobile-note" class="call-note" hidden>🖥️ <b>Gravar videotrucades</b> (Meet, Teams, Zoom) <b>només és possible des de l'ordinador</b>: obre Xiu-xiu amb Chrome o Edge i tria «Videotrucada». Des del mòbil, posa la trucada amb l'altaveu en un altre aparell i grava-la aquí.</p>
+          <div id="source-switch" class="seg source-seg" role="group" aria-label="Font de l'àudio" hidden>
+            <button type="button" data-source="mic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg> Micròfon</button>
+            <button type="button" data-source="call"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16v4"/></svg> Videotrucada</button>
+          </div>
+          <p id="source-hint" class="fineprint" hidden>Grava el so d'una pestanya (Meet, Teams o Zoom al navegador) o de tot l'ordinador, i també el teu micròfon. Quan t'ho demani, marca <b>«Comparteix també l'àudio»</b>.</p>
+          <p id="call-mobile-note" class="call-note" hidden><b>Videotrucades (Meet, Teams, Zoom):</b> només es poden gravar des de l'ordinador, amb Chrome o Edge. Des del mòbil, posa la trucada amb l'altaveu en un altre aparell i grava-la aquí.</p>
         </div>
 
         <div class="card form-card">
-          <div class="field">
+          <div class="form-head">Detalls <em>opcional</em></div>
+          <div class="field" id="type-field">
             <span>Tipus de reunió</span>
             <div id="type-chips" class="type-chips" role="group" aria-label="Tipus de reunió"></div>
           </div>
@@ -136,7 +151,7 @@
             <label for="meeting-agenda" class="field-label">Ordre del dia <em>(opcional, millora molt l'acta)</em></label>
             <textarea id="meeting-agenda" rows="3" placeholder="Un punt per línia, p. ex.&#10;1. Pressupost 2027&#10;2. Contractacions&#10;3. Precs i preguntes"></textarea>
             <div class="agenda-photo-row">
-              <button id="btn-agenda-photo" class="btn secondary small" type="button">📷 O afegeix-ne una foto o captura</button>
+              <button id="btn-agenda-photo" class="btn secondary small btn-icon" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3.2L9 5.5h6l1.8 3H20V19H4z"/><circle cx="12" cy="13.5" r="3.4"/></svg> O afegeix-ne una foto</button>
               <span id="agenda-photo-info" class="fineprint"></span>
               <button id="agenda-photo-clear" class="link" type="button" hidden>Treu-la</button>
             </div>
@@ -158,9 +173,14 @@
           </label>
         </div>
 
-        <ul class="tips">
-          <li>👋 Comenceu presentant-vos («Soc l'Oriol…») i toqueu <b>«Presentacions fetes»</b>: així sabrà qui diu què.</li>
-          <li>📱 Deixa el mòbil damunt la taula amb l'app oberta; la pantalla es mantindrà encesa.</li>
+        <button id="btn-import" class="qa card" type="button">
+          <span class="qa-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg></span>
+          <span class="qa-t"><b>Importa un àudio o vídeo</b><small>Notes de veu, àudios de WhatsApp, gravacions de Zoom o Teams…</small></span>
+        </button>
+
+        <ul class="tips" id="home-tips">
+          <li>Comenceu presentant-vos («Soc l'Oriol…») i toqueu <b>«Presentacions fetes»</b>: així sabrà qui diu què.</li>
+          <li>Deixa el mòbil damunt la taula amb l'app oberta; la pantalla es mantindrà encesa.</li>
         </ul>
 
         <section id="home-tasks" class="home-block" hidden>
@@ -168,7 +188,7 @@
           <ul id="recent-tasks" class="task-list card"></ul>
         </section>
         <section id="home-recent" class="home-block" hidden>
-          <h3>Últimes reunions <button class="link small-link" data-goto="history" type="button">Veure-les totes</button></h3>
+          <h3>Últimes reunions <button class="link small-link" data-goto="history" type="button">Veure-les totes →</button></h3>
           <ul id="recent-list" class="cards"></ul>
         </section>
       </div>
@@ -187,10 +207,10 @@
         <div id="live-text" class="live" aria-live="polite"></div>
       </div>
       <p class="rec-progress" id="rec-progress"></p>
-      <button id="btn-intro" class="btn primary-soft intro" type="button" hidden>👋 Presentacions fetes</button>
+      <button id="btn-intro" class="btn primary-soft intro btn-icon" type="button" hidden><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><path d="M15.5 5.5a3 3 0 0 1 0 6M17.5 14.6c1.7.6 2.8 2.2 3.2 4.9"/></svg> Presentacions fetes</button>
       <div class="rec-tools">
-        <button id="btn-photo" class="tool" type="button">📷 Foto <span id="photo-count"></span></button>
-        <button id="btn-mark" class="tool" type="button">⭐ Moment clau</button>
+        <button id="btn-photo" class="tool" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3.2L9 5.5h6l1.8 3H20V19H4z"/><circle cx="12" cy="13.5" r="3.4"/></svg> Foto <span id="photo-count"></span></button>
+        <button id="btn-mark" class="tool" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 21V4M5.5 4.5h11l-2.2 4 2.2 4h-11"/></svg> Moment clau</button>
       </div>
       <div class="rec-actions">
         <button id="btn-pause" class="btn secondary" type="button">Pausa</button>
@@ -229,17 +249,17 @@
       </details>
 
       <div class="action-bar">
-        <button id="btn-share-open" class="btn primary" type="button">↗ Comparteix el resum</button>
+        <button id="btn-share-open" class="btn primary btn-icon" type="button">Comparteix</button>
         <button id="btn-more" class="btn secondary square" type="button" aria-label="Més opcions">⋯</button>
       </div>
-      <button id="btn-continue" class="btn secondary full continue-btn" type="button" hidden>➕ Continua gravant aquí</button>
+      <button id="btn-continue" class="btn secondary full continue-btn" type="button" hidden>Continua gravant aquí</button>
       <button id="btn-new" class="btn ghost full" type="button" hidden>＋ Nova reunió</button>
     </section>
 
     <!-- HISTORIAL -->
     <section id="view-history" class="view" hidden>
       <h2>Historial</h2>
-      <input id="history-search" class="search" type="search" placeholder="🔍 Cerca per títol, persona o tema" autocomplete="off">
+      <input id="history-search" class="search" type="search" placeholder="Cerca per títol, persona o tema" autocomplete="off">
       <div id="history-filters" class="type-chips filters" role="group" aria-label="Classificació"></div>
       <ul id="history-list" class="cards"></ul>
       <p class="fineprint" id="history-empty">Encara no hi ha reunions.</p>
@@ -270,7 +290,7 @@
       <p class="fineprint left">Tot es desa en aquest aparell i, si entres amb Google, també al teu Drive.</p>
 
       <div id="account-section" hidden>
-        <h3>☁️ Compte i sincronització</h3>
+        <h3>Compte i sincronització</h3>
         <div class="card group">
           <p id="account-status" class="account-status"></p>
           <button id="btn-google-signin" class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>Entra amb Google</button>
@@ -283,7 +303,7 @@
         </div>
       </div>
 
-      <h3>🔑 Clau de Google (Gemini)</h3>
+      <h3>Clau de Google (Gemini)</h3>
       <div class="card group">
         <label class="field"><span>Clau de Gemini</span>
           <input id="set-gemini-key" type="password" placeholder="Enganxa aquí la clau de Google" autocomplete="off"></label>
@@ -291,7 +311,7 @@
         <button class="btn secondary small" id="btn-test-keys" type="button">Comprova la clau</button>
       </div>
 
-      <h3>📝 Resums</h3>
+      <h3>Resums</h3>
       <div class="card group">
         <label class="field"><span>Idioma dels resums</span>
           <select id="set-summary-lang">
@@ -309,7 +329,7 @@
         <label class="check last"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
       </div>
 
-      <h3>🎙️ Transcripció</h3>
+      <h3>Transcripció</h3>
       <div class="card group">
         <label class="field"><span>Com es transcriu</span>
           <select id="set-engine">
@@ -332,7 +352,7 @@
         </div>
       </div>
 
-      <h3>✉️ Correu i Google Sheets <em class="opt">opcional</em></h3>
+      <h3>Correu i Google Sheets <em class="opt">opcional</em></h3>
       <div class="card group">
         <p class="fineprint left first">Si ho omples, cada resum t'arribarà sol per correu i es desarà en un full de càlcul.</p>
         <label class="field"><span>El teu correu</span>
@@ -344,7 +364,7 @@
         <button class="btn secondary small" id="btn-test-email" type="button">Envia un correu de prova</button>
       </div>
 
-      <h3 id="backup-section">💾 Còpia de seguretat</h3>
+      <h3 id="backup-section">Còpia de seguretat</h3>
       <div class="card group">
         <p class="fineprint left first">Guarda la configuració i totes les reunions en un fitxer (p. ex. a iCloud Drive o Google Drive) per recuperar-les si canvies de mòbil o reinstal·les l'app.</p>
         <div class="row2">
@@ -356,7 +376,7 @@
         <input id="restore-input" type="file" accept="application/json,.json" hidden>
       </div>
 
-      <h3>⚙️ Avançat</h3>
+      <h3>Avançat</h3>
       <div class="card group">
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
           <input id="set-segment" type="number" min="10" max="300" step="10"></label>
@@ -417,11 +437,11 @@
       <div class="sheet-grip"></div>
       <h3>Comparteix el resum</h3>
       <div class="sheet-grid">
-        <button id="btn-mail" class="sheet-item" type="button" data-closes><span class="ic">✉️</span>Envia-me'l per correu</button>
-        <button id="btn-wa" class="sheet-item" type="button" data-closes><span class="ic wa">💬</span>WhatsApp</button>
-        <button id="btn-pdf" class="sheet-item" type="button"><span class="ic">📄</span>Acta en PDF</button>
-        <button id="btn-share" class="sheet-item" type="button"><span class="ic">👥</span>A altres persones</button>
-        <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic">📋</span>Copia el text</button>
+        <button id="btn-mail" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></span>Envia-me'l per correu</button>
+        <button id="btn-wa" class="sheet-item" type="button" data-closes><span class="ic wa"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.3-4.4A8.5 8.5 0 1 1 20.5 11.5z"/></svg></span>WhatsApp</button>
+        <button id="btn-pdf" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M9 13h6.5M9 16.5h6.5"/></svg></span>Acta en PDF</button>
+        <button id="btn-share" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><path d="M15.5 5.5a3 3 0 0 1 0 6M17.5 14.6c1.7.6 2.8 2.2 3.2 4.9"/></svg></span>A altres persones</button>
+        <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3.5"/></svg></span>Copia el text</button>
       </div>
       <div id="share-panel" class="share-panel" hidden>
         <label class="field"><span>Adreces de correu <em>(separades per comes)</em></span>

@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -933,8 +933,8 @@ Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres,
 // Enviament per correu (Google Apps Script)
 // ---------------------------------------------------------------------------
 const EMAIL_STYLE = {
-  h1: 'font-size:22px;margin:0 0 12px;color:#0f172a',
-  h2: 'font-size:16px;margin:22px 0 6px;color:#1e3a8a;border-bottom:1px solid #e2e8f0;padding-bottom:4px',
+  h1: 'font-size:22px;margin:0 0 12px;color:#13265c',
+  h2: 'font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:24px 0 8px;color:#1f4bd8;border-bottom:1px solid #e3e6eb;padding-bottom:6px',
   h3: 'font-size:15px;margin:14px 0 4px;color:#0f172a',
   p: 'margin:6px 0',
   ul: 'margin:6px 0;padding-left:22px',
@@ -1755,9 +1755,9 @@ async function showResult(id) {
   if (m.status === 'processing' || pipelines.has(id)) { showView('proc'); updateProcView(m); return; }
   showView('result');
   $('#btn-continue').hidden = !(m.engine === 'audio' && m.status !== 'recording');
-  $('#btn-continue').textContent = m.type === 'revisio' ? '➕ Continua aquesta revisió' : '➕ Continua gravant aquí';
-  $('#btn-share-open').textContent = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
-    ? `✉️ Envia-ho a ${m.reviewFor.name}` : '↗ Comparteix el resum';
+  $('#btn-continue').textContent = m.type === 'revisio' ? '+ Continua aquesta revisió' : '+ Continua gravant aquí';
+  $('#btn-share-open').innerHTML = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
+    ? `${svgIcon('mail')} Envia-ho a ${escapeHtml(m.reviewFor.name)}` : `${svgIcon('share')} Comparteix`;
   const st = $('#result-status');
   if (m.status === 'error') {
     st.className = 'banner err';
@@ -1813,14 +1813,14 @@ function meetingCard(m, { withDelete = false, onDelete = null } = {}) {
   const li = document.createElement('li');
   const t = MEETING_TYPES[m.type || 'general'] || MEETING_TYPES.general;
   const title = m.summary ? summaryTitle(m) : (m.title || 'Reunió');
-  li.innerHTML = `<button class="item" type="button"><span class="ticon">${t.icon}</span><span class="body">
+  li.innerHTML = `<button class="item" type="button"><span class="ticon">${svgIcon(t.svg || 'chat')}</span><span class="body">
       <span class="t">${escapeHtml(title)}</span>
-      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${m.group ? ` · 🏷 ${escapeHtml(m.group)}` : ''}${meetingBadge(m)}</span></span></button>`;
+      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${escapeHtml(fmtDuration(m.durationMs || 0))}${m.group ? ` · ${escapeHtml(m.group)}` : ''}${meetingBadge(m)}</span></span></button>`;
   li.querySelector('.item').onclick = () => showResult(m.id);
   if (withDelete) {
     li.classList.add('has-del');
     const del = document.createElement('button');
-    del.className = 'del'; del.type = 'button'; del.setAttribute('aria-label', 'Esborra'); del.textContent = '🗑';
+    del.className = 'del'; del.type = 'button'; del.setAttribute('aria-label', 'Esborra'); del.innerHTML = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
     del.onclick = onDelete;
     li.appendChild(del);
   }
@@ -2061,16 +2061,18 @@ async function testEmail() {
 // ---------------------------------------------------------------------------
 // Tipus de reunió (adapten el resum)
 // ---------------------------------------------------------------------------
+const ICON_PATHS = {"chat": "<path d=\"M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.3-4.4A8.5 8.5 0 1 1 20.5 11.5z\"/>", "star": "<path d=\"M12 3.6l2.6 5.2 5.8.9-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.9z\"/>", "edit": "<path d=\"M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z\"/><path d=\"M13.5 8.5l2 2\"/>", "users": "<circle cx=\"9\" cy=\"8.5\" r=\"3.2\"/><path d=\"M3 19.5c.8-3.2 3.2-5 6-5s5.2 1.8 6 5\"/><path d=\"M15.5 5.5a3 3 0 0 1 0 6M17.5 14.6c1.7.6 2.8 2.2 3.2 4.9\"/>", "briefcase": "<rect x=\"3\" y=\"7.5\" width=\"18\" height=\"12\" rx=\"2.2\"/><path d=\"M8.5 7.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.5M3 13h18\"/>", "user": "<circle cx=\"12\" cy=\"8.5\" r=\"3.6\"/><path d=\"M5 20c1-3.7 3.8-5.8 7-5.8s6 2.1 7 5.8\"/>", "mic": "<rect x=\"9\" y=\"3\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21\"/>", "book": "<path d=\"M4 6.5C6.5 5 9.5 5 12 6.5c2.5-1.5 5.5-1.5 8 0V19c-2.5-1.5-5.5-1.5-8 0-2.5-1.5-5.5-1.5-8 0z\"/><path d=\"M12 6.5V19\"/>", "chart": "<path d=\"M4 20V11M10 20V5M16 20v-6M2.5 20.5h19\"/>", "upload": "<path d=\"M12 15.5V4M7.5 8.5L12 4l4.5 4.5\"/><path d=\"M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15\"/>", "camera": "<path d=\"M4 8.5h3.2L9 5.5h6l1.8 3H20V19H4z\"/><circle cx=\"12\" cy=\"13.5\" r=\"3.4\"/>", "flag": "<path d=\"M5.5 21V4M5.5 4.5h11l-2.2 4 2.2 4h-11\"/>", "share": "<path d=\"M12 15V3.5M7.5 8L12 3.5 16.5 8\"/><path d=\"M5 12.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5\"/>", "mail": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2.2\"/><path d=\"M3.5 7l8.5 6 8.5-6\"/>", "doc": "<path d=\"M6 3h8.5L19 7.5V21H6z\"/><path d=\"M14 3v5h5M9 13h6.5M9 16.5h6.5\"/>", "copy": "<rect x=\"8.5\" y=\"8.5\" width=\"11.5\" height=\"11.5\" rx=\"2\"/><path d=\"M15.5 8.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3.5\"/>", "monitor": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8.5 20h7M12 16v4\"/>", "phone": "<rect x=\"7\" y=\"2.8\" width=\"10\" height=\"18.4\" rx=\"2.2\"/><path d=\"M11 18h2\"/>", "calendar": "<rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2.2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/>", "check": "<path d=\"M5 12.5l4.5 4.5L19 7.5\"/>"};
+const svgIcon = (name, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
 const MEETING_TYPES = {
-  general: { icon: '💬', label: 'General', prompt: '' },
-  important: { icon: '⭐', label: 'Reunió important', prompt: '' },
-  equip: { icon: '👥', label: "Reunió d'equip", prompt: "Posa èmfasi en l'estat de cada projecte o àrea, els bloquejos i qui fa què. A «Punts tractats» agrupa per projecte o àrea." },
-  comercial: { icon: '🤝', label: 'Comercial / client', prompt: "Afegeix just després de «## Resum» una secció «## Client i necessitats» (qui és, què necessita, pressupost, terminis i objeccions). A «Temes oberts i propers passos» deixa clar el següent pas comercial, qui el fa i quan." },
-  u1: { icon: '🙋', label: '1 a 1', prompt: "Centra't en el feedback, els objectius, les preocupacions i els acords entre les dues persones. Sigues discret i respectuós amb els temes personals." },
-  entrevista: { icon: '🎤', label: 'Entrevista', prompt: "Afegeix just després de «## Resum» una secció «## Perfil i respostes clau» amb les respostes rellevants de la persona entrevistada, punts forts i dubtes, sense judicis de valor no fonamentats." },
-  formacio: { icon: '🎓', label: 'Formació / classe', prompt: "Afegeix just després de «## Resum» una secció «## Conceptes clau» amb el que s'ha explicat, ordenat i didàctic." },
-  projecte: { icon: '📈', label: 'Seguiment de projecte', prompt: "Afegeix just després de «## Resum» una secció «## Estat del projecte» (avenços, fites, riscos i calendari)." },
-  revisio: { icon: '📝', label: 'Revisió de feina', prompt: '' },
+  general: { svg: 'chat', icon: '💬', label: 'General', prompt: '' },
+  important: { svg: 'star', icon: '⭐', label: 'Reunió important', prompt: '' },
+  equip: { svg: 'users', icon: '👥', label: "Reunió d'equip", prompt: "Posa èmfasi en l'estat de cada projecte o àrea, els bloquejos i qui fa què. A «Punts tractats» agrupa per projecte o àrea." },
+  comercial: { svg: 'briefcase', icon: '🤝', label: 'Comercial / client', prompt: "Afegeix just després de «## Resum» una secció «## Client i necessitats» (qui és, què necessita, pressupost, terminis i objeccions). A «Temes oberts i propers passos» deixa clar el següent pas comercial, qui el fa i quan." },
+  u1: { svg: 'user', icon: '🙋', label: '1 a 1', prompt: "Centra't en el feedback, els objectius, les preocupacions i els acords entre les dues persones. Sigues discret i respectuós amb els temes personals." },
+  entrevista: { svg: 'mic', icon: '🎤', label: 'Entrevista', prompt: "Afegeix just després de «## Resum» una secció «## Perfil i respostes clau» amb les respostes rellevants de la persona entrevistada, punts forts i dubtes, sense judicis de valor no fonamentats." },
+  formacio: { svg: 'book', icon: '🎓', label: 'Formació / classe', prompt: "Afegeix just després de «## Resum» una secció «## Conceptes clau» amb el que s'ha explicat, ordenat i didàctic." },
+  projecte: { svg: 'chart', icon: '📈', label: 'Seguiment de projecte', prompt: "Afegeix just després de «## Resum» una secció «## Estat del projecte» (avenços, fites, riscos i calendari)." },
+  revisio: { svg: 'edit', icon: '📝', label: 'Revisió de feina', prompt: '' },
 };
 
 // Revisió de feina: l'usuari dicta correccions sobre la feina d'algú i en surt
@@ -2113,11 +2115,12 @@ function renderTypeChips() {
   const box = $('#type-chips');
   if (!box || box.childElementCount) { updateTypeChips(); return; }
   for (const [key, t] of Object.entries(MEETING_TYPES)) {
+    if (key === 'important' || key === 'revisio') continue; // són modes propis
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'type-chip';
     b.dataset.type = key;
-    b.textContent = `${t.icon} ${t.label}`;
+    b.innerHTML = `${svgIcon(t.svg || 'chat')}<span>${escapeHtml(t.label)}</span>`;
     b.onclick = () => { saveSettings({ lastType: key }); updateTypeChips(); };
     box.appendChild(b);
   }
@@ -2127,6 +2130,15 @@ function updateTypeChips() {
   const type = settings.lastType || 'general';
   document.querySelectorAll('.type-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
   const review = type === 'revisio';
+  const mode = type === 'important' || type === 'revisio' ? type : 'general';
+  document.querySelectorAll('.mode').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+  if ($('#type-field')) $('#type-field').hidden = mode !== 'general';
+  if ($('#record-caption')) {
+    const sub = mode === 'general' && type !== 'general' && MEETING_TYPES[type] ? ` · ${MEETING_TYPES[type].label}` : '';
+    $('#record-caption').textContent = mode === 'important' ? 'Reunió important · acta professional'
+      : mode === 'revisio' ? 'Revisió de feina · llista de correccions'
+      : `Reunió${sub} · ${(settings.detail || 'full') === 'short' ? 'resum breu' : 'resum detallat'}`;
+  }
   if ($('#review-fields')) $('#review-fields').hidden = !review;
   if ($('#agenda-field')) $('#agenda-field').hidden = type !== 'important';
   const tips = document.querySelector('#view-home .tips');
@@ -2163,18 +2175,16 @@ function reviewForm() {
   $('#review-name').value = ''; $('#review-email').value = '';
   return name || email ? { name, email } : null;
 }
-$('#btn-important-mode').onclick = () => {
-  saveSettings({ lastType: 'important' });
-  updateTypeChips();
-  $('#agenda-field').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  toast("⭐ Reunió important: en acabar en faràs l'acta professional. Si vols, posa-hi l'ordre del dia.", 4500);
-};
-$('#btn-review-mode').onclick = () => {
-  saveSettings({ lastType: 'revisio' });
-  updateTypeChips();
-  $('#review-fields').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  setTimeout(() => $('#review-name').focus(), 400);
-};
+// Modes de la pantalla d'inici: reunió, reunió important o revisió de feina.
+let lastGeneralType = 'general';
+document.querySelectorAll('.mode').forEach((b) => {
+  b.onclick = () => {
+    const cur = settings.lastType || 'general';
+    if (cur !== 'important' && cur !== 'revisio') lastGeneralType = cur;
+    saveSettings({ lastType: b.dataset.mode === 'general' ? lastGeneralType : b.dataset.mode });
+    updateTypeChips();
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Idiomes del resum (el català és l'original; la resta són traduccions)
@@ -2245,6 +2255,10 @@ function friendlyError(raw) {
 // ---------------------------------------------------------------------------
 async function renderHome() {
   if (!$('#home-recent')) return;
+  if ($('#home-date')) {
+    const d = new Date().toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('#home-date').textContent = d.charAt(0).toUpperCase() + d.slice(1);
+  }
   const all = (await db.all('meetings')).sort((a, b) => b.startedAt - a.startedAt);
   const recent = all.slice(0, 3);
   const ul = $('#recent-list');
@@ -2657,7 +2671,7 @@ function renderHistoryFilters(all) {
   const chips = [{ kind: 'all', value: '', label: 'Totes', n: all.length }];
   const types = {};
   for (const m of all) { const t = m.type || 'general'; types[t] = (types[t] || 0) + 1; }
-  for (const [t, n] of Object.entries(types)) if (MEETING_TYPES[t]) chips.push({ kind: 'type', value: t, label: `${MEETING_TYPES[t].icon} ${MEETING_TYPES[t].label}`, n });
+  for (const [t, n] of Object.entries(types)) if (MEETING_TYPES[t]) chips.push({ kind: 'type', value: t, label: MEETING_TYPES[t].label, n });
   const groups = {};
   for (const m of all) if (m.group) groups[m.group] = (groups[m.group] || 0) + 1;
   for (const [g, n] of Object.entries(groups).sort((a, b) => b[1] - a[1])) chips.push({ kind: 'group', value: g, label: `🏷 ${g}`, n });
@@ -2890,7 +2904,7 @@ async function renderAskScope() {
   const add = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sel.appendChild(o); };
   add('all', `Totes les reunions (${all.filter((m) => m.summary).length})`);
   const types = [...new Set(all.map((m) => m.type || 'general'))].filter((t) => MEETING_TYPES[t]);
-  for (const t of types) add(`type:${t}`, `${MEETING_TYPES[t].icon} ${MEETING_TYPES[t].label}`);
+  for (const t of types) add(`type:${t}`, MEETING_TYPES[t].label);
   for (const g of await allGroups()) add(`group:${g}`, `🏷 ${g}`);
   if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
 }
