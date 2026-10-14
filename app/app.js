@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -279,6 +279,8 @@ const GEMINI_MODELS = {
   transcribe: ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'],
   // Més precís per a veus difícils; si s'esgota la quota, passa sol a Flash-Lite.
   transcribePrecise: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
+  // Actes professionals: el model més capaç disponible; si no n'hi ha (nivell gratuït), Flash.
+  pro: ['gemini-pro-latest', 'gemini-2.5-pro', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
   summary: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'],
 };
 const missingModels = new Set();
@@ -338,9 +340,9 @@ async function readGeminiStream(res, onText) {
 }
 
 // thinking: límit de «pensament» (tokens) per anar més de pressa · onText: resposta en directe
-async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thinking = null, onText = null } = {}) {
+async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thinking = null, onText = null, json = false, precise = false } = {}) {
   const spent = exhaustedModels();
-  const chain = task === 'transcribe' && settings.precise === true ? GEMINI_MODELS.transcribePrecise : GEMINI_MODELS[task];
+  const chain = task === 'transcribe' && (precise || settings.precise === true) ? GEMINI_MODELS.transcribePrecise : GEMINI_MODELS[task];
   const models = chain.filter((x) => !missingModels.has(x) && !spent.includes(x));
   if (!models.length) throw new FatalError(QUOTA_MSG);
   let lastErr;
@@ -352,6 +354,7 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
         contents: [{ role: 'user', parts }],
         generationConfig: { maxOutputTokens: maxTokens },
       };
+      if (json) body.generationConfig.responseMimeType = 'application/json';
       if (thinking != null && !noThinkingCfg.has(model)) body.generationConfig.thinkingConfig = { thinkingBudget: thinking };
       if (system) body.systemInstruction = { parts: [{ text: system }] };
       const url = onText
@@ -406,7 +409,7 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
         throw new Error(`Google no ha acceptat la petició: ${errText.replace(/\s+/g, ' ').slice(0, 160)}`);
       }
       if (res.status === 429) {
-        if (/PerDay|per day/i.test(errText)) { markExhausted(model); lastErr = new FatalError(QUOTA_MSG); break; }
+        if (/PerDay|per day|limit: 0\b/i.test(errText)) { markExhausted(model); lastErr = new FatalError(QUOTA_MSG); break; }
         lastErr = new Error('Gemini: massa peticions seguides');
         // Si hi ha un altre model disponible, no esperis: prova'l ara mateix.
         if (hasNext) break;
@@ -497,7 +500,7 @@ const LANG_NAMES = { ca: 'català', es: 'castellà', en: 'anglès' };
 let forceWav = false;
 
 // ref: { blob, text } = àudio de les presentacions (mostra de veus) · isRef: és el tram de presentacions
-async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false, boost = false, call = false } = {}) {
+async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false, boost = false, call = false, precise = false } = {}) {
   const speakerRules = !speakers ? [
     'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
   ] : !isRef && !ref ? [
@@ -533,7 +536,7 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     ...(r ? [await audioPart(r)] : []),
     await audioPart(b),
     { text: prompt },
-  ], { task: 'transcribe', thinking: 0 }); // transcriure no requereix «pensar»: més ràpid
+  ], { task: 'transcribe', thinking: 0, precise }); // transcriure no requereix «pensar»: més ràpid
   let refBlob = ref && ref.blob ? ref.blob : null;
   let text;
   if (boost) {
@@ -579,7 +582,7 @@ function kickQueue(meetingId) {
           if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx) };
         }
         try {
-          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call' });
+          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call', precise: m.type === 'important' });
           seg.status = 'done';
           delete seg.error;
           // L'àudio de les presentacions es guarda fins al final: és la mostra de veus.
@@ -685,7 +688,7 @@ Un apartat «### <Tema>» per a cada tema tractat, en l'ordre en què s'ha parla
   .replace('Sigues concret i útil: el lector no ha assistit a la reunió i ha de poder actuar amb aquest resum.', "Sigues complet i concret: el lector no ha assistit a la reunió i, llegint aquesta acta, ha de saber TOT el que s'hi ha dit i ha de poder actuar.");
 const summaryStyle = (m) => m.detail || settings.detail || 'full';
 
-function buildTranscript(m) {
+function buildTranscript(m, markEveryMs = 300000) {
   if (m.engine === 'device') return (m.liveText || '').trim();
   return m.segments
     .slice()
@@ -693,7 +696,7 @@ function buildTranscript(m) {
     .filter((s) => s.status === 'done' && s.text)
     .reduce((acc, s) => {
       const t = s.startMs || 0;
-      if (acc.lastMark === null || t - acc.lastMark >= 300000) {
+      if (acc.lastMark === null || t - acc.lastMark >= markEveryMs) {
         acc.lastMark = t;
         acc.out.push(`\n[${fmtClock(t)}]`);
       }
@@ -761,6 +764,114 @@ async function renderPhotos(m, box) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Acta professional (reunions importants): es fa per fases, com un secretari.
+// 1) ordre del dia real · 2) cada punt redactat a part · 3) resum, acords i tasques
+// ---------------------------------------------------------------------------
+const PRO_COMMON = `La transcripció és automàtica i pot tenir errors de reconeixement: corregeix pel context els errors evidents (noms escrits de maneres diferents, paraules que sonen semblant). No t'inventis res. Si una dada, nom, xifra o data ve d'una part marcada amb [dubte de comprensió] o no està clara, posa-hi al costat [dubte de comprensió]. Les línies poden començar amb el nom de qui parla («Nom: …»): fes-ho servir per atribuir bé opinions, propostes i compromisos. Escriu en català correcte, amb registre professional d'acta, en tercera persona.`;
+const PRO_PLAN_PROMPT = `Ets el secretari d'una reunió important. Analitza la transcripció sencera i identifica'n l'ORDRE DEL DIA REAL: els punts o temes que s'han tractat, en l'ordre en què s'han tractat. Si l'usuari ha indicat un ordre del dia previst, fes-lo servir com a base (amb els mateixos noms i ordre) i afegeix-hi al final els temes que hagin sortit fora de l'ordre del dia; si algun punt previst no s'ha tractat, inclou-lo igualment amb "tractat": false.
+Agrupa bé: normalment una reunió d'una hora té entre 4 i 10 punts. No facis punts per a salutacions o converses sense contingut.
+Els temps de la transcripció surten entre claudàtors, p. ex. [12:00]. Per a cada punt indica el temps aproximat d'inici i de final (en el mateix format), encara que el tema es reprengui més tard (en aquest cas, posa-ho a "nota").
+${PRO_COMMON}
+Respon NOMÉS amb JSON vàlid amb aquest format:
+{"titol":"títol breu i professional de la reunió","assistents":["Nom (rol si se sap)"],"punts":[{"titol":"Títol del punt","inici":"00:00","final":"12:00","tractat":true,"nota":"opcional"}]}`;
+const PRO_SECTION_PROMPT = `Ets el secretari d'una reunió important i estàs redactant l'ACTA. Ara has de redactar UN SOL PUNT de l'ordre del dia, amb tot detall, a partir de la transcripció (te la dono sencera perquè tinguis context, però només has de redactar el punt indicat; el tema també es pot haver tractat en altres moments de la reunió: recull-ho tot).
+No és un resum: recull TOT el que s'ha dit sobre aquest punt, ben ordenat i redactat (sense repeticions ni crosses): el context i els antecedents, què ha explicat o proposat cada persona (amb el seu nom), els arguments a favor i en contra, les dades, xifres, exemples i terminis, les preguntes i respostes, i com ha quedat el punt.
+${PRO_COMMON}
+Format (Markdown), exactament:
+### <número>. <títol del punt>
+**Context:** un paràgraf breu (només si n'hi ha).
+
+**Exposició i debat:**
+paràgrafs i llistes amb tot el que s'ha dit, en ordre lògic.
+
+**Conclusió:** com ha quedat el punt (acord, decisió, pendent…).
+
+Si el punt no s'ha tractat a la reunió, escriu només el títol i «No s'ha tractat en aquesta reunió.». No escriguis res més abans ni després del punt.`;
+const PRO_CLOSING_PROMPT = `Ets el secretari d'una reunió important. Tens l'acta ja redactada punt per punt. Ara escriu les parts de síntesi de l'acta, a partir NOMÉS del que diu l'acta (no t'inventis res).
+${PRO_COMMON}
+Escriu en Markdown, exactament amb aquestes seccions i en aquest ordre:
+## Resum executiu
+Un paràgraf de 5-8 frases per a algú que no hi era: objectiu de la reunió, temes principals, conclusions i el més important que cal fer.
+
+## Acords i decisions
+- Cada acord o decisió presa, clar i accionable (indica a quin punt correspon entre parèntesis).
+
+## Tasques
+- [ ] **Responsable**: tasca concreta — termini (si s'ha dit)
+
+## Temes oberts i propers passos
+- Qüestions pendents, dubtes per resoldre i temes per a la propera reunió.
+
+## Dades clau
+- Xifres, imports, dates i noms propis importants.
+
+## Dubtes de comprensió
+- Punts on la transcripció no era clara i que poden afectar l'acta. Si no n'hi ha, "- Cap."
+
+Si una secció no té contingut, escriu "- Cap.". No escriguis res abans de la primera secció ni després de l'última.`;
+const isProMeeting = (m) => (m.type === 'important' || m.pro) && m.detail !== 'short' && !m.textOnly && m.type !== 'revisio';
+
+async function proMinutes(m, info, photos, photoParts, onText) {
+  const transcript = buildTranscript(m, 60000);
+  const progress = (t) => { m.summaryProgress = t; updateProcView(m); };
+  const strip = (t) => t.replace(/^```(?:markdown|json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const head = `${info.join('\n')}${m.agenda ? `\nOrdre del dia previst per l'usuari:\n${m.agenda}` : ''}`;
+  const trans = `<transcripcio>\n${transcript}\n</transcripcio>`;
+
+  // 1. Ordre del dia
+  progress("Analitzant l'ordre del dia de la reunió…");
+  let plan;
+  try {
+    plan = JSON.parse(strip(await gemini([{ text: `${head}\n\n${trans}` }], { system: PRO_PLAN_PROMPT, task: 'pro', thinking: 4096, maxTokens: 8192, json: true })));
+  } catch (e) {
+    if (e instanceof FatalError) throw e;
+    plan = null;
+  }
+  const items = plan && Array.isArray(plan.punts) ? plan.punts.filter((x) => x && x.titol).slice(0, 15) : [];
+  if (!items.length) return null; // no s'ha pogut estructurar: es farà l'acta d'una sola passada
+
+  const agendaList = items.map((x, i) => `${i + 1}. ${x.titol}${x.inici ? ` (${x.inici}${x.final ? `–${x.final}` : ''})` : ''}${x.tractat === false ? ' — no tractat' : ''}`).join('\n');
+  const title = String(plan.titol || m.title || 'Acta de la reunió').trim();
+  const attendees = Array.isArray(plan.assistents) ? plan.assistents.filter(Boolean) : [];
+  const toMs = (t) => { const p = String(t || '').split(':').map(Number); return p.length >= 2 && p.every((n) => !isNaN(n)) ? (p.length === 3 ? ((p[0] * 60 + p[1]) * 60 + p[2]) : (p[0] * 60 + p[1])) * 1000 : null; };
+
+  const assemble = (sections, closing = '') => {
+    const meta = [`**Data:** ${fmtDate(m.startedAt)}`, `**Durada:** ${fmtDuration(m.durationMs || 0)}`];
+    if (attendees.length) meta.push(`**Assistents:** ${attendees.join(', ')}`);
+    const [top, ...rest] = closing.split(/\n(?=## Acords)/);
+    const exec = /## Resum executiu/.test(top || '') ? top.trim() : '';
+    return [`# ${title}`, meta.join(' · '), exec, `## Ordre del dia\n${items.map((x, i) => `${i + 1}. ${x.titol}`).join('\n')}`,
+      `## Desenvolupament de la reunió\n\n${sections.join('\n\n')}`, rest.join('\n').trim()].filter(Boolean).join('\n\n');
+  };
+
+  // 2. Cada punt, per separat (de dos en dos, per anar més de pressa)
+  const sections = new Array(items.length).fill('');
+  let done = 0;
+  const writeItem = async (i) => {
+    const it = items[i];
+    const from = toMs(it.inici); const to = toMs(it.final);
+    // Fotos fetes durant aquest punt (o afegides després).
+    const extra = photoParts.filter((_, k) => { const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
+    const ask = `${head}\n\nORDRE DEL DIA:\n${agendaList}\n\nRedacta ara NOMÉS el punt ${i + 1}: «${it.titol}»${it.inici ? ` (aprox. de ${it.inici} a ${it.final || 'final'})` : ''}${it.nota ? `. Nota: ${it.nota}` : ''}.${extra.length ? " Les fotos adjuntes són documents mostrats a la reunió: fes-les servir si tenen relació amb aquest punt." : ''}\n\n${trans}`;
+    const t = strip(await gemini([{ text: ask }, ...extra], { system: PRO_SECTION_PROMPT, task: 'pro', thinking: 1024, maxTokens: 8192 }));
+    sections[i] = /^###\s/.test(t) ? t : `### ${i + 1}. ${it.titol}\n\n${t}`;
+    done++;
+    progress(`Redactant l'acta: ${done} de ${items.length} punts fets…`);
+    if (onText) onText(assemble(sections.filter(Boolean)));
+  };
+  progress(`Redactant l'acta: 0 de ${items.length} punts fets…`);
+  let next = 0;
+  const worker = async () => { while (next < items.length) { const i = next++; await writeItem(i); } };
+  await Promise.all([worker(), worker()]);
+
+  // 3. Resum executiu, acords, tasques…
+  progress('Escrivint el resum executiu, els acords i les tasques…');
+  const closing = strip(await gemini([{ text: `${head}\n\n<acta>\n${sections.join('\n\n')}\n</acta>` }], { system: PRO_CLOSING_PROMPT, task: 'pro', thinking: 2048, maxTokens: 8192 }));
+  delete m.summaryProgress;
+  return assemble(sections, closing);
+}
+
 async function summarize(m, onText = null) {
   const transcript = buildTranscript(m);
   if (!transcript) throw new FatalError("No s'ha captat cap paraula a la gravació");
@@ -770,6 +881,7 @@ async function summarize(m, onText = null) {
   ];
   if (m.title) info.push(`Títol indicat per l'usuari: ${m.title}`);
   if (m.context) info.push(`Context i assistents: ${m.context}`);
+  if (m.agenda && !isProMeeting(m)) info.push(`Ordre del dia previst: ${m.agenda}`);
   if (m.group) info.push(`Grup de treball o projecte: ${m.group}`);
   if (m.source === 'call') info.push("És una videotrucada: s'ha gravat el so de la trucada i el micròfon de l'usuari.");
   if (m.engine === 'import') {
@@ -799,6 +911,11 @@ async function summarize(m, onText = null) {
 Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
   }
 
+  if (isProMeeting(m)) {
+    const pro = await proMinutes(m, info, photos, photoParts, onText);
+    if (pro) return pro;
+    delete m.summaryProgress;
+  }
   const review = m.type === 'revisio';
   if (review && m.reviewFor && m.reviewFor.name) info.push(`La revisió és per a: ${m.reviewFor.name}.`);
   const text = await gemini(
@@ -1284,6 +1401,7 @@ async function startRecording(cont = null) {
     engine: settings.engine,
     speakers: settings.engine !== 'device' && settings.speakers !== false && settings.lastType !== 'revisio',
     reviewFor: reviewForm(),
+    agenda: settings.lastType === 'important' ? $('#meeting-agenda').value.trim() : '',
     type: settings.lastType || 'general',
     status: 'recording',
     segments: [],
@@ -1467,6 +1585,7 @@ async function stopRecording() {
   $('#meeting-title').value = '';
   $('#meeting-context').value = '';
   $('#meeting-group').value = '';
+  $('#meeting-agenda').value = '';
   viewingId = m.id;
   showView('proc');
   updateProcView(m);
@@ -1614,7 +1733,7 @@ function updateProcView(m) {
   else setStep('step-transcribe', 'active', total ? `${done} de ${total} trams` : 'Preparant…');
 
   if (m.summary) setStep('step-summary', 'done', 'Fet');
-  else if (m.stage === 'summary') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : 'Escrivint el resum…');
+  else if (m.stage === 'summary') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : (m.summaryProgress || 'Escrivint el resum…'));
   else if (m.stage === 'translate') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : 'Traduint el resum…');
   else setStep('step-summary', '', '');
 
@@ -1941,6 +2060,7 @@ async function testEmail() {
 // ---------------------------------------------------------------------------
 const MEETING_TYPES = {
   general: { icon: '💬', label: 'General', prompt: '' },
+  important: { icon: '⭐', label: 'Reunió important', prompt: '' },
   equip: { icon: '👥', label: "Reunió d'equip", prompt: "Posa èmfasi en l'estat de cada projecte o àrea, els bloquejos i qui fa què. A «Punts tractats» agrupa per projecte o àrea." },
   comercial: { icon: '🤝', label: 'Comercial / client', prompt: "Afegeix just després de «## Resum» una secció «## Client i necessitats» (qui és, què necessita, pressupost, terminis i objeccions). A «Temes oberts i propers passos» deixa clar el següent pas comercial, qui el fa i quan." },
   u1: { icon: '🙋', label: '1 a 1', prompt: "Centra't en el feedback, els objectius, les preocupacions i els acords entre les dues persones. Sigues discret i respectuós amb els temes personals." },
@@ -2005,6 +2125,7 @@ function updateTypeChips() {
   document.querySelectorAll('.type-chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
   const review = type === 'revisio';
   if ($('#review-fields')) $('#review-fields').hidden = !review;
+  if ($('#agenda-field')) $('#agenda-field').hidden = type !== 'important';
   const tips = document.querySelector('#view-home .tips');
   if (tips) tips.hidden = review; // els consells de presentacions no hi fan res
   const chip = document.querySelector(`.type-chip[data-type="${type}"]`);
@@ -2379,6 +2500,7 @@ $('#btn-more').onclick = async () => {
   if (m) {
     const isShort = m.engine === 'import' && m.detail !== 'full' && settings.shortImports !== false ? true : summaryStyle(m) === 'short';
     $('#btn-toggle-detail').hidden = m.type === 'revisio' || !!m.textOnly;
+    $('#btn-pro').hidden = m.type === 'revisio' || !!m.textOnly || isProMeeting(m);
     $('#btn-toggle-detail').textContent = isShort ? '📄 Fes-ne la versió detallada (tot el que s\'ha parlat)' : '✂️ Fes-ne una versió més resumida';
   }
   openSheet('#more-sheet');
@@ -2696,6 +2818,7 @@ async function importFiles(list, { textOnly = false } = {}) {
     engine: 'import',
     textOnly,
     reviewFor: reviewForm(),
+    agenda: settings.lastType === 'important' ? $('#meeting-agenda').value.trim() : '',
     importFiles: files.map((f, i) => ({ key: `${id}:import:${i}`, name: f.name, mime: importMime(f), durationMs: durations[i] })),
     importName: files.map((f) => f.name).join(', ').slice(0, 200),
     type: settings.lastType || 'general',
@@ -2707,7 +2830,7 @@ async function importFiles(list, { textOnly = false } = {}) {
   };
   for (let i = 0; i < files.length; i++) await db.put('audio', files[i], m.importFiles[i].key);
   await saveMeeting(m);
-  $('#meeting-title').value = ''; $('#meeting-context').value = ''; $('#meeting-group').value = '';
+  $('#meeting-title').value = ''; $('#meeting-context').value = ''; $('#meeting-group').value = ''; $('#meeting-agenda').value = '';
   viewingId = m.id;
   showView('proc');
   updateProcView(m);
@@ -3267,6 +3390,16 @@ $('#btn-resend').onclick = async () => {
   await saveMeeting(m);
   showView('proc'); updateProcView(m);
   runPipeline(m.id);
+};
+$('#btn-pro').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m) return;
+  m.pro = true;
+  if (m.detail === 'short') delete m.detail;
+  await saveMeeting(m);
+  showView('proc');
+  updateProcView(m);
+  runPipeline(m.id, { redoSummary: true });
 };
 $('#btn-toggle-detail').onclick = async () => {
   const m = await getMeeting(viewingId);

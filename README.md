@@ -98,6 +98,16 @@ Per saber qui diu què (i a qui toca cada tasca):
 
 Si no es pot saber amb seguretat qui parla, hi posa «Persona no identificada». Es pot desactivar a *Configuració > Avançat*. Enviar la mostra amb cada tram fa que el cost de transcripció sigui aproximadament el doble (uns 10 € al mes per 15 h setmanals).
 
+## Reunions importants: acta professional
+
+Tria el tipus **«⭐ Reunió important»** (i, si vols, escriu-hi l'**ordre del dia**, un punt per línia). Xiu-xiu fa l'acta per fases, com un secretari:
+
+1. Treu l'**ordre del dia real** de la reunió (o fa servir el teu, i hi afegeix el que hagi sortit fora).
+2. **Redacta cada punt per separat i amb detall**: context, què ha dit cadascú, arguments, dades i conclusió.
+3. Escriu el **resum executiu**, els **acords**, les **tasques**, els temes oberts i les dades clau.
+
+Fa servir el model més bo que permeti la teva clau (Gemini Pro si tens facturació activada; si no, Flash) i transcriu amb Flash. Triga uns minuts més i gasta més quota, per això és només per a les reunions importants. Una reunió ja gravada també es pot refer així: **⋯ > «Refés-la com a acta professional»**.
+
 ## Resum detallat o resumit
 
 De sèrie, Xiu-xiu fa una **acta detallada**: no és la transcripció literal, sinó tot el que s'ha parlat ben ordenat per temes (què ha dit cadascú, arguments, dades, dubtes i conclusions), més les decisions i les tasques. Si d'una reunió en vols només el més important, toca **⋯ > «Fes-ne una versió més resumida»** (i al revés). Per canviar-ho per a totes les reunions: Ajustos > Resums > «Com vols el resum».

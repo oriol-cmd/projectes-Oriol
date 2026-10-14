@@ -131,6 +131,11 @@
               <input id="review-email" type="email" placeholder="marta@exemple.cat" autocomplete="off">
             </label>
           </div>
+          <label id="agenda-field" class="field" hidden>
+            <span>Ordre del dia <em>(opcional, millora molt l'acta)</em></span>
+            <textarea id="meeting-agenda" rows="3" placeholder="Un punt per línia, p. ex.&#10;1. Pressupost 2027&#10;2. Contractacions&#10;3. Precs i preguntes"></textarea>
+            <small class="fineprint left">Xiu-xiu farà una acta professional: l'ordre del dia, cada punt redactat amb detall, acords i tasques. Triga una mica més.</small>
+          </label>
           <label class="field">
             <span>Títol <em>(opcional)</em></span>
             <input id="meeting-title" type="text" placeholder="p. ex. Comitè de direcció" autocomplete="off">
@@ -463,6 +468,7 @@
       <div class="sheet-list">
         <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
         <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📷 Afegeix una foto d'un document</button>
+        <button id="btn-pro" class="sheet-row" type="button" data-closes>⭐ Refés-la com a acta professional (punt per punt)</button>
         <button id="btn-toggle-detail" class="sheet-row" type="button" data-closes>✂️ Fes-ne una versió més resumida</button>
         <button id="btn-redo" class="sheet-row" type="button" data-closes>✨ Refés el resum</button>
         <button id="btn-resend" class="sheet-row" type="button" data-closes>🔁 Torna a enviar el correu automàtic</button>
