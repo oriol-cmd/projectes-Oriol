@@ -156,7 +156,9 @@ const ESQUEMA = {
           repeteix_fins: { type: 'STRING', description: 'AAAA-MM-DD' },
           tota_la_serie: { type: 'BOOLEAN' }
         },
-        required: ['tipus']
+        // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
+        required: ['tipus', 'ref', 'titol', 'inici', 'fi'],
+        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'recorda_a', 'repeticio', 'repeteix_fins', 'tota_la_serie']
       }
     },
     resposta: { type: 'STRING', description: "Missatge de WhatsApp per a l'usuari" }
@@ -178,6 +180,7 @@ function aten_(parts, u) {
     '- crear_cita: tot el que passa un dia concret (reunions, metge, viatges, sopars…). Si no diu hora, és de tot el dia.',
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
+    '- A cada acció omple SEMPRE tipus, ref, titol, inici i fi (cadena buida "" si no cal). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
     '',
     'Regles:',
     '- Calcula les dates relatives («demà», «dijous que ve», «d\'aquí a 15 dies») a partir d\'avui. Hores ambigües: «a les 5» de la tarda si és més lògic (17:00).',
@@ -214,6 +217,16 @@ function aten_(parts, u) {
       { role: 'user', parts: [{ text: "(Avís del sistema: has respost que ho has fet, però «accions» és buit i, per tant, no s'ha apuntat res al calendari. Torna a respondre posant a «accions» tot el que cal fer. Si de debò no cal fer res, no diguis que ho has fet.)" }] }
     ]);
   }
+  // Si a alguna acció li falta una dada (p. ex. el dia), li demanem a Gemini que la corregeixi.
+  const problemes = problemesAccions_(res.accions, ctx.refs);
+  if (problemes.length) {
+    registre_('Accions incompletes, ho torno a demanar: ' + JSON.stringify(res.accions) + ' → ' + problemes.join('; '));
+    res = gemini_(sistema, [
+      { role: 'user', parts: parts },
+      { role: 'model', parts: [{ text: JSON.stringify(res) }] },
+      { role: 'user', parts: [{ text: '(Avís del sistema: no s\'ha pogut fer cap acció perquè ' + problemes.join('; ') + '. Torna a respondre amb les accions completes. Si et falta informació, pregunta-la a «resposta» i deixa «accions» buit.)' }] }
+    ]);
+  }
   registre_((u.nom || u.numero) + ' → ' + (res.peticio || '') + ' | accions: ' + JSON.stringify(res.accions || []));
   const errors = [];
   (res.accions || []).forEach(function (a) {
@@ -224,11 +237,31 @@ function aten_(parts, u) {
     }
   });
   if (diuQueHoHaFet(res)) errors.push("⚠️ Compte: no he pogut apuntar res al calendari. Torna-m'ho a dir, si us plau.");
-  const resposta = [res.resposta || 'Fet.'].concat(errors).join('\n\n');
+  // Si alguna cosa ha fallat, no comencem dient «Apuntat».
+  const fet = (res.accions || []).length > errors.length;
+  const resposta = (errors.length && !fet ? errors : [res.resposta || 'Fet.'].concat(errors)).join('\n\n');
 
   historial.push({ u: String(res.peticio || '').slice(0, 300), r: resposta.slice(0, 500) });
   desaEstat_(u, 'HISTORIAL', JSON.stringify(historial.slice(-MAX_HISTORIAL)));
   return resposta;
+}
+
+/** Comprova que les accions tenen les dades necessàries abans de fer-les. */
+function problemesAccions_(accions, refs) {
+  const problemes = [];
+  (accions || []).forEach(function (a, i) {
+    const nom = 'l\'acció ' + (i + 1) + ' (' + a.tipus + ')';
+    if (a.tipus === 'crear_cita') {
+      if (!a.titol) problemes.push(nom + ' no té «titol»');
+      if (!a.inici) problemes.push(nom + ' no té «inici» (el dia i l\'hora)');
+      else { try { data_(a.inici); } catch (err) { problemes.push(nom + ' té un «inici» no vàlid: ' + a.inici + ' (format AAAA-MM-DDTHH:MM)'); } }
+    } else if (a.tipus === 'crear_tasca') {
+      if (!a.titol) problemes.push(nom + ' no té «titol»');
+    } else if (!refs[a.ref]) {
+      problemes.push(nom + ' té una «ref» que no és a les llistes: «' + (a.ref || '') + '»');
+    }
+  });
+  return problemes;
 }
 
 function context_(cal, ara) {
