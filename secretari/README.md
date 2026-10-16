@@ -139,7 +139,8 @@ Després de canviar els ajustos o d'enganxar-hi una versió nova del codi: desa,
 
 ## Si alguna cosa no va
 
-- **No respon:** a l'script, menú de l'esquerra **Execucions**: hi veuràs cada missatge rebut i l'error, si n'hi ha. Si no hi surt res, Meta no arriba a l'script: revisa l'URL del webhook (amb el `?k=…`) i que estiguis subscrit a `messages`.
+- **No respon:** a l'script, menú de l'esquerra **Execucions**: hi veuràs cada missatge rebut i l'error, si n'hi ha. Si no hi surt cap `doPost`, Meta no arriba a l'script: revisa l'URL del webhook (amb el `?k=…`) i que estiguis subscrit a `messages`. Després afegeix la propietat `WA_ACCOUNT_ID` (el número que surt després de `waba_id=` a l'adreça de https://business.facebook.com/wa/manage/home/) i executa **`connectaWhatsApp`**: ha de dir `200 {"success":true}`.
+- **La resposta t'arriba per correu amb «Object with ID … does not exist»:** el `WA_PHONE_ID` no és bo. Amb `WA_ACCOUNT_ID` posat, executa **`trobaNumero`**: el busca i el desa sol.
 - **«Falta la propietat de l'script…»:** revisa el pas 4 (els noms en majúscules, exactes).
 - **Error 401 de WhatsApp:** el token ha caducat o no té els permisos del pas 3.
 - **Error 131047 o els avisos arriben per correu:** fa més de 24 h que no li has escrit i la plantilla encara no està aprovada (pas 6).
