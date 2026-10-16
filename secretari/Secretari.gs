@@ -499,7 +499,8 @@ function connectaWhatsApp() {
   ((info.data && info.data.granular_scopes) || []).forEach(function (s) {
     if (s.scope === 'whatsapp_business_management') (s.target_ids || []).forEach(function (id) { comptes.push(id); });
   });
-  if (!comptes.length) throw new Error('No trobo cap compte de WhatsApp al token: ' + JSON.stringify(info).slice(0, 300));
+  if (!comptes.length && prop_('WA_ACCOUNT_ID', true)) comptes.push(digits_(prop_('WA_ACCOUNT_ID')));
+  if (!comptes.length) throw new Error("Afegeix la propietat WA_ACCOUNT_ID amb l'identificador del compte de WhatsApp Business");
   comptes.forEach(function (id) {
     const r = UrlFetchApp.fetch(GRAPH + id + '/subscribed_apps', { method: 'post', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
     console.log('Compte de WhatsApp ' + id + ': ' + r.getResponseCode() + ' ' + r.getContentText());
