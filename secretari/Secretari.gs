@@ -596,6 +596,23 @@ function provaSecretari() {
   console.log(aten_([{ text: 'Què tinc aquesta setmana?' }], propietari_()));
 }
 
+/**
+ * Diagnòstic d'una persona del full (canvia el nom a NOM_PROVA): crea una cita de prova directament
+ * al seu calendari i després li demana una cita al secretari, sense WhatsApp. Mira el registre.
+ */
+function provaPersona() {
+  const NOM_PROVA = 'Maria';
+  const u = usuaris_().filter(function (x) { return x.nom.toLowerCase().indexOf(NOM_PROVA.toLowerCase()) >= 0; })[0];
+  if (!u) throw new Error('No trobo ' + NOM_PROVA + ' al full');
+  console.log('Persona: ' + JSON.stringify(u));
+  const cal = calendari_(u);
+  console.log('Calendari: «' + cal.getName() + '» (' + cal.getId() + ')');
+  const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 9 * 3600e3);
+  const ev = cal.createEvent('Prova directa del secretari', dema, new Date(dema.getTime() + 3600e3));
+  console.log('1) Cita creada directament: ' + quan_(ev));
+  console.log('2) Resposta del secretari: ' + aten_([{ text: 'Apunta una prova del secretari demà a les 12' }], u));
+}
+
 // ── Persones ────────────────────────────────────────────────────────────────
 
 /** Obre (o crea el primer cop) el full on es donen d'alta les persones que poden fer servir el secretari. */
