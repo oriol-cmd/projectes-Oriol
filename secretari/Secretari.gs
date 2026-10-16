@@ -157,8 +157,8 @@ const ESQUEMA = {
           tota_la_serie: { type: 'BOOLEAN' }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
-        required: ['tipus', 'ref', 'titol', 'inici', 'fi'],
-        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'recorda_a', 'repeticio', 'repeteix_fins', 'tota_la_serie']
+        required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a'],
+        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'repeticio', 'repeteix_fins', 'tota_la_serie']
       }
     },
     resposta: { type: 'STRING', description: "Missatge de WhatsApp per a l'usuari" }
@@ -180,7 +180,8 @@ function aten_(parts, u) {
     '- crear_cita: tot el que passa un dia concret (reunions, metge, viatges, sopars…). Si no diu hora, és de tot el dia.',
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
-    '- A cada acció omple SEMPRE tipus, ref, titol, inici i fi (cadena buida "" si no cal). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
+    '- A cada acció omple SEMPRE tipus, ref, titol, inici, fi i recorda_a (cadena buida "" si no cal). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
+    "- Recordatoris: «recorda'm X a les 17h», «avisa'm demà a les 9 que…», «el dia 20 recorda'm que el 25 he de pagar» → crear_tasca amb recorda_a = el dia i l'hora exactes de l'avís (AAAA-MM-DDTHH:MM) i inici = el dia de la tasca. Per a una cita amb hora, l'avís previ va a avis_minuts (p. ex. «avisa'm una hora abans» → 60).",
     '',
     'Regles:',
     '- Calcula les dates relatives («demà», «dijous que ve», «d\'aquí a 15 dies») a partir d\'avui. Hores ambigües: «a les 5» de la tarda si és més lògic (17:00).',
@@ -257,6 +258,8 @@ function problemesAccions_(accions, refs) {
       else { try { data_(a.inici); } catch (err) { problemes.push(nom + ' té un «inici» no vàlid: ' + a.inici + ' (format AAAA-MM-DDTHH:MM)'); } }
     } else if (a.tipus === 'crear_tasca') {
       if (!a.titol) problemes.push(nom + ' no té «titol»');
+      if (a.recorda_a && esDia_(a.recorda_a)) problemes.push(nom + ' té «recorda_a» sense hora: ' + a.recorda_a + ' (cal AAAA-MM-DDTHH:MM)');
+      else if (a.recorda_a) { try { data_(a.recorda_a); } catch (err) { problemes.push(nom + ' té un «recorda_a» no vàlid: ' + a.recorda_a + ' (format AAAA-MM-DDTHH:MM)'); } }
     } else if (!refs[a.ref]) {
       problemes.push(nom + ' té una «ref» que no és a les llistes: «' + (a.ref || '') + '»');
     }
@@ -413,13 +416,16 @@ function revisaRecordatorisDe_(u) {
   const enviats = JSON.parse(estat_(u, 'ENVIATS') || '{}');
   const avisos = [];
 
-  cal.getEvents(ara, new Date(ara.getTime() + 2 * 864e5)).forEach(function (ev) {
+  // Els avisos es revisen cada 5 minuts: enviem els que toquen d'aquí a 2,5 min com a molt,
+  // perquè arribin a l'hora (±2,5 min) i no fins a 5 minuts tard.
+  const llindar = ara.getTime() + 150000;
+  cal.getEvents(ara, new Date(ara.getTime() + 8 * 864e5)).forEach(function (ev) {
     if (ev.isAllDayEvent() || ev.getTitle().indexOf(FETA) === 0) return;
     const tag = ev.getTag('avis');
     const minuts = tag == null || tag === '' ? AVIS_PER_DEFECTE : Number(tag);
     if (!(minuts >= 0)) return;
     const ini = ev.getStartTime();
-    if (ini.getTime() - minuts * 60000 > ara.getTime() || ini.getTime() < ara.getTime() - 5 * 60000) return;
+    if (ini.getTime() - minuts * 60000 > llindar || ini.getTime() < ara.getTime() - 5 * 60000) return;
     const clau = ev.getId() + '@' + ini.getTime();
     if (enviats[clau]) return;
     enviats[clau] = ara.getTime();
@@ -428,14 +434,16 @@ function revisaRecordatorisDe_(u) {
   });
 
   const avui = iniciDia_(ara);
-  cal.getEvents(new Date(avui.getTime() - 60 * 864e5), new Date(avui.getTime() + 2 * 864e5)).forEach(function (ev) {
+  // Tasques amb recordatori: també les dels propers dies (el recordatori pot ser abans del dia de la tasca).
+  cal.getEvents(new Date(avui.getTime() - 60 * 864e5), new Date(avui.getTime() + 60 * 864e5)).forEach(function (ev) {
     if (ev.getTitle().indexOf(TASCA) !== 0) return;
     const recorda = ev.getTag('recorda_a');
-    if (!recorda || data_(recorda) > ara) return;
+    if (!recorda || data_(recorda).getTime() > llindar) return;
     const clau = ev.getId() + '@' + recorda;
     if (enviats[clau]) return;
     enviats[clau] = ara.getTime();
-    avisos.push('🔔 Recorda: *' + ev.getTitle().slice(TASCA.length) + '*');
+    const dia = ev.getAllDayStartDate();
+    avisos.push('🔔 Recorda: *' + ev.getTitle().slice(TASCA.length) + '*' + (dia > avui ? ' (per al ' + diaCurt_(dia) + ')' : ''));
   });
 
   // Oblida els avisos de fa més de 3 dies.
