@@ -208,7 +208,12 @@ app/                 L'app web (HTML + JS, sense dependències)
   manifest.webmanifest
   icons/
 apps-script/Code.gs  Script del full de Google: correu + registre de reunions i tasques
+secretari/           Secretari per WhatsApp: t'apunta les coses al Google Calendar i te les recorda
 ```
+
+## Secretari per WhatsApp
+
+Un contacte de WhatsApp a qui escrius (o envies notes de veu) i que t'apunta les cites i les tasques al Google Calendar, te les recorda i cada matí t'envia l'agenda del dia. Instruccions a [`secretari/README.md`](secretari/README.md).
 
 ---
 *Xiu-xiu by Oriolbop*
