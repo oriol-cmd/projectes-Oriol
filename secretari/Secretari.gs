@@ -448,7 +448,11 @@ function wa_(missatge) {
     muteHttpExceptions: true,
     payload: JSON.stringify(Object.assign({ messaging_product: 'whatsapp', to: digits_(prop_('MY_NUMBER')) }, missatge))
   });
-  if (r.getResponseCode() >= 300) throw new Error('WhatsApp ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 300));
+  if (r.getResponseCode() >= 300) {
+    let detall = r.getContentText();
+    try { const e = JSON.parse(detall).error; detall = e.message + ' (codi ' + e.code + (e.error_subcode ? '/' + e.error_subcode : '') + ')'; } catch (err) { /* deixem el text tal qual */ }
+    throw new Error('WhatsApp ' + r.getResponseCode() + ': ' + String(detall).slice(0, 400));
+  }
 }
 
 function marcaLlegit_(id) {
