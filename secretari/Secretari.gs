@@ -494,16 +494,26 @@ function configura() {
  */
 function connectaWhatsApp() {
   const token = prop_('WA_TOKEN');
-  const info = JSON.parse(UrlFetchApp.fetch(GRAPH + 'debug_token?input_token=' + encodeURIComponent(token) + '&access_token=' + encodeURIComponent(token), { muteHttpExceptions: true }).getContentText());
+  const llegeix = function (cami) {
+    return JSON.parse(UrlFetchApp.fetch(GRAPH + cami, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }).getContentText());
+  };
   const comptes = [];
+  const info = llegeix('debug_token?input_token=' + encodeURIComponent(token));
   ((info.data && info.data.granular_scopes) || []).forEach(function (s) {
     if (s.scope === 'whatsapp_business_management') (s.target_ids || []).forEach(function (id) { comptes.push(id); });
   });
-  if (!comptes.length && prop_('WA_ACCOUNT_ID', true)) comptes.push(digits_(prop_('WA_ACCOUNT_ID')));
-  if (!comptes.length) throw new Error("Afegeix la propietat WA_ACCOUNT_ID amb l'identificador del compte de WhatsApp Business");
-  comptes.forEach(function (id) {
-    const r = UrlFetchApp.fetch(GRAPH + id + '/subscribed_apps', { method: 'post', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
-    console.log('Compte de WhatsApp ' + id + ': ' + r.getResponseCode() + ' ' + r.getContentText());
+  // WA_ACCOUNT_ID pot ser l'identificador del compte de WhatsApp o el del portfoli empresarial.
+  const id = digits_(prop_('WA_ACCOUNT_ID', true));
+  if (!comptes.length && id) {
+    ['owned_whatsapp_business_accounts', 'client_whatsapp_business_accounts'].forEach(function (llista) {
+      (llegeix(id + '/' + llista).data || []).forEach(function (w) { comptes.push(w.id); });
+    });
+    if (!comptes.length) comptes.push(id);
+  }
+  if (!comptes.length) throw new Error("Afegeix la propietat WA_ACCOUNT_ID amb l'identificador del compte de WhatsApp Business o del portfoli");
+  comptes.forEach(function (compte) {
+    const r = UrlFetchApp.fetch(GRAPH + compte + '/subscribed_apps', { method: 'post', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+    console.log('Compte de WhatsApp ' + compte + ': ' + r.getResponseCode() + ' ' + r.getContentText());
   });
 }
 
