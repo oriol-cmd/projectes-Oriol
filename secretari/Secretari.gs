@@ -45,6 +45,12 @@ const DIES_CURTS = ['dg', 'dl', 'dt', 'dc', 'dj', 'dv', 'ds'];
 const MESOS = ['de gener', 'de febrer', 'de març', "d'abril", 'de maig', 'de juny', 'de juliol', "d'agost", 'de setembre', "d'octubre", 'de novembre', 'de desembre'];
 const MAX_HISTORIAL = 6;
 const FULL_USUARIS = 'Secretari – Usuaris';
+const REGISTRE = [];  // Línies de diagnòstic de l'execució (provaPersona les envia per correu)
+
+function registre_(text) {
+  console.log(text);
+  REGISTRE.push(text);
+}
 
 // ── Webhook de WhatsApp ─────────────────────────────────────────────────────
 
@@ -201,14 +207,14 @@ function aten_(parts, u) {
   let res = gemini_(sistema, [{ role: 'user', parts: parts }]);
   // De vegades Gemini diu «Apuntat» però no posa cap acció: l'hi tornem a demanar.
   if (diuQueHoHaFet(res)) {
-    console.warn('Resposta sense accions, ho torno a demanar: ' + res.resposta);
+    registre_('Resposta sense accions, ho torno a demanar: ' + res.resposta);
     res = gemini_(sistema, [
       { role: 'user', parts: parts },
       { role: 'model', parts: [{ text: JSON.stringify(res) }] },
       { role: 'user', parts: [{ text: "(Avís del sistema: has respost que ho has fet, però «accions» és buit i, per tant, no s'ha apuntat res al calendari. Torna a respondre posant a «accions» tot el que cal fer. Si de debò no cal fer res, no diguis que ho has fet.)" }] }
     ]);
   }
-  console.log((u.nom || u.numero) + ' → ' + (res.peticio || '') + ' | accions: ' + JSON.stringify(res.accions || []));
+  registre_((u.nom || u.numero) + ' → ' + (res.peticio || '') + ' | accions: ' + JSON.stringify(res.accions || []));
   const errors = [];
   (res.accions || []).forEach(function (a) {
     try {
@@ -602,15 +608,19 @@ function provaSecretari() {
  */
 function provaPersona() {
   const NOM_PROVA = 'Maria';
-  const u = usuaris_().filter(function (x) { return x.nom.toLowerCase().indexOf(NOM_PROVA.toLowerCase()) >= 0; })[0];
-  if (!u) throw new Error('No trobo ' + NOM_PROVA + ' al full');
-  console.log('Persona: ' + JSON.stringify(u));
-  const cal = calendari_(u);
-  console.log('Calendari: «' + cal.getName() + '» (' + cal.getId() + ')');
-  const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 9 * 3600e3);
-  const ev = cal.createEvent('Prova directa del secretari', dema, new Date(dema.getTime() + 3600e3));
-  console.log('1) Cita creada directament: ' + quan_(ev));
-  console.log('2) Resposta del secretari: ' + aten_([{ text: 'Apunta una prova del secretari demà a les 12' }], u));
+  try {
+    const u = usuaris_().filter(function (x) { return x.nom.toLowerCase().indexOf(NOM_PROVA.toLowerCase()) >= 0; })[0];
+    if (!u) throw new Error('No trobo ' + NOM_PROVA + ' al full');
+    registre_('Persona: ' + JSON.stringify(u));
+    const cal = calendari_(u);
+    registre_('Calendari: «' + cal.getName() + '» (' + cal.getId() + ')');
+    registre_('Context que veu el secretari:\n' + JSON.stringify(context_(cal, new Date()), null, 1).slice(0, 3000));
+    registre_('Resposta del secretari: ' + aten_([{ text: 'Apunta una prova del secretari demà a les 12' }], u));
+  } catch (err) {
+    registre_('ERROR: ' + (err && err.stack ? err.stack : err));
+  }
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Diagnòstic del secretari', REGISTRE.join('\n\n'));
+  console.log("Diagnòstic enviat per correu.");
 }
 
 // ── Persones ────────────────────────────────────────────────────────────────
