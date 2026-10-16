@@ -54,7 +54,10 @@ function doGet(e) {
 function doPost(e) {
   try {
     const clau = prop_('WEBHOOK_KEY', true);
-    if (clau && ((e && e.parameter) || {}).k !== clau) return text_('ok');
+    if (clau && ((e && e.parameter) || {}).k !== clau) {
+      console.warn('Missatge ignorat: la clau ?k= de l\'URL del webhook no coincideix amb WEBHOOK_KEY');
+      return text_('ok');
+    }
     const body = JSON.parse(e.postData.contents);
     (body.entry || []).forEach(function (entry) {
       (entry.changes || []).forEach(function (change) {
@@ -483,6 +486,24 @@ function configura() {
   envia_("👋 Hola! Soc el teu secretari. Escriu-me o envia'm una nota de veu amb el que t'he d'apuntar, per exemple:\n" +
     '• «Dentista dijous a les 10»\n• «Recorda\'m a les 6 que truqui a la gestoria»\n• «Què tinc demà?»\n• «Passa el dentista a divendres»');
   console.log('Fet. Si no t\'ha arribat el WhatsApp, mira el correu i el registre d\'execucions.');
+}
+
+/**
+ * Si l'script no rep els teus missatges (a Execucions no surt cap doPost), executa-ho:
+ * connecta el compte de WhatsApp amb l'app perquè Meta li enviï els missatges.
+ */
+function connectaWhatsApp() {
+  const token = prop_('WA_TOKEN');
+  const info = JSON.parse(UrlFetchApp.fetch(GRAPH + 'debug_token?input_token=' + encodeURIComponent(token) + '&access_token=' + encodeURIComponent(token), { muteHttpExceptions: true }).getContentText());
+  const comptes = [];
+  ((info.data && info.data.granular_scopes) || []).forEach(function (s) {
+    if (s.scope === 'whatsapp_business_management') (s.target_ids || []).forEach(function (id) { comptes.push(id); });
+  });
+  if (!comptes.length) throw new Error('No trobo cap compte de WhatsApp al token: ' + JSON.stringify(info).slice(0, 300));
+  comptes.forEach(function (id) {
+    const r = UrlFetchApp.fetch(GRAPH + id + '/subscribed_apps', { method: 'post', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+    console.log('Compte de WhatsApp ' + id + ': ' + r.getResponseCode() + ' ' + r.getContentText());
+  });
 }
 
 /** Prova el cervell sense WhatsApp: mira la resposta al registre. */
