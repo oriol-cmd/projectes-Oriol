@@ -521,6 +521,16 @@ function connectaWhatsApp() {
   });
 }
 
+/** Busca el número del secretari al compte WA_ACCOUNT_ID i en desa l'identificador a WA_PHONE_ID. */
+function trobaNumero() {
+  const r = UrlFetchApp.fetch(GRAPH + digits_(prop_('WA_ACCOUNT_ID')) + '/phone_numbers', { headers: { Authorization: 'Bearer ' + prop_('WA_TOKEN') }, muteHttpExceptions: true });
+  const numeros = JSON.parse(r.getContentText()).data || [];
+  if (!numeros.length) throw new Error('No trobo cap número: ' + r.getContentText().slice(0, 300));
+  numeros.forEach(function (n) { console.log(n.display_phone_number + ' (' + (n.verified_name || '') + ') → identificador ' + n.id); });
+  PropertiesService.getScriptProperties().setProperty('WA_PHONE_ID', numeros[0].id);
+  console.log('Desat a WA_PHONE_ID: ' + numeros[0].id);
+}
+
 /** Prova el cervell sense WhatsApp: mira la resposta al registre. */
 function provaSecretari() {
   console.log(aten_([{ text: 'Què tinc aquesta setmana?' }]));
