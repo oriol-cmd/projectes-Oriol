@@ -17,6 +17,10 @@
  *   MY_NUMBER    El teu mòbil amb prefix i sense «+» (p. ex. 34600111222)
  *   CALENDAR_ID  (opcional) Calendari on apuntar-ho. Si no hi és, el principal.
  *   WEBHOOK_KEY  (opcional) Clau que ha de portar l'URL del webhook: …/exec?k=CLAU
+ *
+ * Diverses persones (p. ex. l'equip): executa «configura» i es crea el full «Secretari – Usuaris»
+ * (l'adreça surt al registre). Cada fila és una persona: nom, mòbil i calendari. El secretari
+ * reconeix qui li escriu pel número i fa servir el calendari d'aquella persona.
  */
 
 // ── Ajustos que pots canviar ────────────────────────────────────────────────
@@ -40,6 +44,7 @@ const DIES = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres
 const DIES_CURTS = ['dg', 'dl', 'dt', 'dc', 'dj', 'dv', 'ds'];
 const MESOS = ['de gener', 'de febrer', 'de març', "d'abril", 'de maig', 'de juny', 'de juliol', "d'agost", 'de setembre', "d'octubre", 'de novembre', 'de desembre'];
 const MAX_HISTORIAL = 6;
+const FULL_USUARIS = 'Secretari – Usuaris';
 
 // ── Webhook de WhatsApp ─────────────────────────────────────────────────────
 
@@ -71,13 +76,17 @@ function doPost(e) {
 }
 
 function processa_(msg) {
-  if (String(msg.from) !== digits_(prop_('MY_NUMBER'))) {
-    console.warn('Missatge ignorat d\'un número no autoritzat: ' + msg.from);
-    return;
-  }
   // WhatsApp torna a enviar el missatge si no rep resposta prou ràpid: només el tractem un cop.
   if (!primerCop_(msg.id)) return;
-  PropertiesService.getScriptProperties().setProperty('DARRER_MISSATGE', String(Date.now()));
+  const u = usuari_(msg.from);
+  if (!u) {
+    console.warn('Missatge d\'un número no donat d\'alta: ' + msg.from);
+    try {
+      wa_({ type: 'text', text: { body: "Hola! Aquest número no està donat d'alta al secretari. Demana a qui el gestiona que t'hi afegeixi." } }, msg.from);
+    } catch (err) { console.warn(err); }
+    return;
+  }
+  desaEstat_(u, 'DARRER_MISSATGE', String(Date.now()));
   marcaLlegit_(msg.id);
 
   const parts = [];
@@ -93,13 +102,13 @@ function processa_(msg) {
     } else if (msg.type === 'button') {
       parts.push({ text: msg.button.text });
     } else {
-      envia_('De moment entenc missatges de text, notes de veu, fotos i PDF.');
+      envia_('De moment entenc missatges de text, notes de veu, fotos i PDF.', u);
       return;
     }
-    envia_(aten_(parts));
+    envia_(aten_(parts, u), u);
   } catch (err) {
     console.error(err);
-    envia_('⚠️ No ho he pogut fer: ' + (err && err.message ? err.message : err));
+    envia_('⚠️ No ho he pogut fer: ' + (err && err.message ? err.message : err), u);
   }
 }
 
@@ -149,14 +158,14 @@ const ESQUEMA = {
   required: ['peticio', 'accions', 'resposta']
 };
 
-function aten_(parts) {
-  const cal = calendari_();
+function aten_(parts, u) {
+  const cal = calendari_(u);
   const ara = new Date();
   const ctx = context_(cal, ara);
-  const historial = JSON.parse(prop_('HISTORIAL', true) || '[]');
+  const historial = JSON.parse(estat_(u, 'HISTORIAL') || '[]');
 
   const sistema = [
-    "Ets el secretari personal de l'usuari i parles amb ell per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.",
+    'Ets el secretari personal ' + (u.nom ? 'de ' + u.nom : "de l'usuari") + ' i hi parles per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.',
     'Ara és ' + diaLlarg_(ara) + ' a les ' + fmt_(ara, 'HH:mm') + ' (' + TZ + ').',
     '',
     'Gestiones el seu Google Calendar amb aquestes accions:',
@@ -174,6 +183,7 @@ function aten_(parts) {
     "- Les preguntes («què tinc demà?», «quan és el dentista?») les respons amb l'agenda de sota, sense accions. Només veus els propers " + DIES_AGENDA + ' dies.',
     '- Si una cita nova se solapa amb una altra, apunta-la igualment però avisa-ho.',
     "- A «resposta», confirma el que has fet amb el dia i l'hora (p. ex. «✅ Apuntat: *Dentista*, dv 17/10 a les 10:00. T'avisaré 30 min abans.»). No diguis que has fet res que no sigui a «accions».",
+    "- Si la conversa recent és buida, és la primera vegada que t'escriu: saluda'l pel nom i explica en dues línies què pots fer (apuntar cites i tasques al seu calendari, recordar-les-hi i fer-li un resum cada matí).",
     '',
     'AGENDA (propers ' + DIES_AGENDA + ' dies):',
     ctx.agenda.length ? ctx.agenda.join('\n') : '(buida)',
@@ -197,7 +207,7 @@ function aten_(parts) {
   const resposta = [res.resposta || 'Fet.'].concat(errors).join('\n\n');
 
   historial.push({ u: String(res.peticio || '').slice(0, 300), r: resposta.slice(0, 500) });
-  PropertiesService.getScriptProperties().setProperty('HISTORIAL', JSON.stringify(historial.slice(-MAX_HISTORIAL)));
+  desaEstat_(u, 'HISTORIAL', JSON.stringify(historial.slice(-MAX_HISTORIAL)));
   return resposta;
 }
 
@@ -332,12 +342,22 @@ function gemini_(sistema, contents) {
 
 // ── Recordatoris i resums (activadors de temps) ─────────────────────────────
 
+/** Fa una feina per a cada persona del full, sense que l'error d'una aturi les altres. */
+function perACadaUsuari_(feina) {
+  usuaris_().forEach(function (u) {
+    try { feina(u); } catch (err) { console.error((u.nom || u.numero) + ': ' + (err && err.message ? err.message : err)); }
+  });
+}
+
 /** S'executa cada 5 minuts: avisos de cites i recordatoris de tasques. */
 function revisaRecordatoris() {
-  const cal = calendari_();
+  perACadaUsuari_(revisaRecordatorisDe_);
+}
+
+function revisaRecordatorisDe_(u) {
+  const cal = calendari_(u);
   const ara = new Date();
-  const props = PropertiesService.getScriptProperties();
-  const enviats = JSON.parse(props.getProperty('ENVIATS') || '{}');
+  const enviats = JSON.parse(estat_(u, 'ENVIATS') || '{}');
   const avisos = [];
 
   cal.getEvents(ara, new Date(ara.getTime() + 2 * 864e5)).forEach(function (ev) {
@@ -367,34 +387,38 @@ function revisaRecordatoris() {
 
   // Oblida els avisos de fa més de 3 dies.
   Object.keys(enviats).forEach(function (k) { if (ara.getTime() - enviats[k] > 3 * 864e5) delete enviats[k]; });
-  props.setProperty('ENVIATS', JSON.stringify(enviats));
-  if (avisos.length) envia_(avisos.join('\n\n'));
+  desaEstat_(u, 'ENVIATS', JSON.stringify(enviats));
+  if (avisos.length) envia_(avisos.join('\n\n'), u);
 }
 
 /** Cada matí: l'agenda del dia i les tasques pendents. */
 function resumDelMati() {
-  const cal = calendari_();
-  const ara = new Date();
-  const avui = iniciDia_(ara);
-  const cites = llistaCites_(cal, avui);
-  const tasques = tasquesPendents_(cal, avui);
-  const linies = ['☀️ Bon dia! Avui és ' + diaLlarg_(ara) + '.'];
-  linies.push(cites.length ? '\n📅 *Agenda*\n' + cites.join('\n') : '\n📅 Avui no tens cap cita.');
-  if (tasques.length) linies.push('\n☐ *Per fer*\n' + tasques.join('\n'));
-  envia_(linies.join('\n'));
+  perACadaUsuari_(function (u) {
+    const cal = calendari_(u);
+    const ara = new Date();
+    const avui = iniciDia_(ara);
+    const cites = llistaCites_(cal, avui);
+    const tasques = tasquesPendents_(cal, avui);
+    const linies = ['☀️ Bon dia' + (u.nom ? ', ' + u.nom : '') + '! Avui és ' + diaLlarg_(ara) + '.'];
+    linies.push(cites.length ? '\n📅 *Agenda*\n' + cites.join('\n') : '\n📅 Avui no tens cap cita.');
+    if (tasques.length) linies.push('\n☐ *Per fer*\n' + tasques.join('\n'));
+    envia_(linies.join('\n'), u);
+  });
 }
 
 /** Cada vespre: què ha quedat pendent i què hi ha demà. */
 function resumDelVespre() {
-  const cal = calendari_();
-  const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 3600e3);
-  const cites = llistaCites_(cal, iniciDia_(dema));
-  const tasques = tasquesPendents_(cal, iniciDia_(new Date()));
-  if (!cites.length && !tasques.length) return;
-  const linies = ['🌙 Repàs del dia'];
-  if (tasques.length) linies.push('\n☐ *Encara pendent*\n' + tasques.join('\n') + "\n(Digue'm «fet» quan acabis alguna cosa, o a quin dia la passo.)");
-  if (cites.length) linies.push('\n📅 *Demà, ' + diaLlarg_(dema) + '*\n' + cites.join('\n'));
-  envia_(linies.join('\n'));
+  perACadaUsuari_(function (u) {
+    const cal = calendari_(u);
+    const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 3600e3);
+    const cites = llistaCites_(cal, iniciDia_(dema));
+    const tasques = tasquesPendents_(cal, iniciDia_(new Date()));
+    if (!cites.length && !tasques.length) return;
+    const linies = ['🌙 Repàs del dia'];
+    if (tasques.length) linies.push('\n☐ *Encara pendent*\n' + tasques.join('\n') + "\n(Digue'm «fet» quan acabis alguna cosa, o a quin dia la passo.)");
+    if (cites.length) linies.push('\n📅 *Demà, ' + diaLlarg_(dema) + '*\n' + cites.join('\n'));
+    envia_(linies.join('\n'), u);
+  });
 }
 
 function llistaCites_(cal, dia) {
@@ -420,33 +444,33 @@ function tasquesPendents_(cal, finsA) {
  * Envia un missatge. WhatsApp només deixa escriure lliurement fins a 24 h després del teu
  * darrer missatge; fora d'aquesta finestra cal una plantilla aprovada. Si tot falla, per correu.
  */
-function envia_(text) {
-  const obert = Date.now() - Number(prop_('DARRER_MISSATGE', true) || 0) < 23.5 * 3600e3;
+function envia_(text, u) {
+  const obert = Date.now() - Number(estat_(u, 'DARRER_MISSATGE') || 0) < 23.5 * 3600e3;
   let error = '';
   if (obert) {
-    try { return wa_({ type: 'text', text: { body: text.slice(0, 4000), preview_url: false } }); } catch (err) { error = err.message; }
+    try { return wa_({ type: 'text', text: { body: text.slice(0, 4000), preview_url: false } }, u.numero); } catch (err) { error = err.message; }
   }
   if (PLANTILLA) {
     try {
       // Els paràmetres de les plantilles no poden tenir salts de línia.
       const pla = text.replace(/\s*\n+\s*/g, ' · ').replace(/\s{2,}/g, ' ').slice(0, 900);
-      return wa_({ type: 'template', template: { name: PLANTILLA, language: { code: PLANTILLA_IDIOMA }, components: [{ type: 'body', parameters: [{ type: 'text', text: pla }] }] } });
+      return wa_({ type: 'template', template: { name: PLANTILLA, language: { code: PLANTILLA_IDIOMA }, components: [{ type: 'body', parameters: [{ type: 'text', text: pla }] }] } }, u.numero);
     } catch (err) { error = err.message; }
   }
   console.error('No s\'ha pogut enviar per WhatsApp: ' + error);
   try {
-    MailApp.sendEmail(Session.getEffectiveUser().getEmail(), NOM + ': ' + text.split('\n')[0].replace(/\*/g, '').slice(0, 80),
+    MailApp.sendEmail(u.correu || Session.getEffectiveUser().getEmail(), NOM + (u.nom ? ' (' + u.nom + ')' : '') + ': ' + text.split('\n')[0].replace(/\*/g, '').slice(0, 80),
       text.replace(/\*/g, '') + "\n\n(T'ho envio per correu perquè WhatsApp ha fallat: " + error + ')');
   } catch (err) { console.error(err); }
 }
 
-function wa_(missatge) {
+function wa_(missatge, numero) {
   const r = UrlFetchApp.fetch(GRAPH + prop_('WA_PHONE_ID') + '/messages', {
     method: 'post',
     contentType: 'application/json',
     headers: { Authorization: 'Bearer ' + prop_('WA_TOKEN') },
     muteHttpExceptions: true,
-    payload: JSON.stringify(Object.assign({ messaging_product: 'whatsapp', to: digits_(prop_('MY_NUMBER')) }, missatge))
+    payload: JSON.stringify(Object.assign({ messaging_product: 'whatsapp', to: digits_(numero) }, missatge))
   });
   if (r.getResponseCode() >= 300) {
     let detall = r.getContentText();
@@ -480,7 +504,9 @@ function media_(id) {
 /** Executa-ho un cop després d'omplir les propietats: crea els activadors i t'envia un missatge de prova. */
 function configura() {
   ['GEMINI_KEY', 'WA_TOKEN', 'WA_PHONE_ID', 'WA_VERIFY', 'MY_NUMBER'].forEach(function (k) { prop_(k); });
-  calendari_();
+  const full = fullUsuaris_();
+  console.log('Full de persones: ' + full.getUrl());
+  comprovaUsuaris();
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (['revisaRecordatoris', 'resumDelMati', 'resumDelVespre'].indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
   });
@@ -488,7 +514,7 @@ function configura() {
   if (HORA_RESUM_MATI != null) ScriptApp.newTrigger('resumDelMati').timeBased().atHour(HORA_RESUM_MATI).nearMinute(0).everyDays(1).inTimezone(TZ).create();
   if (HORA_RESUM_VESPRE != null) ScriptApp.newTrigger('resumDelVespre').timeBased().atHour(HORA_RESUM_VESPRE).nearMinute(0).everyDays(1).inTimezone(TZ).create();
   envia_("👋 Hola! Soc el teu secretari. Escriu-me o envia'm una nota de veu amb el que t'he d'apuntar, per exemple:\n" +
-    '• «Dentista dijous a les 10»\n• «Recorda\'m a les 6 que truqui a la gestoria»\n• «Què tinc demà?»\n• «Passa el dentista a divendres»');
+    '• «Dentista dijous a les 10»\n• «Recorda\'m a les 6 que truqui a la gestoria»\n• «Què tinc demà?»\n• «Passa el dentista a divendres»', propietari_());
   console.log('Fet. Si no t\'ha arribat el WhatsApp, mira el correu i el registre d\'execucions.');
 }
 
@@ -527,13 +553,117 @@ function trobaNumero() {
   const numeros = JSON.parse(r.getContentText()).data || [];
   if (!numeros.length) throw new Error('No trobo cap número: ' + r.getContentText().slice(0, 300));
   numeros.forEach(function (n) { console.log(n.display_phone_number + ' (' + (n.verified_name || '') + ') → identificador ' + n.id); });
-  PropertiesService.getScriptProperties().setProperty('WA_PHONE_ID', numeros[0].id);
-  console.log('Desat a WA_PHONE_ID: ' + numeros[0].id);
+  // Si hi ha un número real a més del de prova, fem servir el real.
+  const tria = numeros.filter(function (n) { return !/^\+?1 ?555/.test(n.display_phone_number || ''); })[0] || numeros[0];
+  PropertiesService.getScriptProperties().setProperty('WA_PHONE_ID', tria.id);
+  console.log('Desat a WA_PHONE_ID: ' + tria.id + ' (' + tria.display_phone_number + ')');
+}
+
+/** Per a un número de telèfon real (no el de prova): l'activa a l'API de WhatsApp. */
+function registraNumero() {
+  const props = PropertiesService.getScriptProperties();
+  const pin = prop_('WA_PIN', true) || String(Math.floor(100000 + Math.random() * 900000));
+  const r = UrlFetchApp.fetch(GRAPH + prop_('WA_PHONE_ID') + '/register', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + prop_('WA_TOKEN') },
+    muteHttpExceptions: true,
+    payload: JSON.stringify({ messaging_product: 'whatsapp', pin: pin })
+  });
+  console.log(r.getResponseCode() + ' ' + r.getContentText());
+  if (r.getResponseCode() < 300) {
+    props.setProperty('WA_PIN', pin);
+    console.log('Número activat. PIN de verificació en dos passos (desat a WA_PIN): ' + pin);
+  }
 }
 
 /** Prova el cervell sense WhatsApp: mira la resposta al registre. */
 function provaSecretari() {
-  console.log(aten_([{ text: 'Què tinc aquesta setmana?' }]));
+  console.log(aten_([{ text: 'Què tinc aquesta setmana?' }], propietari_()));
+}
+
+// ── Persones ────────────────────────────────────────────────────────────────
+
+/** Obre (o crea el primer cop) el full on es donen d'alta les persones que poden fer servir el secretari. */
+function fullUsuaris_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = prop_('USERS_SHEET_ID', true);
+  if (id) return SpreadsheetApp.openById(id);
+  const full = SpreadsheetApp.create(FULL_USUARIS);
+  const pestanya = full.getSheets()[0];
+  pestanya.setName('Persones');
+  pestanya.getRange(1, 1, 1, 5).setValues([['Nom', 'Mòbil', 'Calendari', 'Correu', 'Actiu']]).setFontWeight('bold');
+  pestanya.getRange(2, 1, 1, 5).setValues([['Jo', '+' + digits_(prop_('MY_NUMBER')), prop_('CALENDAR_ID', true) || Session.getEffectiveUser().getEmail(), Session.getEffectiveUser().getEmail(), 'Sí']]);
+  pestanya.getRange('B1').setNote('Amb el prefix del país: +34 600 11 12 22');
+  pestanya.getRange('C1').setNote("El correu de Google de la persona (ha de compartir-te el seu calendari amb permís per «Fer canvis als esdeveniments»). Si ho deixes buit, se li crea un calendari nou al teu compte.");
+  pestanya.getRange('D1').setNote('(Opcional) On li arriben els avisos si WhatsApp falla.');
+  pestanya.getRange('E1').setNote('«No» per donar-la de baixa sense esborrar la fila.');
+  pestanya.setFrozenRows(1);
+  pestanya.autoResizeColumns(1, 5);
+  props.setProperty('USERS_SHEET_ID', full.getId());
+  return full;
+}
+
+/** Les persones donades d'alta. Sense full, només tu (MY_NUMBER). */
+function usuaris_() {
+  const cache = CacheService.getScriptCache();
+  const desat = cache.get('usuaris');
+  if (desat) return JSON.parse(desat);
+  let llista = [];
+  if (prop_('USERS_SHEET_ID', true)) {
+    const files = fullUsuaris_().getSheets()[0].getDataRange().getValues();
+    for (let i = 1; i < files.length; i++) {
+      const f = files[i];
+      const numero = numeroMobil_(f[1]);
+      if (!numero || /^no$/i.test(String(f[4]).trim())) continue;
+      llista.push({ nom: String(f[0]).trim(), numero: numero, calId: String(f[2]).trim(), correu: String(f[3]).trim(), fila: i + 1 });
+    }
+  }
+  if (!llista.length) llista = [{ nom: '', numero: digits_(prop_('MY_NUMBER')), calId: prop_('CALENDAR_ID', true) || '', correu: '' }];
+  cache.put('usuaris', JSON.stringify(llista), 300);
+  return llista;
+}
+
+function usuari_(numero) {
+  return usuaris_().filter(function (u) { return u.numero === digits_(numero); })[0] || null;
+}
+
+/** Tu: la persona de MY_NUMBER (per al missatge de benvinguda i les proves). */
+function propietari_() {
+  return usuari_(prop_('MY_NUMBER')) || { nom: '', numero: digits_(prop_('MY_NUMBER')), calId: prop_('CALENDAR_ID', true) || '', correu: '' };
+}
+
+/** Comprova que el secretari pot obrir el calendari de cada persona del full. Mira el registre. */
+function comprovaUsuaris() {
+  CacheService.getScriptCache().remove('usuaris');
+  usuaris_().forEach(function (u) {
+    try {
+      console.log('✅ ' + (u.nom || u.numero) + ' (+' + u.numero + '): calendari «' + calendari_(u).getName() + '»');
+    } catch (err) {
+      console.error('❌ ' + (u.nom || u.numero) + ' (+' + u.numero + '): ' + err.message);
+    }
+  });
+}
+
+/** Mòbil sense «+» ni espais. Si no porta prefix (9 xifres), hi posa el d'Espanya. */
+function numeroMobil_(v) {
+  let n = digits_(v);
+  if (n.indexOf('00') === 0) n = n.slice(2);
+  if (n.length === 9) n = '34' + n;
+  return n.length >= 10 ? n : '';
+}
+
+/** Dades de cada persona (historial, darrer missatge, avisos enviats). */
+function estat_(u, clau) {
+  const props = PropertiesService.getScriptProperties();
+  const v = props.getProperty(clau + '_' + u.numero);
+  // Abans només hi havia una persona i les dades no portaven número.
+  if (v == null && u.numero === digits_(prop_('MY_NUMBER', true))) return props.getProperty(clau);
+  return v;
+}
+
+function desaEstat_(u, clau, valor) {
+  PropertiesService.getScriptProperties().setProperty(clau + '_' + u.numero, valor);
 }
 
 // ── Utilitats ───────────────────────────────────────────────────────────────
@@ -544,10 +674,19 @@ function prop_(clau, opcional) {
   return v;
 }
 
-function calendari_() {
-  const id = prop_('CALENDAR_ID', true);
-  const cal = id ? CalendarApp.getCalendarById(id) : CalendarApp.getDefaultCalendar();
-  if (!cal) throw new Error('No trobo el calendari ' + id);
+function calendari_(u) {
+  u = u || propietari_();
+  if (!u.calId) {
+    if (u.numero === digits_(prop_('MY_NUMBER'))) return CalendarApp.getDefaultCalendar();
+    // Persona sense calendari al full: li'n creem un i l'apuntem al full.
+    const nou = CalendarApp.createCalendar(NOM + ' · ' + (u.nom || '+' + u.numero), { timeZone: TZ });
+    u.calId = nou.getId();
+    if (u.fila) fullUsuaris_().getSheets()[0].getRange(u.fila, 3).setValue(u.calId);
+    CacheService.getScriptCache().remove('usuaris');
+    return nou;
+  }
+  const cal = CalendarApp.getCalendarById(u.calId);
+  if (!cal) throw new Error("no puc obrir el calendari «" + u.calId + "». Cal que te'l comparteixi amb permís per «Fer canvis als esdeveniments».");
   return cal;
 }
 

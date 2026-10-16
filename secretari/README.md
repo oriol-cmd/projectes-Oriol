@@ -91,6 +91,7 @@ A l'script: ⚙️ **Configuració del projecte > Propietats de l'script > Afege
 | `MY_NUMBER` | El teu mòbil amb el prefix, sense `+` ni espais: `34600111222` |
 | `WEBHOOK_KEY` | *(Recomanat)* Una altra frase inventada, p. ex. `x7k9-pinya-2026` |
 | `CALENDAR_ID` | *(Opcional)* Si no vols fer servir el calendari principal: Calendar > ⚙️ > el calendari > *ID del calendari* |
+| `WA_ACCOUNT_ID` | *(Si cal)* L'identificador del compte de WhatsApp Business (el número després de `waba_id=` a l'adreça de https://business.facebook.com/wa/manage/home/) |
 
 El secretari **només fa cas dels missatges del teu número**.
 
@@ -121,6 +122,36 @@ Mentre no estigui aprovada, els avisos fora de les 24 h t'arriben per correu.
 
 1. A l'script, tria la funció **`configura`** a dalt i prem **Executa**. Crea els avisos automàtics (cada 5 minuts, el resum del matí i el del vespre) i t'envia un missatge de benvinguda.
 2. Llest! 🎉
+
+## Fer-lo servir amb l'equip
+
+Un sol secretari (un número de WhatsApp i un script) pot servir per a tota l'empresa. Reconeix qui li escriu pel número de mòbil i apunta les coses al calendari d'aquella persona. Cadascú té la seva agenda, els seus avisos i el seu resum del matí.
+
+1. **Actualitza el codi** (enganxa el `Secretari.gs` nou, desa i fes *Implementa > Gestiona les implementacions > ✏️ > Versió nova*) i torna a executar **`configura`**. Et demanarà permís per a Google Sheets i crearà el full **«Secretari – Usuaris»** al teu Drive (l'adreça surt al registre d'execució).
+2. **Al full, una fila per persona:**
+
+   | Nom | Mòbil | Calendari | Correu | Actiu |
+   |---|---|---|---|---|
+   | Jo | +34 639 69 40 12 | el teu correu | el teu correu | Sí |
+   | Joan | +34 600 11 12 22 | joan@esportec.cat | joan@esportec.cat | Sí |
+   | Marta | +34 611 22 33 44 | *(buit)* | | Sí |
+
+   - **Calendari amb el correu de la persona:** el secretari apunta les coses al seu Google Calendar. Abans, la persona ha de compartir-te el calendari: *Google Calendar > ⚙️ > el seu calendari > Comparteix amb persones concretes > el teu correu > «Fer canvis als esdeveniments»*.
+   - **Calendari buit:** el secretari crea un calendari nou al teu compte («Secretari · Marta»). Va bé per a qui no fa servir Google Calendar.
+   - **Actiu = No** per donar algú de baixa sense esborrar-lo.
+   - Els canvis al full tarden fins a 5 minuts a aplicar-se. Per veure-ho de seguida, executa **`comprovaUsuaris`**: diu, per a cada persona, si pot obrir el seu calendari.
+3. **Cada persona ha d'escriure primer al secretari** (per exemple, «Hola»). Llavors es presenta i ja el pot fer servir.
+
+### El número de WhatsApp per a l'equip
+
+- **Número de prova de Meta:** només pot escriure a **5 números** com a màxim, i cadascun s'ha d'afegir a *Conectar en WhatsApp > Paso 1. Pruébalo > Destinatario > Administrar la lista* (a la persona li arriba un codi per WhatsApp que t'ha de dir). Serveix per provar-ho amb 3 o 4 persones.
+- **Per a més persones, un número propi:** una SIM o un fix que **no** tingui WhatsApp. A *WhatsApp Manager > Números de teléfono > Añadir* hi poses el nom que veuran (p. ex. «Secretari Esportec»), el verifiques per SMS o trucada i hi afegeixes una forma de pagament. Després, a l'script, executa **`trobaNumero`** (agafa el número nou) i **`registraNumero`** (l'activa). Meta pot demanar que verifiquis l'empresa per treure els límits.
+
+### Bo de saber
+
+- **Privadesa:** l'script és teu i funciona amb el teu compte, així que tècnicament tens accés als calendaris i als missatges de tothom. Explica-ho a l'equip abans de començar.
+- **Gemini:** cada missatge gasta una petició. Amb unes quantes persones, la quota gratuïta es pot acabar. A més, al nivell gratuït Google pot fer servir el contingut. Per a dades de la feina, **activa la facturació** al projecte d'AI Studio: amb aquest ús són pocs euros al mes.
+- **Cost de WhatsApp:** els avisos fora de la finestra de 24 h costen uns 2 cèntims cadascun i per persona.
 
 ## Ajustos
 
