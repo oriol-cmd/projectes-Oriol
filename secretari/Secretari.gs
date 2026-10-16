@@ -195,7 +195,20 @@ function aten_(parts, u) {
     historial.length ? historial.map(function (h) { return 'Usuari: ' + h.u + '\nTu: ' + h.r; }).join('\n') : '(cap)'
   ].join('\n');
 
-  const res = gemini_(sistema, [{ role: 'user', parts: parts }]);
+  const diuQueHoHaFet = function (r) {
+    return !(r.accions || []).length && /apunt|anotat|afegit|creat|agendat|canviat|mogut|passat|esborrat|anul·lat|✅/i.test(r.resposta || '');
+  };
+  let res = gemini_(sistema, [{ role: 'user', parts: parts }]);
+  // De vegades Gemini diu «Apuntat» però no posa cap acció: l'hi tornem a demanar.
+  if (diuQueHoHaFet(res)) {
+    console.warn('Resposta sense accions, ho torno a demanar: ' + res.resposta);
+    res = gemini_(sistema, [
+      { role: 'user', parts: parts },
+      { role: 'model', parts: [{ text: JSON.stringify(res) }] },
+      { role: 'user', parts: [{ text: "(Avís del sistema: has respost que ho has fet, però «accions» és buit i, per tant, no s'ha apuntat res al calendari. Torna a respondre posant a «accions» tot el que cal fer. Si de debò no cal fer res, no diguis que ho has fet.)" }] }
+    ]);
+  }
+  console.log((u.nom || u.numero) + ' → ' + (res.peticio || '') + ' | accions: ' + JSON.stringify(res.accions || []));
   const errors = [];
   (res.accions || []).forEach(function (a) {
     try {
@@ -204,6 +217,7 @@ function aten_(parts, u) {
       errors.push('⚠️ No he pogut fer «' + (a.titol || a.ref || a.tipus) + '»: ' + (err && err.message ? err.message : err));
     }
   });
+  if (diuQueHoHaFet(res)) errors.push("⚠️ Compte: no he pogut apuntar res al calendari. Torna-m'ho a dir, si us plau.");
   const resposta = [res.resposta || 'Fet.'].concat(errors).join('\n\n');
 
   historial.push({ u: String(res.peticio || '').slice(0, 300), r: resposta.slice(0, 500) });
