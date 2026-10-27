@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -497,6 +497,8 @@ async function enhanceAudio(blob) {
 const enhancedRef = new Map(); // àudio de presentacions -> versió millorada
 
 const LANG_NAMES = { ca: 'català', es: 'castellà', en: 'anglès' };
+// Evita que Gemini «ompli» la transcripció amb text de les instruccions quan l'àudio no s'entén.
+const NO_LEAK = "Transcriu NOMÉS el que se sent a l'àudio. No facis servir mai noms de persones, frases ni temes que no se sentin a l'àudio (les instruccions i el context només serveixen per escriure bé el que sí que se sent). Si només hi ha soroll, música o veus que no s'entenen, no t'inventis cap conversa: respon [silenci] o [dubte de comprensió].";
 let forceWav = false;
 
 // ref: { blob, text } = àudio de les presentacions (mostra de veus) · isRef: és el tram de presentacions
@@ -508,11 +510,11 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     "Escriu només la transcripció, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts, si el pots saber pel context o pel tram anterior; si no, posa «Persona no identificada:».",
   ] : isRef ? [
     "Aquest és l'INICI de la reunió: normalment els participants es presenten dient el seu nom.",
-    "Escriu només la transcripció, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»), fent servir el nom amb què cadascú s'ha presentat. Si algú no ha dit el nom, posa «Persona no identificada:».",
+    "Escriu només la transcripció, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts («Nom: …»), fent servir el nom amb què cadascú s'ha presentat. Si algú no ha dit el nom, posa «Persona no identificada:».",
   ] : [
     "Et dono DOS àudios. El PRIMER és l'inici de la reunió, on els participants es presenten" + (ref && ref.text ? ` (transcripció de les presentacions: «${ref.text.slice(0, 700)}»)` : '') + ". Fes-lo servir NOMÉS com a mostra per reconèixer la veu de cada persona: NO el transcriguis.",
     "El SEGON àudio és el tram que has de transcriure.",
-    "Escriu només la transcripció del segon àudio, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Identifica qui parla comparant la veu amb la mostra i ajudant-te del context (si algú diu «Montse, tu faràs…», qui respon probablement és la Montse).",
+    "Escriu només la transcripció del segon àudio, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts («Nom: …»). Identifica qui parla comparant la veu amb la mostra i ajudant-te del context (si algú s'adreça a una persona pel nom, qui respon probablement és aquella persona).",
     "Fes servir només noms de persones que s'hagin presentat. Si no pots saber amb seguretat qui parla, posa «Persona no identificada:».",
   ];
   const prompt = [
@@ -525,7 +527,8 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
     ...speakerRules,
     "Si no hi ha veu, respon només: [silenci]",
-    "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió] en aquell punt. Exemple: «quedem dijous [dubte de comprensió] a les deu».",
+    "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió] en aquell punt.",
+    NO_LEAK,
     context ? `Context de la reunió (per escriure bé noms i termes): ${context}` : '',
     settings.vocab ? `Noms i paraules que surten sovint (escriu-los exactament així quan els sentis): ${settings.vocab}` : '',
     prevText ? `Final del tram anterior (només per continuïtat i per saber de què es parla; no el repeteixis): «${prevText.slice(-800)}»` : '',
@@ -2957,7 +2960,7 @@ async function transcribeImportFile(m, blob, f, label) {
     settings.lang === 'auto'
       ? "Pot ser en català, en castellà o barrejat: escriu cada intervenció en l'idioma en què es parla, sense traduir."
       : `L'idioma principal és el ${LANG_NAMES[settings.lang]}; no tradueixis les intervencions en altres idiomes.`,
-    "Si parlen diverses persones, comença cada intervenció en una línia nova amb el nom de qui parla i dos punts (p. ex. «Oriol: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
+    "Si parlen diverses persones, comença cada intervenció en una línia nova amb el nom de qui parla i dos punts («Nom: …»). Fes servir els noms si es presenten o es diuen durant la conversa; si no, fes servir «Persona 1», «Persona 2»… de manera coherent tota l'estona.",
     m.textOnly ? '' : "Cada 5 minuts aproximadament, afegeix una línia amb el temps de la gravació entre claudàtors, p. ex. [05:00], [10:00].",
     "Escriu només la transcripció, sense títols, comentaris ni resums. Si no hi ha veu, respon només: [silenci]",
     m.textOnly ? "Fes una transcripció NETA, perquè es pugui llegir i fer servir com a text: treu les crosses (eh, mmm, o sigui…), les repeticions i les frases que es tallen i es tornen a començar; posa bé la puntuació i separa-ho en paràgrafs. NO resumeixis, NO escurcis el contingut i NO canviïs el sentit ni l'ordre del que es diu: s'ha de conservar tot el que es demana o s'explica, amb tots els detalls. No posis marques de temps." : '',
@@ -2965,6 +2968,7 @@ async function transcribeImportFile(m, blob, f, label) {
     "Fes servir el context de la conversa per entendre paraules mal pronunciades o tallades, però només si n'estàs raonablement segur. Escriu bé els noms propis, xifres, dates i imports.",
     "Si només parla una persona (p. ex. una nota de veu), no cal posar-hi nom a cada línia: separa'l en paràgrafs per idees.",
     "MOLT IMPORTANT: no t'inventis mai res. Quan una paraula o frase no s'entengui bé, escriu el que probablement s'ha dit seguit de [dubte de comprensió]. Si un fragment no s'entén gens, escriu només [dubte de comprensió].",
+    NO_LEAK,
     m.context ? `Context (per escriure bé noms i termes): ${m.context}` : '',
     settings.vocab ? `Noms i paraules que surten sovint (escriu-los exactament així): ${settings.vocab}` : '',
   ].filter(Boolean).join('\n');
