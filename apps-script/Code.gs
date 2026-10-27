@@ -26,6 +26,8 @@ const MAX_CELL = 49000; // Límit de caràcters d'una cel·la de Google Sheets
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+    // Seguretat: si no s'ha canviat la clau d'exemple, l'script no envia res.
+    if (SECRET === 'CANVIA-AQUESTA-CLAU') return json_({ ok: false, error: "Cal canviar la clau secreta (SECRET) de l'script abans de fer-lo servir" });
     if (!data.secret || data.secret !== SECRET) return json_({ ok: false, error: 'unauthorized' });
 
     // Enviament a altres persones (botó «Envia a altres persones»).
@@ -74,10 +76,18 @@ function saveToSheet_(d) {
   try {
     const meetings = getSheet_(ss, SHEET_MEETINGS, ['Data', 'Títol', 'Durada (min)', 'Resum', 'Transcripció', 'ID']);
     const ids = meetings.getLastRow() > 1 ? meetings.getRange(2, 6, meetings.getLastRow() - 1, 1).getValues().map(String) : [];
-    if (ids.indexOf(String(d.id)) >= 0) return; // ja desada (reenviament)
-
     const date = d.date ? new Date(d.date) : new Date();
     const transcript = String(d.transcript || '');
+    const pos = ids.indexOf(String(d.id));
+    if (pos >= 0) {
+      // Ja desada: actualitza el resum (p. ex. després de «Refés el resum» o de continuar la reunió).
+      meetings.getRange(pos + 2, 2, 1, 4).setValues([[
+        d.title || '', d.durationMin || 0, String(d.summary || '').slice(0, MAX_CELL),
+        transcript.length > MAX_CELL ? transcript.slice(0, MAX_CELL) + '\n[…continua al correu]' : transcript,
+      ]]);
+      return;
+    }
+
     meetings.appendRow([
       date,
       d.title || '',
