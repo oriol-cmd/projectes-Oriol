@@ -1,1 +1,1 @@
-{ "v": 60, "notes": "Nou: corregeix els dubtes de comprensió de l'acta. També avisa si s'ha perdut àudio (mòbil bloquejat) i permet tornar a transcriure els trossos buits." }
+{ "v": 61, "notes": "Importació de reunions llargues (1–3 h) molt més fiable: es talla en trossos i es transcriu sencera. A l'iPhone, nova drecera per gravar amb Notes de veu sense talls." }

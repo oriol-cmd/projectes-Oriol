@@ -541,3 +541,7 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .fix-quote mark { background: var(--warn-bg); color: var(--warn-text); padding: 0 4px; border-radius: 4px; font-weight: 700; }
 .fix-manual-text { font: 14px/1.5 ui-monospace, Menlo, monospace; min-height: 50dvh; }
 #fix-sheet .btn { margin-top: 8px; }
+
+.voicememo-tip { font-size: 13.5px; color: var(--muted); margin: 10px 4px 0; }
+.voicememo-tip .link { color: var(--accent); }
+#voicememo-sheet .btn { margin-top: 8px; }

@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 60;
+const APP_VERSION = 61;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -3176,8 +3176,20 @@ async function transcribeImportFile(m, blob, f, label) {
   ].filter(Boolean).join('\n');
   const clean = (t) => (/^\s*(\[silenci\]\.?\s*)+$/i.test(t) ? '' : t.trim());
 
-  // Àudios curts: millora el so (veus fluixes, soroll) i envia'ls en WAV.
+  // Gravacions llargues: es tallen en trossos de ~5 minuts (com quan es grava en directe),
+  // per pausa de la conversa, i es transcriuen un a un amb el final del tros anterior com a context.
   const dur = f.durationMs || 0;
+  if (dur > 12 * 60000 || (!dur && blob.size > 15e6)) {
+    try {
+      const text = await transcribeLongImport(m, blob, f, label, prompt, clean, progress);
+      if (text != null) return text;
+    } catch (e) {
+      if (e instanceof FatalError || /Gemini|Google|connexió|quota/i.test(e.message || '')) throw e;
+      // no s'ha pogut descodificar al dispositiu (format o memòria): es fa d'una sola peça
+    }
+  }
+
+  // Àudios curts: millora el so (veus fluixes, soroll) i envia'ls en WAV.
   if (settings.boost !== false && (dur > 0 ? dur <= 15 * 60000 && blob.size <= 60e6 : blob.size <= 5e6)) {
     let wav = null;
     try { progress('Millorant el so…'); wav = await enhanceAudio(blob); }
@@ -3221,6 +3233,96 @@ async function transcribeImportFile(m, blob, f, label) {
   }
   throw new FatalError(`Google no accepta el format de «${f.name || 'fitxer'}». Prova d'exportar-lo en MP3 o M4A. (${lastErr ? lastErr.message : ''})`);
 }
+// Descodifica a mono 16 kHz (la resolució amb què escolta Gemini) i talla en trossos.
+const LONG_CHUNK_MS = 5 * 60000;
+async function decodeForChunks(blob) {
+  const off = new OfflineAudioContext(1, 1, 16000);
+  const buf = await off.decodeAudioData(await blob.arrayBuffer());
+  return buf; // AudioBuffer a 16 kHz (1 o 2 canals)
+}
+// Busca el punt més silenciós entre ±20 s del tall previst, perquè no es parteixin paraules.
+function quietCut(buf, target) {
+  const rate = buf.sampleRate, ch = buf.getChannelData(0);
+  const win = Math.round(rate * 0.25), from = Math.max(0, target - 20 * rate), to = Math.min(ch.length - win, target + 20 * rate);
+  let best = target, bestE = Infinity;
+  for (let i = from; i < to; i += win) {
+    let e = 0;
+    for (let k = i; k < i + win; k += 4) e += ch[k] * ch[k];
+    if (e < bestE) { bestE = e; best = i + (win >> 1); }
+  }
+  return best;
+}
+function chunkPcm(buf, a, b) {
+  const out = new Float32Array(b - a);
+  const n = buf.numberOfChannels;
+  for (let c = 0; c < n; c++) { const d = buf.getChannelData(c); for (let i = a; i < b; i++) out[i - a] += d[i] / n; }
+  return out;
+}
+// Mateixa millora de so que enhanceAudio, però sobre mostres ja descodificades.
+async function enhancePcm(pcm, rate) {
+  const off = new OfflineAudioContext(1, pcm.length, rate);
+  const ab = off.createBuffer(1, pcm.length, rate);
+  ab.getChannelData(0).set(pcm);
+  const src = off.createBufferSource(); src.buffer = ab;
+  const hp = off.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+  const comp = off.createDynamicsCompressor();
+  comp.threshold.value = -42; comp.knee.value = 18; comp.ratio.value = 6; comp.attack.value = 0.005; comp.release.value = 0.35;
+  src.connect(hp).connect(comp).connect(off.destination); src.start();
+  const outp = (await off.startRendering()).getChannelData(0);
+  let sum = 0, n = 0;
+  for (let i = 0; i < outp.length; i += 2) { const v = Math.abs(outp[i]); if (v > 0.003) { sum += v * v; n++; } }
+  if (n < outp.length / 2 * 0.005) return outp;
+  const gain = Math.min(12, 0.1 / Math.sqrt(sum / n));
+  for (let i = 0; i < outp.length; i++) outp[i] = Math.tanh(outp[i] * gain);
+  return outp;
+}
+async function transcribeLongImport(m, blob, f, label, basePrompt, clean, progress) {
+  progress('Preparant la gravació llarga…');
+  // Si l'intent anterior es va tallar mentre es descodificava (p. ex. memòria plena a l'iPhone
+  // i l'app es va reiniciar), no ho tornis a provar: es transcriurà d'una sola peça.
+  m.importDecoding = m.importDecoding || {};
+  if (m.importDecoding[f.key]) return null;
+  m.importDecoding[f.key] = true;
+  await saveMeeting(m);
+  let buf;
+  try { buf = await decodeForChunks(blob); } catch { return null; }
+  delete m.importDecoding[f.key];
+  await saveMeeting(m);
+  const rate = buf.sampleRate, total = buf.length;
+  const cuts = [0];
+  while (total - cuts[cuts.length - 1] > rate * LONG_CHUNK_MS / 1000 * 1.3) cuts.push(quietCut(buf, cuts[cuts.length - 1] + Math.round(rate * LONG_CHUNK_MS / 1000)));
+  cuts.push(total);
+  const n = cuts.length - 1;
+  // Es desa la feina feta: si es talla (connexió, quota), es reprèn pel tros on era.
+  m.importParts = m.importParts || {};
+  const saved = m.importParts[f.key] && m.importParts[f.key].n === n ? m.importParts[f.key] : { n, parts: [] };
+  m.importParts[f.key] = saved;
+  const prompt = basePrompt.replace(/\n?Cada 5 minuts aproximadament[^\n]*/, '');
+  for (let i = 0; i < n; i++) {
+    if (typeof saved.parts[i] === 'string') continue;
+    progress(`Transcrivint el tros ${i + 1} de ${n}…`);
+    let pcm = chunkPcm(buf, cuts[i], cuts[i + 1]);
+    if (settings.boost !== false) { try { pcm = await enhancePcm(pcm, rate); } catch { /* sense millora */ } }
+    const wav = pcmToWav(pcm, rate);
+    pcm = null;
+    const prev = i > 0 ? saved.parts.slice(0, i).filter(Boolean).join(' ').slice(-800) : '';
+    const from = fmtClock(Math.round(cuts[i] / rate * 1000)), to = fmtClock(Math.round(cuts[i + 1] / rate * 1000));
+    const ask = [
+      prompt,
+      `Aquest és el tros ${i + 1} de ${n} de la gravació (de ${from} a ${to}). Transcriu-lo sencer, des del principi fins al final.`,
+      prev ? `Final del tros anterior (només per continuïtat i per fer servir els mateixos noms de qui parla; no el repeteixis): «${prev}»` : '',
+    ].filter(Boolean).join('\n');
+    const part = wav.size <= 14e6
+      ? { inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } }
+      : { fileData: { mimeType: 'audio/wav', fileUri: await uploadToGemini(wav, 'audio/wav', `${f.name || 'reunio'}-${i + 1}`) } };
+    saved.parts[i] = clean(await gemini([part, { text: ask }], { task: 'transcribe', thinking: 0, maxTokens: 16384 }));
+    await saveMeeting(m);
+  }
+  const text = saved.parts.map((t, i) => (m.textOnly || !t || i === 0 ? t : `[${fmtClock(Math.round(cuts[i] / rate * 1000))}]\n${t}`)).filter(Boolean).join('\n\n');
+  delete m.importParts[f.key];
+  return text;
+}
+
 async function importFiles(list, { textOnly = false } = {}) {
   const miss = missingSetup();
   if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); return; }
@@ -3273,6 +3375,9 @@ async function importFiles(list, { textOnly = false } = {}) {
   runPipeline(m.id);
 }
 $('#btn-import').onclick = () => $('#import-input').click();
+$('#btn-voicememo').onclick = () => openSheet('#voicememo-sheet');
+$('#btn-voicememo-import').onclick = () => { closeSheets(); $('#import-input').click(); };
+if ($('#voicememo-tip')) $('#voicememo-tip').hidden = !IS_IOS;
 let pendingImport = [];
 $('#import-input').onchange = (e) => {
   pendingImport = [...e.target.files];

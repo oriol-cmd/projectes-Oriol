@@ -181,6 +181,8 @@
           <span class="qa-t"><b>Importa un àudio o vídeo</b><small>Notes de veu, àudios de WhatsApp, gravacions de Zoom o Teams…</small></span>
         </button>
 
+        <p id="voicememo-tip" class="voicememo-tip" hidden>Reunió llarga o necessites fer servir el mòbil mentre graves? <button id="btn-voicememo" class="link" type="button">Grava-la amb Notes de veu</button></p>
+
         <ul class="tips" id="home-tips">
           <li>Comenceu presentant-vos («Soc l'Oriol…») i toqueu <b>«Presentacions fetes»</b>: així sabrà qui diu què.</li>
           <li>Deixa el mòbil damunt la taula amb l'app oberta; la pantalla es mantindrà encesa.</li>
@@ -567,6 +569,26 @@
         <button id="btn-fix-back" class="btn ghost full" type="button">← Torna a les correccions guiades</button>
       </div>
       <p id="fix-msg" class="fineprint"></p>
+    </div>
+  </div>
+
+  <!-- Gravar amb Notes de veu (iPhone) -->
+  <div id="voicememo-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Gravar amb Notes de veu">
+      <div class="sheet-grip"></div>
+      <h3>Gravar sense talls amb Notes de veu</h3>
+      <div class="card group">
+        <p class="fineprint left first">A l'iPhone, una web no pot fer servir el micròfon si canvies d'app o bloqueges la pantalla. L'app <b>Notes de veu</b> d'Apple sí: grava encara que facis altres coses amb el mòbil.</p>
+        <ol class="kw-list">
+          <li>Obre <b>Notes de veu</b> i toca el botó vermell per gravar la reunió. Ja pots fer servir el mòbil.</li>
+          <li>En acabar, atura-la, toca la gravació › <b>⋯</b> › <b>Desa a Fitxers</b>.</li>
+          <li>Torna a Xiu-xiu i toca <b>Importa un àudio o vídeo</b>. Tria la gravació i <b>Fes-ne el resum</b>.</li>
+        </ol>
+        <p class="fineprint left">Les gravacions llargues (1–3 h) es tallen en trossos de 5 minuts per pausa de la conversa i es transcriuen sencers, amb el temps de cada part. Si tries abans «Reunió important», en farà l'acta professional.</p>
+      </div>
+      <button id="btn-voicememo-import" class="btn primary full" type="button">Ja la tinc: importa-la</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Tanca</button>
     </div>
   </div>
 

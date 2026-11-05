@@ -120,6 +120,10 @@ De sèrie, Xiu-xiu fa una **acta detallada**: no és la transcripció literal, s
 
 Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb **«Corregeix-los»** (també a **⋯ > «Corregeix l'acta»**). Hi veuràs cada frase amb el dubte i hi podràs escriure què s'hi deia; també pots afegir altres correccions («el client és X, no Y»). Xiu-xiu aplica **només** aquestes correccions i deixa la resta igual, i recorda els noms corregits per a les properes reunions. Si ho prefereixes, també pots **editar el text de l'acta a mà**.
 
+## Gravar sense talls (iPhone) i reunions llargues
+
+A l'iPhone, una web no pot fer servir el micròfon si canvies d'app o bloqueges la pantalla. Si necessites fer servir el mòbil durant la reunió, grava-la amb **Notes de veu** (Apple) i després importa-la a Xiu-xiu: a la pantalla d'inici hi ha la drecera **«Grava-la amb Notes de veu»** amb els passos. Les gravacions llargues (1–3 h) es tallen en trossos de 5 minuts per les pauses de la conversa i es transcriuen sencers, amb el temps de cada part; si es talla a mitges, es reprèn pel tros on era.
+
 ## Si es perd àudio
 
 A l'iPhone, si la pantalla es bloqueja o canvies d'app, el micròfon s'atura. Xiu-xiu t'avisa en tornar, marca la interrupció a la transcripció i, al resultat, et diu quanta estona no s'ha gravat. Si algun tros d'àudio torna sense text, el guarda i pots tocar **«Torna'ls a transcriure»** (amb el model més precís).
