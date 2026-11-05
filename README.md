@@ -116,6 +116,14 @@ Fa servir el model més bo que permeti la teva clau (Gemini Pro si tens facturac
 
 De sèrie, Xiu-xiu fa una **acta detallada**: no és la transcripció literal, sinó tot el que s'ha parlat ben ordenat per temes (què ha dit cadascú, arguments, dades, dubtes i conclusions), més les decisions i les tasques. Si d'una reunió en vols només el més important, toca **⋯ > «Fes-ne una versió més resumida»** (i al revés). Per canviar-ho per a totes les reunions: Ajustos > Resums > «Com vols el resum».
 
+## Corregir l'acta
+
+Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb **«Corregeix-los»** (també a **⋯ > «Corregeix l'acta»**). Hi veuràs cada frase amb el dubte i hi podràs escriure què s'hi deia; també pots afegir altres correccions («el client és X, no Y»). Xiu-xiu aplica **només** aquestes correccions i deixa la resta igual, i recorda els noms corregits per a les properes reunions. Si ho prefereixes, també pots **editar el text de l'acta a mà**.
+
+## Si es perd àudio
+
+A l'iPhone, si la pantalla es bloqueja o canvies d'app, el micròfon s'atura. Xiu-xiu t'avisa en tornar, marca la interrupció a la transcripció i, al resultat, et diu quanta estona no s'ha gravat. Si algun tros d'àudio torna sense text, el guarda i pots tocar **«Torna'ls a transcriure»** (amb el model més precís).
+
 ## Veus fluixes i noms difícils
 
 - **Amplifica les veus fluixes o llunyanes** (Ajustos > Transcripció, activat de sèrie): abans d'enviar cada tros a Gemini, l'app puja el volum de les parts fluixes, treu el brunzit greu i dona claredat a la veu.

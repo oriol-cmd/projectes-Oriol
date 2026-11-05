@@ -1,1 +1,1 @@
-{ "v": 59, "notes": "Revisió completa: Gemini només transcriu el que se sent (no s'inventa res), més seguretat amb les dades i diverses correccions." }
+{ "v": 60, "notes": "Nou: corregeix els dubtes de comprensió de l'acta. També avisa si s'ha perdut àudio (mòbil bloquejat) i permet tornar a transcriure els trossos buits." }

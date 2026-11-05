@@ -237,6 +237,8 @@
     <!-- RESULTAT -->
     <section id="view-result" class="view" hidden>
       <div id="result-status" class="banner"></div>
+      <div id="rec-report" class="banner warn rec-report" hidden></div>
+      <div id="doubt-banner" class="banner doubt-banner" hidden></div>
       <div id="lang-switch" class="seg" role="group" aria-label="Idioma del resum" hidden>
         <button type="button" data-lang="ca">Català</button>
         <button type="button" data-lang="es">Castellano</button>
@@ -543,6 +545,31 @@
     </div>
   </div>
 
+  <!-- Corregir l'acta -->
+  <div id="fix-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Corregeix l'acta">
+      <div class="sheet-grip"></div>
+      <h3>Corregeix l'acta</h3>
+      <div id="fix-assist">
+        <p class="fineprint left first">Escriu què s'hi deia de debò (deixa en blanc el que no sàpigues). Xiu-xiu aplicarà <b>només</b> les teves correccions i deixarà la resta igual.</p>
+        <div id="fix-doubts" class="fix-doubts"></div>
+        <label class="field"><span>Altres correccions <em>(opcional)</em></span>
+          <textarea id="fix-free" rows="3" placeholder="p. ex. «El client és l'empresa X, no Y» o «La reunió següent és el dimarts, no el dijous»"></textarea></label>
+        <label class="check"><input id="fix-remember" type="checkbox" checked> Recorda els noms corregits per a les properes reunions</label>
+        <button id="btn-fix-apply" class="btn primary full" type="button">Aplica les correccions</button>
+        <button id="btn-fix-manual" class="btn ghost full" type="button">O edita el text de l'acta a mà</button>
+      </div>
+      <div id="fix-manual" hidden>
+        <p class="fineprint left first">Pots canviar qualsevol cosa. Els títols comencen per <b>#</b> i les llistes per <b>-</b>.</p>
+        <textarea id="fix-manual-text" rows="16" class="fix-manual-text"></textarea>
+        <button id="btn-fix-manual-save" class="btn primary full" type="button">Desa els canvis</button>
+        <button id="btn-fix-back" class="btn ghost full" type="button">← Torna a les correccions guiades</button>
+      </div>
+      <p id="fix-msg" class="fineprint"></p>
+    </div>
+  </div>
+
   <!-- Més opcions -->
   <div id="more-sheet" class="sheet" hidden>
     <div class="sheet-backdrop" data-close-sheet></div>
@@ -554,6 +581,7 @@
         <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📷 Afegeix una foto d'un document</button>
         <button id="btn-pro" class="sheet-row" type="button" data-closes>⭐ Refés-la com a acta professional (punt per punt)</button>
         <button id="btn-toggle-detail" class="sheet-row" type="button" data-closes>✂️ Fes-ne una versió més resumida</button>
+        <button id="btn-fix-open" class="sheet-row" type="button">✏️ Corregeix l'acta (dubtes, noms, errors)</button>
         <button id="btn-redo" class="sheet-row" type="button" data-closes>✨ Refés el resum</button>
         <button id="btn-resend" class="sheet-row" type="button" data-closes>🔁 Torna a enviar el correu automàtic</button>
         <button id="btn-delete" class="sheet-row danger-text" type="button" data-closes>🗑 Esborra aquesta reunió</button>

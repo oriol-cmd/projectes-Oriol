@@ -530,3 +530,14 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .tpl-color.custom::-webkit-color-swatch-wrapper { padding: 0; } .tpl-color.custom::-webkit-color-swatch { border: 0; border-radius: 50%; opacity: 0; }
 .tpl-gap { margin-top: 8px; }
 #tpl-sheet .group { margin-bottom: 12px; }
+
+.rec-report p { margin: 4px 0; }
+.rec-report .muted { opacity: .75; font-size: 13px; }
+
+.doubt-banner { background: var(--warn-bg); color: var(--warn-text); }
+.fix-doubts { display: grid; gap: 12px; margin: 10px 0 14px; }
+.fix-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.fix-quote { margin: 0 0 8px; font-size: 14px; color: var(--text); }
+.fix-quote mark { background: var(--warn-bg); color: var(--warn-text); padding: 0 4px; border-radius: 4px; font-weight: 700; }
+.fix-manual-text { font: 14px/1.5 ui-monospace, Menlo, monospace; min-height: 50dvh; }
+#fix-sheet .btn { margin-top: 8px; }
