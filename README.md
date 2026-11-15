@@ -128,6 +128,17 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v67
+
+- **Gravar amb un toc**: a Ajustos, «En obrir Xiu-xiu, preparat per gravar amb un sol toc» (surt un botó gran a tota la pantalla). A Android, mantén premuda la icona › «Grava ara». També funciona l'enllaç `…/projectes-Oriol/?rec=1`.
+- **Correu a cada assistent** (Comparteix): un correu per persona amb els acords i les seves tasques, per revisar i enviar.
+- **Anàlisi de la reunió** (⋯): quant ha parlat cadascú, temps per tema, temes oberts, preguntes sense resposta i acords sense responsable.
+- **Pregunta sobre aquesta reunió**: sota l'acta. Les respostes porten el moment ▶ [mm:ss] per escoltar-lo.
+- **Documents PDF**: a l'inici («Adjunta documents») o després (⋯). Gemini els llegeix per escriure bé noms, xifres i punts.
+- **Vídeos de YouTube**: «O fes-ne el resum d'un vídeo de YouTube» (públic o no llistat, fins a 4 hores).
+- **Resum de diverses reunions** (Historial): un recull amb l'evolució dels temes, decisions i tasques.
+- **Etiquetes automàtiques**: cada reunió en rep d'1 a 3; es poden filtrar a l'historial i canviar a ⋯ › Etiquetes.
+
 ## Calendari, plantilles, versions i editar (v66)
 
 - **📅 Omple-ho amb el calendari**: a l'inici, agafa el títol, els convidats, el lloc i la convocatòria de la reunió que tens ara al Google Calendar (cal l'script de Google actualitzat i tornar a executar `autoritza`).
@@ -237,11 +248,21 @@ Cada reunió té un **tipus** (equip, entrevista, comercial…) i, si vols, un *
 ```
 app/                 L'app web (HTML + JS, sense dependències)
   index.html
-  app.js             Gravació, transcripció i resum (Gemini) i enviament
+  js/                El codi, per temes (es carreguen en aquest ordre)
+    core.js          Configuració, utilitats, Markdown i base de dades (IndexedDB)
+    ai.js            Gemini: transcripció, resum, acta professional i documents
+    pipeline.js      Cua de feina, correu automàtic, importar (àudio, vídeo, YouTube), etiquetes, privadesa
+    recording.js     Gravació (micròfon i videotrucada) i «gravar amb un toc»
+    home.js          Navegació, inici, historial, tasques, calendari, recull i preguntes
+    result.js        Pantalla de l'acta: versions, transcripció, mapa, noms, correccions, preguntes, anàlisi
+    share.js         PDF, Word, Markdown, enviar a altres persones i correus de seguiment
+    settings.js      Ajustos, plantilles, còpia de seguretat, actualitzacions i compte de Google
+    main.js          Esdeveniments generals i arrencada
   style.css
   sw.js              Funcionament sense connexió
   manifest.webmanifest
   icons/
+tests/               Proves automàtiques (node tests/e2e.mjs) i de gravació a l'iPhone
 apps-script/Code.gs  Script del full de Google: correu + registre de reunions i tasques
 ```
 
