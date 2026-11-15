@@ -319,6 +319,13 @@
       <div id="account-section" hidden>
         <h3>Compte i sincronització</h3>
         <div class="card group">
+          <div id="gcid-setup" hidden>
+            <p class="fineprint left first">Per tenir les reunions al mòbil i a l'ordinador alhora, cal crear un accés a Google (només un cop, uns 10 minuts). <a href="https://github.com/oriol-cmd/projectes-Oriol/blob/main/docs/guia-vincular-google.md" target="_blank" rel="noopener">Guia pas a pas ↗</a></p>
+            <label class="field"><span>Identificador de client de Google <em>(Client ID)</em></span>
+              <input id="set-gcid" type="text" placeholder="…apps.googleusercontent.com" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+            <button id="btn-gcid-save" class="btn secondary small" type="button">Desa</button>
+          </div>
+          <div id="gcid-ready" hidden>
           <p id="account-status" class="account-status"></p>
           <button id="btn-google-signin" class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>Entra amb Google</button>
           <div class="row2">
@@ -327,6 +334,9 @@
           </div>
           <label class="check"><input id="set-sync-keys" type="checkbox"> Desa també les claus al meu Drive (així no les hauràs de tornar a posar)</label>
           <p class="fineprint left">Les reunions es guarden en una carpeta privada i oculta del teu Google Drive que només Xiu-xiu pot llegir. Ningú més hi té accés.</p>
+          <button id="btn-gcid-link" class="btn secondary small full" type="button">Copia l'enllaç per vincular un altre aparell</button>
+          <button id="btn-gcid-change" class="link small-link" type="button">Canvia l'identificador de Google</button>
+          </div>
         </div>
       </div>
 
@@ -354,6 +364,13 @@
         <label class="field"><span>Instruccions extra <em>(opcional)</em></span>
           <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
         <label class="check last"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
+      </div>
+
+      <h3>Les meves plantilles de resum</h3>
+      <div class="card group">
+        <p class="fineprint left first">Escriu l'estructura que vols (p. ex. «Acta de patronat» o «Seguiment de client») i surtirà com un tipus de reunió més.</p>
+        <div id="stpl-list" class="tpl-list"></div>
+        <button id="btn-stpl-new" class="btn secondary small" type="button">+ Nova plantilla de resum</button>
       </div>
 
       <h3>Acta en PDF</h3>
@@ -410,12 +427,31 @@
         <input id="restore-input" type="file" accept="application/json,.json" hidden>
       </div>
 
+      <h3>Privadesa i espai</h3>
+      <div class="card group">
+        <label class="field"><span>Àudio de les reunions</span>
+          <select id="set-audio-days">
+            <option value="0">Esborra'l quan ja s'ha transcrit</option>
+            <option value="7">Guarda'l 7 dies (per poder-lo escoltar)</option>
+            <option value="30">Guarda'l 30 dies</option>
+            <option value="-1">Guarda'l sempre (ocupa molt espai)</option>
+          </select></label>
+        <label class="field"><span>Reunions antigues</span>
+          <select id="set-meeting-days">
+            <option value="0">No les esborris mai</option>
+            <option value="30">Esborra-les al cap de 30 dies</option>
+            <option value="90">Esborra-les al cap de 3 mesos</option>
+            <option value="365">Esborra-les al cap d'1 any</option>
+          </select></label>
+        <p class="fineprint left">Si el mòbil va just d'espai, Xiu-xiu esborra primer l'àudio de les reunions més antigues (mai la transcripció ni l'acta).</p>
+        <p class="fineprint left"><b>Recomanació:</b> activa la <b>facturació</b> a Google AI Studio. Amb la facturació activada, Google no fa servir el contingut de les teves reunions per millorar els seus productes; en el nivell gratuït, sí que el pot fer servir.</p>
+      </div>
+
       <h3>Avançat</h3>
       <div class="card group">
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
           <input id="set-segment" type="number" min="10" max="300" step="10"></label>
-        <label class="check"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
-        <label class="check last"><input id="set-keep-audio" type="checkbox"> Conserva l'àudio després de processar</label>
+        <label class="check last"><input id="set-speakers" type="checkbox"> Identifica qui parla (a partir de les presentacions)</label>
       </div>
 
       <div class="settings-actions">
@@ -429,7 +465,7 @@
           <div class="privacy-body">
           <h4>🎙️ L'àudio</h4>
           <ul>
-            <li>Mentre graves, cada tros d'àudio es guarda al mòbil <b>només fins que s'ha transcrit</b>. Després s'esborra.</li>
+            <li>L'àudio es guarda <b>només al mòbil</b>, el temps que triïs a «Privadesa i espai» (de sèrie, 7 dies, per poder-lo escoltar). Després s'esborra sol.</li>
             <li>Els trossos en silenci no es guarden mai.</li>
             <li>El tros de les presentacions (per saber qui parla) i els fitxers importats s'esborren quan el resum està fet.</li>
             <li>Si falla la transcripció (p. ex. sense cobertura), l'àudio es guarda fins que es pugui fer, per no perdre res.</li>
@@ -475,6 +511,8 @@
         <button id="btn-wa" class="sheet-item" type="button" data-closes><span class="ic wa"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.3-4.4A8.5 8.5 0 1 1 20.5 11.5z"/></svg></span>WhatsApp</button>
         <button id="btn-pdf" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M9 13h6.5M9 16.5h6.5"/></svg></span>Acta en PDF</button>
         <button id="btn-share" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><path d="M15.5 5.5a3 3 0 0 1 0 6M17.5 14.6c1.7.6 2.8 2.2 3.2 4.9"/></svg></span>A altres persones</button>
+        <button id="btn-docx" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M8.5 12l1.5 5 2-4 2 4 1.5-5"/></svg></span>Word</button>
+        <button id="btn-md" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M6.5 15V9l2.5 3 2.5-3v6M15.5 9v6M13.5 13l2 2 2-2"/></svg></span>Markdown</button>
         <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3.5"/></svg></span>Copia el text</button>
       </div>
       <div id="share-panel" class="share-panel" hidden>
@@ -517,6 +555,25 @@
         <button id="btn-import-text" class="sheet-row" type="button">📝 Només el text<br><small>Transcripció neta, per copiar-la a un document o passar-la a un assistent</small></button>
       </div>
       <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+  <!-- Plantilla de resum de l'usuari -->
+  <div id="stpl-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Plantilla de resum">
+      <div class="sheet-grip"></div>
+      <h3 id="stpl-title">Nova plantilla de resum</h3>
+      <div class="card group">
+        <label class="field"><span>Nom</span>
+          <input id="stpl-name" type="text" placeholder="p. ex. Acta de patronat" autocomplete="off"></label>
+        <label class="field last"><span>Apartats <em>(un per línia; entre parèntesis, indicacions)</em></span>
+          <textarea id="stpl-structure" rows="7" placeholder="Assistents&#10;Ordre del dia&#10;Acords (numerats)&#10;Tasques&#10;Propera reunió"></textarea></label>
+        <button id="btn-stpl-example" class="link" type="button">Posa-hi un exemple</button>
+      </div>
+      <button id="btn-stpl-save" class="btn primary full" type="button">Desa la plantilla</button>
+      <button id="btn-stpl-delete" class="btn ghost full danger-text" type="button" hidden>Esborra la plantilla</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Cancel·la</button>
     </div>
   </div>
 

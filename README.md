@@ -120,6 +120,14 @@ De sèrie, Xiu-xiu fa una **acta detallada**: no és la transcripció literal, s
 
 Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb **«Corregeix-los»** (també a **⋯ > «Corregeix l'acta»**). Hi veuràs cada frase amb el dubte i hi podràs escriure què s'hi deia; també pots afegir altres correccions («el client és X, no Y»). Xiu-xiu aplica **només** aquestes correccions i deixa la resta igual, i recorda els noms corregits per a les properes reunions. Si ho prefereixes, també pots **editar el text de l'acta a mà**.
 
+## Més funcions (v63)
+
+- **Les meves plantilles de resum:** a Ajustos, escriu els apartats que vols (p. ex. «Acta de patronat») i surten com un tipus de reunió més.
+- **Exportar** l'acta a **Word (.docx)** i **Markdown (.md)** des de «Comparteix» (el Word fa servir el color i l'organització de la plantilla de PDF per defecte).
+- **Escoltar l'àudio:** a la transcripció, cada tros té un botó ▶ (o, a les gravacions importades, cada marca de temps). L'àudio es guarda els dies que triïs.
+- **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
+- **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
+
 ## Mapa mental, tasques, noms i Google Docs
 
 - **Mapa mental:** al resultat, toca **«Mapa mental»**. Es fa a partir de l'acta (temes, acords, tasques…), sense afegir-hi res. Es pot desar o compartir com a imatge.
