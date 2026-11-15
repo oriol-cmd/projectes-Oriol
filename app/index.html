@@ -181,6 +181,7 @@
           <span class="qa-t"><b>Importa un àudio o vídeo</b><small>Notes de veu, àudios de WhatsApp, gravacions de Zoom o Teams…</small></span>
         </button>
 
+        <p id="call-tip" class="voicememo-tip" hidden>Vols l'acta d'una trucada de telèfon? <button id="btn-call-guide" class="link" type="button">Mira com fer-ho</button></p>
         <p id="voicememo-tip" class="voicememo-tip" hidden>Reunió llarga o necessites fer servir el mòbil mentre graves? <button id="btn-voicememo" class="link" type="button">Grava-la amb Notes de veu</button></p>
 
         <ul class="tips" id="home-tips">
@@ -189,7 +190,7 @@
         </ul>
 
         <section id="home-tasks" class="home-block" hidden>
-          <h3 id="home-tasks-title">Tasques</h3>
+          <h3><span id="home-tasks-title">Tasques</span> <button class="link small-link" data-goto="tasks" type="button">Totes les tasques →</button></h3>
           <ul id="recent-tasks" class="task-list card"></ul>
         </section>
         <section id="home-recent" class="home-block" hidden>
@@ -246,6 +247,11 @@
         <button type="button" data-lang="es">Castellano</button>
         <button type="button" data-lang="en">English</button>
       </div>
+      <div class="result-tools">
+        <button id="btn-map" class="chip-btn" type="button">Mapa mental</button>
+        <button id="btn-speakers" class="chip-btn" type="button">Noms de qui parla</button>
+        <a id="doc-link" class="chip-btn" target="_blank" rel="noopener" hidden>Google Doc ↗</a>
+      </div>
       <article id="result-summary" class="summary card"></article>
       <div id="result-photos-wrap" class="photos-wrap" hidden>
         <div id="result-photos" class="photos"></div>
@@ -264,6 +270,20 @@
     </section>
 
     <!-- HISTORIAL -->
+    <!-- TASQUES -->
+    <section id="view-tasks" class="view" hidden>
+      <h2>Tasques</h2>
+      <div id="tasks-state" class="seg" role="group" aria-label="Quines tasques">
+        <button type="button" data-state="pending" aria-pressed="true">Pendents</button>
+        <button type="button" data-state="done">Fetes</button>
+        <button type="button" data-state="all">Totes</button>
+      </div>
+      <div id="tasks-people" class="type-chips filters"></div>
+      <ul id="tasks-list" class="tasks-full"></ul>
+      <p id="tasks-empty" class="fineprint" hidden></p>
+      <button id="btn-tasks-send" class="btn secondary full" type="button" hidden>Envia-li les seves tasques</button>
+    </section>
+
     <section id="view-history" class="view" hidden>
       <h2>Historial</h2>
       <input id="history-search" class="search" type="search" placeholder="Cerca per títol, persona o tema" autocomplete="off">
@@ -588,6 +608,71 @@
         <p class="fineprint left">Les gravacions llargues (1–3 h) es tallen en trossos de 5 minuts per pausa de la conversa i es transcriuen sencers, amb el temps de cada part. Si tries abans «Reunió important», en farà l'acta professional.</p>
       </div>
       <button id="btn-voicememo-import" class="btn primary full" type="button">Ja la tinc: importa-la</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <!-- Afegir una tasca al calendari -->
+  <div id="cal-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Afegeix al calendari">
+      <div class="sheet-grip"></div>
+      <h3>Afegeix al calendari</h3>
+      <div class="card group">
+        <p id="cal-task" class="cal-task"></p>
+        <label class="field last"><span>Dia</span><input id="cal-date" type="date"></label>
+      </div>
+      <button id="btn-cal-ics" class="btn primary full" type="button">Afegeix-la al calendari del mòbil</button>
+      <button id="btn-cal-google" class="btn secondary full tpl-gap" type="button">Obre-la a Google Calendar</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+  <!-- Mapa mental -->
+  <div id="map-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel map-panel" role="dialog" aria-label="Mapa mental">
+      <div class="sheet-grip"></div>
+      <h3>Mapa mental</h3>
+      <div id="map-box" class="map-box"></div>
+      <button id="btn-map-png" class="btn primary full tpl-gap" type="button">Desa'l o comparteix-lo (imatge)</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <!-- Noms de qui parla -->
+  <div id="spk-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Noms de qui parla">
+      <div class="sheet-grip"></div>
+      <h3>Noms de qui parla</h3>
+      <p class="fineprint left first">Escriu el nom real de cada persona. Es canviarà a tota la transcripció i a l'acta.</p>
+      <div id="spk-list" class="fix-doubts"></div>
+      <label class="check"><input id="spk-remember" type="checkbox" checked> Recorda els noms per a les properes reunions</label>
+      <button id="btn-spk-apply" class="btn primary full" type="button">Canvia els noms</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Cancel·la</button>
+      <p id="spk-msg" class="fineprint"></p>
+    </div>
+  </div>
+
+  <!-- Trucades -->
+  <div id="call-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Acta d'una trucada">
+      <div class="sheet-grip"></div>
+      <h3>Acta d'una trucada de telèfon</h3>
+      <div class="card group">
+        <p class="fineprint left first"><b>iPhone (iOS 18.1 o posterior):</b></p>
+        <ol class="kw-list">
+          <li>Durant la trucada, toca el botó de <b>gravar</b> (a dalt a l'esquerra). L'iPhone avisa l'altra persona que es grava.</li>
+          <li>En penjar, la gravació queda a l'app <b>Notes</b>, a la carpeta «Gravacions de trucades».</li>
+          <li>Obre la nota, toca la gravació › <b>⋯</b> › <b>Desa l'àudio a Fitxers</b>.</li>
+          <li>Torna a Xiu-xiu, tria el tipus <b>«Trucada»</b> i toca <b>Importa un àudio o vídeo</b>.</li>
+        </ol>
+        <p class="fineprint left"><b>Android:</b> molts mòbils graven trucades des de l'app Telèfon (⋮ › Grava). Desa l'àudio i importa'l igual.</p>
+        <p class="fineprint left">Recorda: cal que l'altra persona sàpiga que es grava.</p>
+      </div>
+      <button id="btn-call-import" class="btn primary full" type="button">Ja la tinc: importa-la</button>
       <button class="btn ghost full" type="button" data-close-sheet>Tanca</button>
     </div>
   </div>

@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 61;
+const APP_VERSION = 62;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1131,6 +1131,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
         try {
           const r = await sendEmail(buildEmail(m));
           m.email = { status: 'sent', at: Date.now(), confirmed: r.confirmed };
+          if (r.data && r.data.docUrl) m.docUrl = r.data.docUrl;
         } catch (e) {
           m.email = { status: 'error', error: e.message };
         }
@@ -1760,11 +1761,12 @@ function showView(name) {
   if (name === 'history') renderHistory();
   if (name === 'settings') fillSettings();
   if (name === 'ask') renderAskScope();
+  if (name === 'tasks') renderTasks();
 }
 
 // Barra de navegació inferior: sempre visible, excepte gravant o sense clau.
 function updateTabbar() {
-  const tabView = { home: 'home', rec: 'home', proc: 'history', result: 'history', history: 'history', ask: 'ask', settings: 'settings' }[currentView];
+  const tabView = { home: 'home', rec: 'home', tasks: 'home', proc: 'history', result: 'history', history: 'history', ask: 'ask', settings: 'settings' }[currentView];
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', String(t.dataset.view === tabView)));
   const hide = currentView === 'rec' || (currentView === 'home' && missingSetup().length > 0);
   $('#tabbar').hidden = hide;
@@ -1806,6 +1808,318 @@ function updateProcView(m) {
   else if (m.stage === 'email') setStep('step-email', 'active', `Enviant a ${settings.email}…`);
   else setStep('step-email', '', '');
 }
+
+// ---------------------------------------------------------------------------
+// Tasques de totes les reunions (marcar fetes, per persona, calendari, enviar)
+// ---------------------------------------------------------------------------
+const taskKey = (t) => { let h = 0; const str = `${t.who}|${t.task}`; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return `t${h >>> 0}`; };
+let tasksState = 'pending';
+let tasksPerson = '';
+async function allTasks() {
+  const all = (await db.all('meetings')).filter((m) => m.summary && m.status === 'done' && m.type !== 'revisio').sort((a, b) => b.startedAt - a.startedAt);
+  const out = [];
+  for (const m of all) for (const t of parseTasks(m.summary)) {
+    const key = taskKey(t);
+    out.push({ m, t, key, done: !!(m.tasksDone || {})[key] });
+  }
+  return out;
+}
+const personKey = (w) => (w || '').replace(/\[.*?\]/g, '').trim();
+async function renderTasks() {
+  const items = await allTasks();
+  const people = [...new Set(items.map((x) => personKey(x.t.who)).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  if (tasksPerson && !people.includes(tasksPerson)) tasksPerson = '';
+  const chips = $('#tasks-people');
+  chips.textContent = '';
+  for (const p of ['', ...people]) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'type-chip';
+    const n = items.filter((x) => !x.done && (!p || personKey(x.t.who) === p)).length;
+    b.innerHTML = `${escapeHtml(p || 'Tothom')} <span class="n">${n}</span>`;
+    b.setAttribute('aria-pressed', String(p === tasksPerson));
+    b.onclick = () => { tasksPerson = p; renderTasks(); };
+    chips.appendChild(b);
+  }
+  chips.hidden = !people.length;
+  document.querySelectorAll('#tasks-state button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.state === tasksState)));
+  const list = items.filter((x) => (!tasksPerson || personKey(x.t.who) === tasksPerson)
+    && (tasksState === 'all' || (tasksState === 'done') === x.done));
+  const ul = $('#tasks-list');
+  ul.textContent = '';
+  for (const x of list) {
+    const li = document.createElement('li');
+    li.className = 'card task-card' + (x.done ? ' done' : '');
+    li.innerHTML = `<label class="task-check"><input type="checkbox" ${x.done ? 'checked' : ''}></label>
+      <div class="task-body">
+        <div class="task-text">${x.t.who ? `<b>${escapeHtml(x.t.who)}</b>: ` : ''}${markDoubts(escapeHtml(x.t.task))}</div>
+        <div class="task-meta">${x.t.due ? `<span class="due">${escapeHtml(x.t.due)}</span> · ` : ''}<button class="link task-meeting" type="button">${escapeHtml(summaryTitle(x.m))} · ${escapeHtml(fmtDate(x.m.startedAt))}</button></div>
+      </div>
+      <button class="icon-btn task-cal" type="button" aria-label="Afegeix al calendari">${svgIcon('calendar')}</button>`;
+    li.querySelector('input').onchange = async (e) => {
+      const m = await getMeeting(x.m.id);
+      m.tasksDone = { ...(m.tasksDone || {}) };
+      if (e.target.checked) m.tasksDone[x.key] = Date.now(); else delete m.tasksDone[x.key];
+      await saveMeeting(m);
+      renderTasks();
+    };
+    li.querySelector('.task-meeting').onclick = () => showResult(x.m.id);
+    li.querySelector('.task-cal').onclick = () => openCal(x);
+    ul.appendChild(li);
+  }
+  $('#tasks-empty').hidden = !!list.length;
+  $('#tasks-empty').textContent = items.length ? (tasksState === 'pending' ? 'Cap tasca pendent. 🎉' : 'Cap tasca en aquesta llista.') : 'Encara no hi ha tasques. Sortiran aquí les de totes les reunions.';
+  const pending = items.filter((x) => !x.done && personKey(x.t.who) === tasksPerson);
+  $('#btn-tasks-send').hidden = !(tasksPerson && pending.length);
+  $('#btn-tasks-send').textContent = `Envia a ${tasksPerson} les seves tasques pendents (${pending.length})`;
+}
+document.querySelectorAll('#tasks-state button').forEach((b) => { b.onclick = () => { tasksState = b.dataset.state; renderTasks(); }; });
+$('#btn-tasks-send').onclick = async () => {
+  const who = tasksPerson;
+  const items = (await allTasks()).filter((x) => !x.done && personKey(x.t.who) === who);
+  if (!items.length) return;
+  const known = (settings.peopleEmails || {})[who] || '';
+  const to = (prompt(`Correu de ${who}:`, known) || '').trim();
+  if (!to) return;
+  if (!EMAIL_RE.test(to)) { toast('Aquesta adreça no és vàlida'); return; }
+  saveSettings({ peopleEmails: { ...(settings.peopleEmails || {}), [who]: to } });
+  const rows = items.map((x) => `<li style="margin:6px 0"><b>${escapeHtml(x.t.task)}</b>${x.t.due ? ` — <span style="color:#b45309">${escapeHtml(x.t.due)}</span>` : ''}<br><span style="color:#64748b;font-size:13px">${escapeHtml(summaryTitle(x.m))} · ${escapeHtml(fmtDate(x.m.startedAt))}</span></li>`).join('');
+  const text = items.map((x) => `- ${x.t.task}${x.t.due ? ` — ${x.t.due}` : ''} (${summaryTitle(x.m)}, ${fmtDate(x.m.startedAt)})`).join('\n');
+  const subject = `Tasques pendents per a ${who}`;
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1f2937;max-width:680px"><h2 style="color:#13265c;margin:0 0 10px">${escapeHtml(subject)}</h2><ul style="padding-left:20px">${rows}</ul><p style="color:#94a3b8;font-size:12px;margin-top:20px">Enviat amb Xiu-xiu.</p></div>`;
+  if (emailEnabled()) {
+    try {
+      const r = await sendEmail({ subject, html, text, recipients: [to], external: true }, { noFallback: true });
+      toast(r.data && Array.isArray(r.data.sentTo) ? `✓ Enviat a ${to}` : "Cal actualitzar l'script per enviar a altres adreces", 5000);
+      return;
+    } catch (e) { toast(`✗ ${e.message}`, 5000); return; }
+  }
+  location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+};
+
+// Data aproximada a partir del termini dit a la reunió («divendres», «15 de gener», «12/3»…).
+const WEEKDAYS = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
+const MONTHS = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny', 'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
+function guessDate(due, base) {
+  const d = new Date(base); d.setHours(12, 0, 0, 0);
+  const t = (due || '').toLowerCase();
+  let mm;
+  if (/demà passat/.test(t)) { d.setDate(d.getDate() + 2); return d; }
+  if (/\bdemà\b/.test(t)) { d.setDate(d.getDate() + 1); return d; }
+  if (/\bavui\b/.test(t)) return d;
+  if ((mm = t.match(/(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/))) {
+    const y = mm[3] ? (mm[3].length === 2 ? 2000 + Number(mm[3]) : Number(mm[3])) : d.getFullYear();
+    const r = new Date(y, Number(mm[2]) - 1, Number(mm[1]), 12);
+    if (!mm[3] && r < d) r.setFullYear(r.getFullYear() + 1);
+    return r;
+  }
+  for (let i = 0; i < 12; i++) {
+    const re = new RegExp(`(\\d{1,2})\\s+(?:de\\s+|d')?${MONTHS[i]}`);
+    if ((mm = t.match(re))) { const r = new Date(d.getFullYear(), i, Number(mm[1]), 12); if (r < d) r.setFullYear(r.getFullYear() + 1); return r; }
+  }
+  for (let i = 0; i < 7; i++) {
+    if (new RegExp(`\\b${WEEKDAYS[i]}\\b`).test(t)) {
+      let add = (i - d.getDay() + 7) % 7 || 7;
+      if (/vinent|que ve|pròxim|proper/.test(t) && add < 7) add += 0;
+      d.setDate(d.getDate() + add); return d;
+    }
+  }
+  if (/setmana que ve|propera setmana|pròxima setmana/.test(t)) { d.setDate(d.getDate() + 7); return d; }
+  if (/fi de mes|final de mes/.test(t)) return new Date(d.getFullYear(), d.getMonth() + 1, 0, 12);
+  d.setDate(d.getDate() + 1); // sense data clara: demà (l'usuari la pot canviar)
+  return d;
+}
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+let calItem = null;
+function openCal(x) {
+  calItem = x;
+  $('#cal-task').innerHTML = `${x.t.who ? `<b>${escapeHtml(x.t.who)}</b>: ` : ''}${escapeHtml(x.t.task)}${x.t.due ? `<br><small>Termini dit a la reunió: ${escapeHtml(x.t.due)}</small>` : ''}`;
+  $('#cal-date').value = ymd(guessDate(x.t.due, x.m.startedAt));
+  openSheet('#cal-sheet');
+}
+function calText() {
+  const x = calItem;
+  return { title: `${x.t.task}${x.t.who ? ` (${x.t.who})` : ''}`.replace(/\[(dubte de comprensió)\]/gi, '').slice(0, 200), details: `Tasca de la reunió «${summaryTitle(x.m)}» (${fmtDate(x.m.startedAt)}).` };
+}
+$('#btn-cal-ics').onclick = async () => {
+  const v = $('#cal-date').value; if (!v) return;
+  const { title, details } = calText();
+  const day = v.replace(/-/g, '');
+  const next = new Date(`${v}T12:00:00`); next.setDate(next.getDate() + 1);
+  const esc = (t) => t.replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Xiu-xiu//CA', 'BEGIN:VEVENT', `UID:${calItem.key}-${calItem.m.id}@xiu-xiu`, `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${day}`, `DTEND;VALUE=DATE:${ymd(next).replace(/-/g, '')}`, `SUMMARY:${esc(title)}`, `DESCRIPTION:${esc(details)}`,
+    'BEGIN:VALARM', 'TRIGGER:-PT15H', 'ACTION:DISPLAY', `DESCRIPTION:${esc(title)}`, 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  await shareOrDownload(new Blob([ics], { type: 'text/calendar' }), 'tasca.ics', title);
+  closeSheets();
+};
+$('#btn-cal-google').onclick = () => {
+  const v = $('#cal-date').value; if (!v) return;
+  const { title, details } = calText();
+  const next = new Date(`${v}T12:00:00`); next.setDate(next.getDate() + 1);
+  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${v.replace(/-/g, '')}/${ymd(next).replace(/-/g, '')}&details=${encodeURIComponent(details)}`, '_blank');
+  closeSheets();
+};
+
+// ---------------------------------------------------------------------------
+// Mapa mental: es construeix a partir de l'estructura de l'acta (sense IA: no s'inventa res)
+// ---------------------------------------------------------------------------
+const MAP_SKIP = /^(Dubtes de comprensió|Dudas de comprensión|Comprehension doubts|Ordre del dia|Orden del día|Agenda|Documents comentats)/i;
+const mapClean = (t) => t.replace(/\*\*/g, '').replace(/\[(dubte de comprensió|duda de comprensión|unclear)\]/gi, '(?)').replace(/^\[[ xX]?\]\s*/, '').replace(/\s+/g, ' ').trim();
+function buildMapTree(md) {
+  const lines = (md || '').split('\n');
+  const root = { text: mapClean((lines.find((l) => /^#\s/.test(l)) || '# Reunió').replace(/^#\s+/, '')), kids: [] };
+  let sec = null, sub = null;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    let mm;
+    if ((mm = line.match(/^##\s+(.*)$/))) {
+      sub = null;
+      sec = MAP_SKIP.test(mm[1]) ? null : { text: mapClean(mm[1]), kids: [], summary: /^Resum/i.test(mm[1]) };
+      if (sec) root.kids.push(sec);
+    } else if (!sec) continue;
+    else if ((mm = line.match(/^###\s+(.*)$/))) { sub = { text: mapClean(mm[1]), kids: [] }; sec.kids.push(sub); }
+    else if ((mm = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/))) {
+      const t = mapClean(mm[1]);
+      if (!t || /^Cap\.?$/i.test(t)) continue;
+      (sub && !sec.summary ? sub : sec).kids.push({ text: t, kids: [] });
+    } else if (line.trim() && sec.summary && !sec.kids.length) {
+      // Resum: la primera frase
+      sec.kids.push({ text: mapClean(line).split(/(?<=\.)\s/)[0], kids: [] });
+    }
+  }
+  // Treu les branques buides i limita la mida perquè sigui llegible
+  const trim = (n, depth) => { n.kids = n.kids.filter((k) => k.text).slice(0, depth === 0 ? 9 : 8); n.kids.forEach((k) => trim(k, depth + 1)); if (depth >= 2) n.kids = []; };
+  root.kids = root.kids.filter((k) => k.kids.length || !k.summary);
+  trim(root, 0);
+  root.kids = root.kids.filter((k) => k.kids.length);
+  return root;
+}
+const MAP_COLORS = ['#1f4bd8', '#0e7490', '#15803d', '#b45309', '#7c3aed', '#be185d', '#b91c1c', '#334155', '#0f766e'];
+function wrapText(t, max) {
+  const words = t.split(' '); const lines = []; let cur = '';
+  for (const w of words) { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+  if (cur) lines.push(cur);
+  if (lines.length > 3) { lines.length = 3; lines[2] = lines[2].replace(/.{0,2}$/, '…'); }
+  return lines;
+}
+function renderMapSvg(tree) {
+  const LH = 15, PAD = 7, GAP = 8, X = [20, 250, 520], W = [210, 240, 330], WRAP = [24, 30, 44];
+  const nodes = [];
+  let y = 20;
+  const place = (n, depth, color) => {
+    const lines = wrapText(n.text, WRAP[depth]);
+    const h = lines.length * LH + PAD * 2;
+    if (!n.kids.length || depth === 2) { n.y = y; n.h = h; y += h + GAP; }
+    else {
+      n.kids.forEach((k, i) => place(k, depth + 1, depth === 0 ? MAP_COLORS[i % MAP_COLORS.length] : color));
+      const first = n.kids[0], last = n.kids[n.kids.length - 1];
+      n.h = h; n.y = Math.max((first.y + last.y + last.h) / 2 - h / 2, 10);
+      if (depth === 1) y += GAP;
+    }
+    nodes.push({ n, depth, lines, color });
+  };
+  place(tree, 0, '#13265c');
+  const height = Math.max(y + 20, tree.y + tree.h + 20);
+  const width = X[2] + W[2] + 20;
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif"><rect width="100%" height="100%" fill="#ffffff"/>`;
+  const link = (a, ad, b, bd, color) => {
+    const x1 = X[ad] + W[ad], y1 = a.y + a.h / 2, x2 = X[bd], y2 = b.y + b.h / 2, mx = (x1 + x2) / 2;
+    svg += `<path d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="2"/>`;
+  };
+  const walk = (n, depth, color) => n.kids.forEach((k, i) => { const c = depth === 0 ? MAP_COLORS[i % MAP_COLORS.length] : color; link(n, depth, k, depth + 1, c); walk(k, depth + 1, c); });
+  walk(tree, 0, '#13265c');
+  for (const { n, depth, lines, color } of nodes) {
+    const x = X[depth], w = W[depth];
+    const fill = depth === 0 ? '#13265c' : depth === 1 ? color : '#ffffff';
+    const stroke = depth === 2 ? color : fill;
+    const tc = depth === 2 ? '#101828' : '#ffffff';
+    svg += `<rect x="${x}" y="${n.y}" width="${w}" height="${n.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-opacity="${depth === 2 ? .45 : 1}" stroke-width="1.5"/>`;
+    lines.forEach((ln, i) => { svg += `<text x="${x + 10}" y="${n.y + PAD + 11 + i * LH}" font-size="${depth === 0 ? 13.5 : 12.5}" font-weight="${depth === 2 ? 500 : 700}" fill="${tc}">${esc(ln)}</text>`; });
+  }
+  return svg + '</svg>';
+}
+async function openMap() {
+  const m = await getMeeting(viewingId);
+  if (!m || !m.summary) return;
+  const tree = buildMapTree(getSummary(m, resultLang));
+  $('#map-box').innerHTML = tree.kids.length ? renderMapSvg(tree) : '<p class="fineprint">Aquesta acta no té prou estructura per fer-ne un mapa.</p>';
+  openSheet('#map-sheet');
+}
+$('#btn-map').onclick = openMap;
+$('#btn-map-png').onclick = async () => {
+  const svgEl = $('#map-box svg');
+  if (!svgEl) return;
+  const m = await getMeeting(viewingId);
+  const w = Number(svgEl.getAttribute('width')), h = Number(svgEl.getAttribute('height'));
+  const img = new Image();
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgEl.outerHTML)}`;
+  await img.decode();
+  const c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2;
+  const g = c.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0);
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  await shareOrDownload(blob, `Mapa - ${summaryTitle(m).replace(/[\\/:*?"<>|]+/g, '').slice(0, 50)}.png`, summaryTitle(m));
+};
+
+// ---------------------------------------------------------------------------
+// Noms de qui parla: canviar «Persona 1» per «Marta» a la transcripció i a l'acta
+// ---------------------------------------------------------------------------
+function speakerLabels(m) {
+  const count = new Map();
+  for (const sg of m.segments || []) for (const line of (sg.text || '').split('\n')) {
+    const mm = line.match(/^\s*([^:\n[\]]{2,40}):\s/);
+    if (mm && !/^(http|Nota|Context)/i.test(mm[1])) count.set(mm[1].trim(), (count.get(mm[1].trim()) || 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+}
+async function openSpeakers() {
+  const m = await getMeeting(viewingId);
+  if (!m) return;
+  const labels = speakerLabels(m);
+  const box = $('#spk-list');
+  box.textContent = '';
+  if (!labels.length) box.innerHTML = '<p class="fineprint left">La transcripció d\'aquesta reunió no té noms de qui parla.</p>';
+  for (const [label, n] of labels) {
+    const row = document.createElement('div');
+    row.className = 'fix-row';
+    const generic = /^(Persona|Speaker|Hablante|Interlocutor)/i.test(label);
+    row.innerHTML = `<p class="fix-quote"><b>${escapeHtml(label)}</b> <span class="muted">· ${n === 1 ? '1 intervenció' : `${n} intervencions`}</span>${/no identificada/i.test(label) ? '<br><small>Compte: pot ser més d\'una persona.</small>' : ''}</p><input type="text" data-label="${escapeHtml(label)}" placeholder="${generic ? 'Nom real' : 'Deixa-ho buit si és correcte'}" autocomplete="off">`;
+    box.appendChild(row);
+  }
+  $('#spk-msg').textContent = '';
+  openSheet('#spk-sheet');
+}
+$('#btn-speakers').onclick = openSpeakers;
+$('#btn-spk-apply').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m) return;
+  const changes = [...document.querySelectorAll('#spk-list input')].map((i) => [i.dataset.label, i.value.trim()]).filter(([a, b]) => b && b !== a);
+  if (!changes.length) { $('#spk-msg').textContent = 'Escriu almenys un nom.'; return; }
+  const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const [from, to] of changes) {
+    const lineRe = new RegExp(`^(\\s*)${reEsc(from)}:`, 'gm');
+    for (const sg of m.segments || []) if (sg.text) sg.text = sg.text.replace(lineRe, `$1${to}:`);
+    if (m.summary) m.summary = m.summary.replace(new RegExp(`(^|[^\\p{L}])${reEsc(from)}(?![\\p{L}\\d])`, 'gu'), `$1${to}`);
+    if (m.liveText) m.liveText = m.liveText.replace(lineRe, `$1${to}:`);
+  }
+  m.translations = {};
+  await saveMeeting(m);
+  if ($('#spk-remember').checked) {
+    const cur = (settings.vocab || '').split(',').map((x) => x.trim()).filter(Boolean);
+    const add = changes.map(([, to]) => to).filter((x) => !cur.some((c) => c.toLowerCase() === x.toLowerCase()));
+    if (add.length) saveSettings({ vocab: [...cur, ...add].join(', ') });
+  }
+  closeSheets(); showResult(m.id);
+  toast('✓ Noms canviats a la transcripció i a l\'acta');
+};
+$('#btn-call-guide').onclick = () => openSheet('#call-sheet');
+$('#btn-call-import').onclick = () => {
+  closeSheets();
+  saveSettings({ lastType: 'trucada' }); updateTypeChips();
+  $('#import-input').click();
+};
+if ($('#call-tip')) $('#call-tip').hidden = !/iPhone|Android/i.test(navigator.userAgent);
 
 // ---------------------------------------------------------------------------
 // Corregir l'acta: l'usuari diu què s'hi deia als dubtes (o qualsevol altra errada)
@@ -1945,6 +2259,9 @@ async function showResult(id) {
   showView('result');
   renderRecReport(m);
   renderDoubtBanner(m);
+  $('#doc-link').hidden = !m.docUrl;
+  if (m.docUrl) $('#doc-link').href = m.docUrl;
+  $('#btn-speakers').hidden = !(m.engine !== 'device' && speakerLabels(m).length);
   $('#btn-continue').hidden = !(m.engine === 'audio' && m.status !== 'recording');
   $('#btn-continue').textContent = m.type === 'revisio' ? '+ Continua aquesta revisió' : '+ Continua gravant aquí';
   $('#btn-share-open').innerHTML = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
@@ -2268,6 +2585,7 @@ const MEETING_TYPES = {
   u1: { svg: 'user', icon: '🙋', label: '1 a 1', prompt: "Centra't en el feedback, els objectius, les preocupacions i els acords entre les dues persones. Sigues discret i respectuós amb els temes personals." },
   entrevista: { svg: 'mic', icon: '🎤', label: 'Entrevista', prompt: "Afegeix just després de «## Resum» una secció «## Perfil i respostes clau» amb les respostes rellevants de la persona entrevistada, punts forts i dubtes, sense judicis de valor no fonamentats." },
   formacio: { svg: 'book', icon: '🎓', label: 'Formació / classe', prompt: "Afegeix just després de «## Resum» una secció «## Conceptes clau» amb el que s'ha explicat, ordenat i didàctic." },
+  trucada: { svg: 'phone', icon: '📞', label: 'Trucada', prompt: "És una trucada telefònica (normalment entre dues persones). Deixa clar qui ha trucat a qui si es diu, els motius de la trucada, el que s'ha acordat i els propers passos de cadascú." },
   projecte: { svg: 'chart', icon: '📈', label: 'Seguiment de projecte', prompt: "Afegeix just després de «## Resum» una secció «## Estat del projecte» (avenços, fites, riscos i calendari)." },
   revisio: { svg: 'edit', icon: '📝', label: 'Revisió de feina', prompt: '' },
 };

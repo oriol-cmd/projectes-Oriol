@@ -120,6 +120,14 @@ De sèrie, Xiu-xiu fa una **acta detallada**: no és la transcripció literal, s
 
 Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb **«Corregeix-los»** (també a **⋯ > «Corregeix l'acta»**). Hi veuràs cada frase amb el dubte i hi podràs escriure què s'hi deia; també pots afegir altres correccions («el client és X, no Y»). Xiu-xiu aplica **només** aquestes correccions i deixa la resta igual, i recorda els noms corregits per a les properes reunions. Si ho prefereixes, també pots **editar el text de l'acta a mà**.
 
+## Mapa mental, tasques, noms i Google Docs
+
+- **Mapa mental:** al resultat, toca **«Mapa mental»**. Es fa a partir de l'acta (temes, acords, tasques…), sense afegir-hi res. Es pot desar o compartir com a imatge.
+- **Tasques:** a l'inici, **«Totes les tasques →»** mostra les tasques de totes les reunions. Les pots marcar com a fetes, filtrar per persona, **afegir al calendari** (del mòbil o de Google; la data es proposa a partir del termini dit a la reunió) i **enviar a cada persona les seves pendents**.
+- **Noms de qui parla:** al resultat, **«Noms de qui parla»** canvia «Persona 1» pel nom real a tota la transcripció i l'acta, i el recorda per a les properes reunions.
+- **Google Docs:** amb l'script actualitzat, cada acta es desa també com a Google Doc a la carpeta **«Xiu-xiu · Actes»** del teu Drive (i s'actualitza si refàs el resum). L'enllaç surt al correu i al resultat.
+- **Trucades:** l'iPhone (iOS 18.1 o posterior) grava trucades des de l'app Telèfon i les desa a Notes. Desa l'àudio a Fitxers, tria el tipus **«Trucada»** i importa'l. A l'inici hi ha la guia **«Mira com fer-ho»**.
+
 ## Gravar sense talls (iPhone) i reunions llargues
 
 A l'iPhone, una web no pot fer servir el micròfon si canvies d'app o bloqueges la pantalla. Si necessites fer servir el mòbil durant la reunió, grava-la amb **Notes de veu** (Apple) i després importa-la a Xiu-xiu: a la pantalla d'inici hi ha la drecera **«Grava-la amb Notes de veu»** amb els passos. Les gravacions llargues (1–3 h) es tallen en trossos de 5 minuts per les pauses de la conversa i es transcriuen sencers, amb el temps de cada part; si es talla a mitges, es reprèn pel tros on era.

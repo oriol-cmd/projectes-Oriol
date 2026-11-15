@@ -545,3 +545,27 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .voicememo-tip { font-size: 13.5px; color: var(--muted); margin: 10px 4px 0; }
 .voicememo-tip .link { color: var(--accent); }
 #voicememo-sheet .btn { margin-top: 8px; }
+
+/* Eines del resultat (mapa, noms, Google Doc) */
+.result-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.chip-btn { font: inherit; font-size: 14px; font-weight: 600; color: var(--accent-ink); background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 7px 14px; cursor: pointer; text-decoration: none; box-shadow: var(--shadow); }
+@media (prefers-color-scheme: dark) { .chip-btn { color: var(--accent); } }
+/* Mapa mental */
+.map-panel { max-width: 1100px; }
+.map-box { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; max-height: 62dvh; -webkit-overflow-scrolling: touch; }
+.map-box svg { display: block; }
+/* Tasques */
+.tasks-full { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+.task-card { display: flex; align-items: flex-start; gap: 10px; padding: 12px; }
+.task-card.done .task-text { text-decoration: line-through; color: var(--muted); }
+.task-check input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: 1px; }
+.task-body { flex: 1; min-width: 0; }
+.task-text { font-size: 15px; }
+.task-meta { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.task-meta .due { color: var(--warn-text); font-weight: 600; }
+.task-meta .link { font-weight: 500; color: var(--muted); text-align: left; }
+.task-cal { flex: none; width: 38px; height: 38px; color: var(--accent); }
+#tasks-state { margin-bottom: 10px; }
+.cal-task { margin: 0 0 12px; font-size: 15px; }
+.cal-task small { color: var(--muted); }
+.fix-quote .muted { color: var(--muted); font-weight: 400; }
