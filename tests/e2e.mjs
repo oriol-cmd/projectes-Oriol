@@ -195,12 +195,12 @@ await step('Canviar idioma (castellà)', async () => {
   ok((await p.textContent('#result-summary')).includes('Resumen'), 'no tradueix');
   await p.click('#lang-switch button[data-lang="ca"]'); await p.waitForTimeout(300);
 });
-for (const [name, btn, re] of [['PDF', '#btn-pdf', /\.pdf$/], ['Word', '#btn-docx', /\.docx$/], ['Markdown', '#btn-md', /\.md$/]]) {
+for (const [name, btn, magic] of [['PDF', '#btn-pdf', '%PDF'], ['Word', '#btn-docx', 'PK'], ['Markdown', '#btn-md', '# ']]) {
   await step(`Exportar ${name}`, async () => {
     await p.click('#btn-share-open'); await p.waitForTimeout(200);
     const [d] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), p.click(btn)]);
     const f = path.join(tmp, d.suggestedFilename()); await d.saveAs(f);
-    ok(re.test(f) && fs.statSync(f).size > 300, 'fitxer erroni');
+    ok(fs.readFileSync(f).subarray(0, magic.length).toString('latin1') === magic && fs.statSync(f).size > 300, 'fitxer erroni');
     await p.evaluate(() => closeSheets());
     return `${d.suggestedFilename()} (${Math.round(fs.statSync(f).size / 1024)} KB)`;
   });
@@ -254,12 +254,12 @@ await step('Revisió de feina', async () => {
   await p.click('#btn-record'); await waitView('rec'); await p.waitForTimeout(11000);
   await p.click('#btn-stop'); await waitView('result', 60000);
   ok((await p.textContent('#btn-share-open')).includes('Marta'), 'botó Envia-ho a Marta');
-  await p.click('.mode[data-mode="general"]').catch(() => {});
 });
 await step('Plantilla de resum pròpia', async () => {
   await p.click('#btn-settings'); await waitView('settings');
   await p.click('#btn-stpl-new'); await p.click('#btn-stpl-example'); await p.click('#btn-stpl-save'); await p.waitForTimeout(300);
   await p.click('#btn-tab-home'); await waitView('home');
+  await p.click('.mode[data-mode="general"]');
   const chip = await p.$('.type-chip[data-type^="tpl_"]');
   ok(chip, 'no surt el xip');
   await chip.click();
@@ -327,11 +327,27 @@ await step('Privadesa: esborrar àudio i reunions antigues', async () => {
   await p.evaluate(async () => {
     const old = Date.now() - 400 * 86400000;
     await db.put('audio', new Blob(['x'.repeat(3000)]), 'vell:0');
-    await saveMeeting({ id: 'vell', title: 'Molt antiga', startedAt: old, doneAt: old, durationMs: 1, engine: 'audio', status: 'done', segments: [{ idx: 0, startMs: 0, status: 'done', text: 'a' }], marks: [], summary: '# Vella', email: { status: 'off' } });
+    await db.put('meetings', { id: 'vell', title: 'Molt antiga', startedAt: old, doneAt: old, updatedAt: old, durationMs: 1, engine: 'audio', status: 'done', segments: [{ idx: 0, startMs: 0, status: 'done', text: 'a' }], marks: [], summary: '# Vella', email: { status: 'off' } });
+    meetingCache.delete('vell');
+  });
+  await p.evaluate(async () => {
+    const old = Date.now() - 400 * 86400000;
+    // importada avui però amb un fitxer antic: no s'ha d'esborrar
+    await saveMeeting({ id: 'importvella', title: 'Fitxer antic', startedAt: old, createdAt: Date.now(), doneAt: Date.now(), durationMs: 1, engine: 'import', status: 'done', segments: [], marks: [], summary: '# Nova', email: { status: 'off' } });
+    // amb error (pendent de reintent): no s'ha d'esborrar
+    await db.put('meetings', { id: 'errvella', title: 'Error', startedAt: old, updatedAt: old, durationMs: 1, engine: 'audio', status: 'error', segments: [], marks: [], summary: '', email: { status: 'off' } });
+    // tros buit: el seu àudio es guarda encara que s'esborri la resta
+    await db.put('audio', new Blob(['y'.repeat(3000)]), 'buit:1'); await db.put('audio', new Blob(['z'.repeat(3000)]), 'buit:0');
+    await saveMeeting({ id: 'buit', title: 'Buit', startedAt: Date.now(), doneAt: Date.now() - 40 * 86400000, durationMs: 1, engine: 'audio', status: 'done', segments: [{ idx: 0, startMs: 0, status: 'done', text: 'hola' }, { idx: 1, startMs: 60000, status: 'done', text: '', empty: true }], marks: [], summary: '# B', email: { status: 'off' } });
+    // perquè «buit» no compti com a vella per a les reunions, però sí per a l'àudio (30 dies)
+    const mm = await getMeeting('buit'); mm.updatedAt = Date.now(); await db.put('meetings', mm);
   });
   await p.click('#btn-settings'); await waitView('settings');
-  await p.selectOption('#set-meeting-days', '365'); await p.click('#btn-save-settings'); await p.waitForTimeout(1500);
+  await p.selectOption('#set-meeting-days', '365'); await p.selectOption('#set-audio-days', '30'); await p.click('#btn-save-settings'); await p.waitForTimeout(1500);
   const gone = await p.evaluate(async () => !(await db.get('meetings', 'vell')) && !(await db.get('audio', 'vell:0')));
+  const kept = await p.evaluate(async () => ({ imp: !!(await db.get('meetings', 'importvella')), err: !!(await db.get('meetings', 'errvella')), buit1: !!(await db.get('audio', 'buit:1')), buit0: !!(await db.get('audio', 'buit:0')) }));
+  ok(kept.imp && kept.err && kept.buit1 && !kept.buit0, `conservació incorrecta ${JSON.stringify(kept)}`);
+  await p.click('#btn-settings'); await p.selectOption('#set-audio-days', '7'); await p.click('#btn-save-settings');
   await p.click('#btn-settings'); await p.selectOption('#set-meeting-days', '0'); await p.click('#btn-save-settings');
   ok(gone, 'no esborra la reunió antiga');
 });

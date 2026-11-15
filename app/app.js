@@ -1457,6 +1457,7 @@ async function startRecording(cont = null) {
     group: $('#meeting-group').value.trim(),
     source: CAN_CAPTURE_CALL && settings.source === 'call' ? 'call' : 'mic',
     startedAt: Date.now(),
+    createdAt: Date.now(),
     durationMs: 0,
     engine: settings.engine,
     speakers: settings.engine !== 'device' && settings.speakers !== false && settings.lastType !== 'revisio',
@@ -1487,6 +1488,7 @@ async function startRecording(cont = null) {
       const when = new Date().toLocaleString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
       m.segments.push({ idx: m.segments.length, startMs: m.durationMs || 0, status: 'done', text: `[Continuació gravada el ${when}]` });
       m.needsResummary = true;
+      delete m.audioPurged;
       delete m.retryAt;
       m.autoRetries = 0;
       m.status = 'recording';
@@ -3216,14 +3218,19 @@ async function exportPdf(m, tpl, btn) {
 // ---------------------------------------------------------------------------
 // Privadesa i espai: esborrat automàtic de l'àudio i de les reunions antigues
 // ---------------------------------------------------------------------------
-async function purgeAudio(m) {
-  for (const sg of m.segments || []) await db.del('audio', audioKey(m.id, sg.idx));
+async function purgeAudio(snapshot) {
+  const m = await getMeeting(snapshot.id);
+  if (!m || m.status !== 'done' || pipelines.has(m.id) || (rec.meeting && rec.meeting.id === m.id)) return;
+  // Els trossos que van tornar sense text es guarden (per poder-los tornar a transcriure).
+  for (const sg of m.segments || []) if (sg.text || !sg.empty) await db.del('audio', audioKey(m.id, sg.idx));
   if (m.engine === 'import') for (const f of importList(m)) await db.del('audio', f.key);
   m.audioPurged = true;
   await saveMeeting(m);
 }
-const oldMeetings = (all, days) => all.filter((m) => days > 0 && (m.status === 'done' || m.status === 'error') && !pipelines.has(m.id)
-  && !(rec.meeting && rec.meeting.id === m.id) && Date.now() - (m.startedAt || 0) > days * 86400000);
+// Edat d'una reunió: des de l'última vegada que s'ha acabat o tocat (no la data del fitxer importat).
+const meetingAge = (m) => Date.now() - Math.max(m.doneAt || 0, m.updatedAt || 0, m.createdAt || 0, m.startedAt || 0);
+const oldMeetings = (all, days) => all.filter((m) => days > 0 && m.status === 'done' && !pipelines.has(m.id)
+  && !(rec.meeting && rec.meeting.id === m.id) && meetingAge(m) > days * 86400000);
 let cleaning = false;
 async function retentionCleanup() {
   if (cleaning || rec.meeting) return;
@@ -3243,7 +3250,7 @@ async function retentionCleanup() {
     // 3. Si el mòbil va just d'espai, esborra primer l'àudio de les reunions més antigues
     if (navigator.storage && navigator.storage.estimate) {
       const est = await navigator.storage.estimate();
-      if (est.quota && est.usage / est.quota > 0.8) {
+      if (est.quota && est.usage / est.quota > (adays === -1 ? 0.95 : 0.8)) {
         for (const m of all) {
           if (m.audioPurged || m.status !== 'done' || pipelines.has(m.id) || deletedIds.has(m.id)) continue;
           await purgeAudio(m);
@@ -3259,7 +3266,7 @@ async function retentionCleanup() {
 const player = new Audio();
 let playerUrl = null, playingBtn = null;
 function playBlob(blob, btn, at = 0) {
-  if (playingBtn === btn && !player.paused) { player.pause(); return; }
+  if (playingBtn === btn) { if (player.paused) player.play().catch(() => {}); else player.pause(); if (!player.paused) btn.classList.add('playing'); return; }
   if (playerUrl) URL.revokeObjectURL(playerUrl);
   playerUrl = URL.createObjectURL(blob);
   player.src = playerUrl;
@@ -3269,7 +3276,9 @@ function playBlob(blob, btn, at = 0) {
   playingBtn = btn; btn.classList.add('playing');
 }
 player.onpause = () => { if (playingBtn) playingBtn.classList.remove('playing'); };
+let transcriptFor = null;
 async function renderTranscript(m) {
+  transcriptFor = m.id;
   const box = $('#result-transcript');
   const text = buildTranscript(m) || '(buida)';
   const plain = () => { box.innerHTML = text.split('\n').map(speakerHtml).join('\n'); };
@@ -3278,6 +3287,7 @@ async function renderTranscript(m) {
     const files = importList(m);
     const blobs = [];
     for (const f of files) blobs.push(await db.get('audio', f.key));
+    if (transcriptFor !== m.id) return;
     if (!blobs.some(Boolean)) { plain(); return; }
     // Un sol fitxer: els temps [mm:ss] porten a aquell punt de l'àudio.
     box.innerHTML = text.split('\n').map((l) => {
@@ -3299,9 +3309,15 @@ async function renderTranscript(m) {
   // Gravació en directe: un botó per tros.
   const segs = (m.segments || []).slice().sort((a, b) => a.idx - b.idx).filter((sg) => sg.text);
   const blobs = await Promise.all(segs.map((sg) => db.get('audio', audioKey(m.id, sg.idx))));
+  if (transcriptFor !== m.id) return; // s'ha obert una altra reunió mentrestant
   if (!blobs.some(Boolean)) { plain(); return; }
   box.textContent = '';
+  const gaps = (m.gaps || []).slice().sort((a, b) => a.atMs - b.atMs);
   segs.forEach((sg, i) => {
+    while (gaps.length && gaps[0].atMs <= (sg.startMs || 0)) {
+      const g = gaps.shift(); const d = document.createElement('div'); d.className = 'tseg muted';
+      d.textContent = `[Interrupció: ${fmtGap(g.ms)} sense gravar (mòbil bloquejat o en una altra app)]`; box.appendChild(d);
+    }
     const div = document.createElement('div');
     div.className = 'tseg';
     const head = document.createElement('div');
@@ -3348,27 +3364,29 @@ function zipStore(files) {
   return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
 function makeDocx(md, tpl = null) {
-  const x = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const x = (t) => t.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // rPr en l'ordre de l'esquema: b, color, sz, highlight
+  const rpr = ({ b = false, color: c = '', sz = 0, hl = false }) => `${b ? '<w:b/>' : ''}${c ? `<w:color w:val="${c}"/>` : ''}${sz ? `<w:sz w:val="${sz}"/>` : ''}${hl ? '<w:highlight w:val="yellow"/>' : ''}`;
   const color = ((tpl && tpl.color) || '#1f4bd8').replace('#', '');
-  const runs = (raw, base = '') => raw.split('**').map((p, i) => {
+  const runs = (raw, base = {}) => raw.split('**').map((p, i) => {
     if (!p) return '';
     const doubt = p.split(/(\[(?:dubte de comprensió|duda de comprensión|unclear)\])/i);
-    return doubt.map((q) => (!q ? '' : `<w:r><w:rPr>${base}${i % 2 ? '<w:b/>' : ''}${/^\[(dubte|duda|unclear)/i.test(q) ? '<w:highlight w:val="yellow"/>' : ''}</w:rPr><w:t xml:space="preserve">${x(q)}</w:t></w:r>`)).join('');
+    return doubt.map((q) => (!q ? '' : `<w:r><w:rPr>${rpr({ ...base, b: base.b || i % 2 === 1, hl: /^\[(dubte|duda|unclear)/i.test(q) })}</w:rPr><w:t xml:space="preserve">${x(q)}</w:t></w:r>`)).join('');
   }).join('');
   const P = (inner, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inner}</w:p>`;
   const body = [];
-  if (tpl && tpl.org) body.push(P(runs(tpl.org, `<w:color w:val="${color}"/><w:sz w:val="20"/>`), '<w:spacing w:after="200"/>'));
+  if (tpl && tpl.org) body.push(P(runs(tpl.org, { color, sz: 20 }), '<w:spacing w:after="200"/>'));
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd(); let m;
     if (!line.trim()) continue;
-    if ((m = line.match(/^#\s+(.*)$/))) body.push(P(runs(m[1], `<w:b/><w:sz w:val="40"/><w:color w:val="13265C"/>`), '<w:spacing w:after="160"/>'));
-    else if ((m = line.match(/^##\s+(.*)$/))) body.push(P(runs(m[1].toUpperCase(), `<w:b/><w:sz w:val="22"/><w:color w:val="${color}"/>`), `<w:spacing w:before="320" w:after="100"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="${color}"/></w:pBdr>`));
-    else if ((m = line.match(/^###\s+(.*)$/))) body.push(P(runs(m[1], '<w:b/><w:sz w:val="24"/>'), '<w:spacing w:before="200" w:after="60"/>'));
-    else if ((m = line.match(/^(\s*)[-*•]\s+(\[[ xX]?\]\s*)?(.*)$/))) body.push(P(runs(`${m[2] ? '☐ ' : '• '}${m[3]}`), `<w:ind w:left="${m[1].length >= 2 ? 720 : 360}" w:hanging="240"/><w:spacing w:after="60"/>`));
-    else if ((m = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/))) body.push(P(runs(`${m[2]}. ${m[3]}`), '<w:ind w:left="360" w:hanging="240"/><w:spacing w:after="60"/>'));
+    if ((m = line.match(/^#\s+(.*)$/))) body.push(P(runs(m[1], { b: true, color: '13265C', sz: 40 }), '<w:spacing w:after="160"/>'));
+    else if ((m = line.match(/^##\s+(.*)$/))) body.push(P(runs(m[1].toUpperCase(), { b: true, color, sz: 22 }), `<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="${color}"/></w:pBdr><w:spacing w:before="320" w:after="100"/>`));
+    else if ((m = line.match(/^###\s+(.*)$/))) body.push(P(runs(m[1], { b: true, sz: 24 }), '<w:spacing w:before="200" w:after="60"/>'));
+    else if ((m = line.match(/^(\s*)[-*•]\s+(\[[ xX]?\]\s*)?(.*)$/))) body.push(P(runs(`${m[2] ? '☐ ' : '• '}${m[3]}`), `<w:spacing w:after="60"/><w:ind w:left="${m[1].length >= 2 ? 720 : 360}" w:hanging="240"/>`));
+    else if ((m = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/))) body.push(P(runs(`${m[2]}. ${m[3]}`), '<w:spacing w:after="60"/><w:ind w:left="360" w:hanging="240"/>'));
     else body.push(P(runs(line), '<w:spacing w:after="100"/>'));
   }
-  if (tpl && tpl.footer) body.push(P(runs(tpl.footer, '<w:color w:val="64748B"/><w:sz w:val="16"/>'), '<w:spacing w:before="400"/>'));
+  if (tpl && tpl.footer) body.push(P(runs(tpl.footer, { color: '64748B', sz: 16 }), '<w:spacing w:before="400"/>'));
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:lang w:val="ca-ES"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`;
   return zipStore([
@@ -3921,6 +3939,7 @@ async function importFiles(list, { textOnly = false } = {}) {
     context: $('#meeting-context').value.trim(),
     group: $('#meeting-group').value.trim(),
     startedAt: Math.min(...files.map((f) => f.lastModified || Date.now())),
+    createdAt: Date.now(),
     durationMs: durations.reduce((a, b) => a + b, 0),
     engine: 'import',
     textOnly,
@@ -4146,7 +4165,7 @@ const driveDelete = (id) => gfetch(`${DRIVE}/files/${id}`, { method: 'DELETE' })
 const photoFileName = (key) => `photo-${key.replace(/[^\w-]/g, '_')}.jpg`;
 
 function syncableSettings() {
-  const { source, v, lastBackup, ...rest } = settings;
+  const { source, v, lastBackup, meetingDays, audioDays, ...rest } = settings; // l'esborrat és de cada aparell
   if (!settings.syncKeys && settings.syncKeys !== undefined) { delete rest.geminiKey; delete rest.scriptSecret; }
   return rest;
 }
@@ -4179,9 +4198,10 @@ async function syncNow({ manual = false } = {}) {
     try { localStorage.setItem('tombstones', JSON.stringify(deleted)); } catch { /* res */ }
     const remoteNewer = remoteCfg && Number(remoteCfg.updatedAt || 0) > Number(settings.updatedAt || 0);
     if (remoteNewer) {
-      const keep = { source: settings.source, v: settings.v, lastBackup: settings.lastBackup };
+      const keep = { source: settings.source, v: settings.v, lastBackup: settings.lastBackup, meetingDays: settings.meetingDays, audioDays: settings.audioDays };
       saveSettings({ ...remoteCfg.settings, ...keep, updatedAt: remoteCfg.updatedAt }, { silent: true });
       if (Array.isArray(remoteCfg.recentEmails)) rememberEmails(remoteCfg.recentEmails);
+      syncCustomTypes(); renderTypeChips(true);
       changed = true;
     }
     if (!remoteCfg || !remoteNewer && (Number(settings.updatedAt || 0) > Number(remoteCfg.updatedAt || 0) || deleted.length !== (remoteCfg.deleted || []).length)) {
@@ -4249,6 +4269,7 @@ function renderAccount(statusText = null) {
   $('#account-section').hidden = false;
   $('#gcid-setup').hidden = on;
   $('#gcid-ready').hidden = !on;
+  $('#btn-gcid-change').hidden = !!GOOGLE_CLIENT_ID;
   $('#welcome-google').hidden = !on || signedIn();
   if (!on) return;
   const st = $('#account-status');
