@@ -34,7 +34,7 @@ const b = await chromium.launch({ executablePath: exe, args: ['--use-fake-device
 const ctx = await b.newContext({ viewport: { width: 1100, height: 900 }, permissions: ['microphone', 'clipboard-read', 'clipboard-write'], acceptDownloads: true });
 
 // --- Simulacions ---
-const log = { gemini: [], script: [], sys: [] };
+const log = { gemini: [], script: [], sys: [], mimes: [] };
 let geminiFail = 0;
 const SUMMARY = "# Reunió de prova\n\n## Resum\nS'ha parlat del pressupost.\n\n## Desenvolupament de la reunió\n### Pressupost\n- Aprovat amb canvis.\n\n## Decisions\n- Tirar endavant.\n\n## Tasques\n- [ ] **Marta**: enviar l'informe — divendres\n- [ ] **Persona 1**: revisar el contracte [dubte de comprensió] — dilluns\n\n## Temes oberts i propers passos\n- Cap.\n\n## Dades clau\n- 5.000 €\n\n## Dubtes de comprensió\n- No s'entén el nom del proveïdor.";
 await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
@@ -46,7 +46,15 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   const sys = body.systemInstruction ? body.systemInstruction.parts[0].text : '';
   const user = parts.filter((x) => x.text).map((x) => x.text).join(' ');
   if (sys) log.sys.push(sys);
+  for (const x of parts) { const md = x.inlineData || x.fileData; if (md) log.mimes.push(md.mimeType || md.fileUri); }
   let txt;
+  if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
+  else if (user.includes('Proposa etiquetes')) txt = '{"etiquetes":["pressupost","Finances 2027"]}';
+  else if (sys.includes('Analitzes una reunió')) txt = '## Temps per tema\n- Pressupost [00:00]–[00:20]\n\n## Temes que han quedat oberts\n- Cap.';
+  else if (sys.includes('correus de seguiment')) txt = JSON.stringify({ correus: [{ nom: 'Marta', assumpte: 'Seguiment de la reunió', text: "Hola Marta,\nEt toca enviar l'informe.\nSalutacions," }, { nom: 'Persona 1', assumpte: 'x', text: 'x' }] });
+  else if (sys.includes('document de recull')) txt = '# Recull de prova\n\n## Resum general\n- Tot ha anat bé.';
+  else if (sys.includes('Respon preguntes sobre UNA reunió')) txt = 'La Marta va parlar del pressupost [00:05].';
+  if (txt) { log.gemini.push(sys ? 'SYS' : user.slice(0, 30)); return r.fulfill({ status: 200, contentType: url.includes('alt=sse') ? 'text/event-stream' : 'application/json', body: url.includes('alt=sse') ? `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: txt }] }, finishReason: 'STOP' }] })}\n\n` : JSON.stringify({ candidates: [{ content: { parts: [{ text: txt }] }, finishReason: 'STOP' }] }) }); }
   if (sys.includes("editor d'actes")) txt = SUMMARY.replace('[dubte de comprensió] ', '').replace("- No s'entén el nom del proveïdor.", '- Cap.');
   else if (sys.includes('Tradueix') || sys.includes('traductor')) txt = SUMMARY.replace('## Resum', '## Resumen');
   else if (sys.includes("estructura de l'usuari")) txt = '# Patronat\n\n## Assistents\n- Marta\n\n## Acords\n- Cap.\n\n## Tasques\n- Cap.';
@@ -67,6 +75,7 @@ await ctx.route(/script\.google\.com/, async (r) => {
   log.script.push(d.recipients ? `altres:${d.recipients.join(',')}` : `auto:${d.subject}`);
   await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, sentTo: d.recipients || [d.to], docUrl: 'https://docs.google.com/document/d/PROVA' }) });
 });
+await ctx.route(/youtube\.com\/oembed/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"title":"Xerrada de prova"}' }));
 await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 
 const p = await ctx.newPage();
@@ -337,6 +346,80 @@ await step('Editar la transcripció i refer l\'acta', async () => {
   await p.click('#btn-tr-edit'); await p.click('#btn-tr-original'); await p.waitForTimeout(600);
   ok(!(await meeting(id)).transcriptEdited, 'no torna a la original');
 });
+await step('Etiquetes automàtiques', async () => {
+  const m = await meeting(await lastId());
+  ok(JSON.stringify(m.tags) === '["pressupost","finances-2027"]', `etiquetes ${JSON.stringify(m.tags)}`);
+  await p.click('#btn-history'); await waitView('history');
+  await p.click('#history-filters .type-chip:has-text("#pressupost")'); await p.waitForTimeout(300);
+  const n = await p.$$eval('#history-list li', (l) => l.length);
+  const tagged = await p.$$eval('#history-list .tag', (l) => l.length);
+  ok(n > 0 && tagged >= n, `filtre: ${n} reunions, ${tagged} etiquetes`);
+  await p.evaluate(() => { historyFilter = { kind: 'all', value: '' }; });
+  return `${n} reunions amb #pressupost`;
+});
+await step('Pregunta sobre aquesta reunió', async () => {
+  await p.evaluate((id) => showResult(id), micId); await waitView('result');
+  await p.evaluate(() => { document.querySelector('#mq').open = true; });
+  await p.fill('#mq-input', 'Què va dir la Marta?'); await p.click('#btn-mq');
+  await p.waitForSelector('#mq-log .mq-at', { timeout: 30000 });
+  await p.click('#mq-log .mq-at'); await p.waitForTimeout(500);
+  return (await p.textContent('#mq-log .bubble.a')).slice(0, 40);
+});
+await step('Anàlisi de la reunió', async () => {
+  await p.click('#btn-more'); await p.click('#btn-analysis');
+  await p.waitForFunction(() => /Temps per tema/.test(document.querySelector('#an-body').textContent), null, { timeout: 30000 });
+  const m = await meeting(await p.evaluate(() => viewingId));
+  ok(m.analysis, 'no es desa');
+  await p.evaluate(() => closeSheets());
+});
+await step('Correu de seguiment a cada assistent', async () => {
+  await p.click('#btn-share-open'); await p.click('#btn-followup');
+  await p.waitForSelector('#fu-list .fu-card', { timeout: 30000 });
+  const n = await p.$$eval('#fu-list .fu-card', (l) => l.length);
+  ok(n === 1, `${n} correus (Persona 1 no hi ha de ser)`);
+  await p.fill('#fu-list .fu-to', 'marta@exemple.cat');
+  await p.click('#fu-list .fu-send');
+  await p.waitForFunction(() => /Enviat/.test(document.querySelector('.fu-st').textContent), null, { timeout: 15000 });
+  ok(log.script.some((x) => x === 'altres:marta@exemple.cat'), 'no ha sortit');
+  await p.evaluate(() => closeSheets());
+});
+await step('Documents PDF a la reunió', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
+  await p.setInputFiles('#docs-input', { name: 'pressupost.pdf', mimeType: 'application/pdf', buffer: pdf });
+  ok(/pressupost\.pdf/.test(await p.textContent('#docs-info')), 'no surt el document');
+  const before = log.mimes.length;
+  await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 60000);
+  const m = await meeting(await lastId());
+  ok(m.photos && m.photos[0].pdf && m.photos[0].name === 'pressupost.pdf', 'no es desa a la reunió');
+  ok(log.mimes.slice(before).includes('application/pdf'), 'no arriba a Gemini');
+  ok(await p.isVisible('#result-photos .thumb.doc'), 'no es veu al resultat');
+});
+await step('Vídeo de YouTube', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  await p.click('#btn-youtube'); await p.fill('#yt-url', 'no és un enllaç'); await p.click('#btn-yt-summary');
+  ok(/no sembla/.test(await p.textContent('#yt-msg')), 'accepta un enllaç dolent');
+  await p.fill('#yt-url', 'https://youtu.be/abcDEF12345?si=x'); await p.click('#btn-yt-summary');
+  await waitView('result', 60000);
+  const m = await meeting(await lastId());
+  ok(m.importFiles[0].youtube === 'https://www.youtube.com/watch?v=abcDEF12345', m.importFiles[0].youtube);
+  ok(m.title === 'Xerrada de prova', `títol ${m.title}`);
+  ok(m.status === 'done' && /vídeo parla del pressupost/.test(await p.textContent('#result-transcript')), 'sense transcripció');
+  return `trossos=${m.importFiles[0].ytParts.length}`;
+});
+await step('Resum de diverses reunions', async () => {
+  await p.click('#btn-history'); await waitView('history');
+  ok(await p.isVisible('#btn-multi'), 'no surt el botó');
+  await p.click('#btn-multi'); await p.waitForSelector('#multi-sheet:not([hidden])');
+  const n = await p.$$eval('#multi-list input:checked', (l) => l.length);
+  await p.click('#btn-multi-go'); await waitView('result', 30000);
+  const m = await meeting(await p.evaluate(() => viewingId));
+  ok(m.engine === 'digest' && m.digestOf.length === n && /Recull de prova/.test(m.summary), `recull ${m.engine}`);
+  ok(!(await p.isVisible('details.transcript')), 'mostra transcripció buida');
+  const tasks = await p.evaluate(async () => (await allTasks()).filter((t) => t.m.engine === 'digest').length);
+  ok(tasks === 0, 'el recull duplica tasques');
+  return `${n} reunions`;
+});
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');
   await p.click('#btn-tpl-new'); await p.fill('#tpl-name', 'Esportec'); await p.fill('#tpl-org', 'Esportec SL');
@@ -457,6 +540,19 @@ await step('Google: identificador i enllaç per vincular', async () => {
 await step('Avís d\'actualització', async () => {
   fakeVersion = { v: 999, notes: 'Prova' }; await p.evaluate(() => checkForUpdate()); await p.waitForTimeout(600);
   ok(await p.isVisible('#update-banner'), 'sense avís'); fakeVersion = null;
+});
+await step('Gravar amb un toc (?rec=1)', async () => {
+  await p.goto(URL0 + '?rec=1'); await p.waitForTimeout(1200);
+  ok(await p.isVisible('#quick-rec'), 'no surt el botó gran');
+  ok(!/rec=1/.test(p.url()), "l'adreça conserva ?rec=1");
+  await p.click('#btn-quick-rec'); await waitView('rec', 15000);
+  await p.waitForTimeout(3000);
+  await p.click('#btn-stop'); await waitView('result', 90000);
+  // L'ajust: en obrir l'app també surt
+  await p.evaluate(() => saveSettings({ quickStart: true })); await p.reload(); await p.waitForTimeout(1200);
+  ok(await p.isVisible('#quick-rec'), 'amb l\'ajust no surt');
+  await p.click('#btn-quick-no'); ok(!(await p.isVisible('#quick-rec')), 'no es tanca');
+  await p.evaluate(() => saveSettings({ quickStart: false }));
 });
 await step('Instruccions a Gemini sense noms d\'exemple', async () => {
   const all = log.sys.join(' ');

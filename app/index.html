@@ -154,11 +154,11 @@
             <label for="meeting-agenda" class="field-label">Ordre del dia <em>(opcional, millora molt l'acta)</em></label>
             <textarea id="meeting-agenda" rows="3" placeholder="Un punt per línia, p. ex.&#10;1. Pressupost 2027&#10;2. Contractacions&#10;3. Precs i preguntes"></textarea>
             <div class="agenda-photo-row">
-              <button id="btn-agenda-photo" class="btn secondary small btn-icon" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3.2L9 5.5h6l1.8 3H20V19H4z"/><circle cx="12" cy="13.5" r="3.4"/></svg> O afegeix-ne una foto</button>
+              <button id="btn-agenda-photo" class="btn secondary small btn-icon" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3.2L9 5.5h6l1.8 3H20V19H4z"/><circle cx="12" cy="13.5" r="3.4"/></svg> O afegeix-ne una foto o un PDF</button>
               <span id="agenda-photo-info" class="fineprint"></span>
               <button id="agenda-photo-clear" class="link" type="button" hidden>Treu-la</button>
             </div>
-            <input id="agenda-photo-input" type="file" accept="image/*" multiple hidden>
+            <input id="agenda-photo-input" type="file" accept="image/*,application/pdf,.pdf" multiple hidden>
             <small class="fineprint left">Xiu-xiu farà una acta professional: l'ordre del dia, cada punt redactat amb detall, acords i tasques. Triga una mica més.</small>
           </div>
           <label class="field">
@@ -174,6 +174,12 @@
             <span>Assistents i context <em>(opcional, millora el resum)</em></span>
             <textarea id="meeting-context" rows="2" placeholder="p. ex. Anna (finances), Jordi (vendes). Tema: pressupost 2027"></textarea>
           </label>
+          <div class="agenda-photo-row docs-row">
+            <button id="btn-docs" class="btn secondary small btn-icon" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a4.6 4.6 0 0 1-6.5-6.5l8.2-8.2a3 3 0 0 1 4.3 4.3l-8.2 8.2a1.5 1.5 0 0 1-2.1-2.1l7.5-7.5"/></svg> Adjunta documents (PDF o fotos)</button>
+            <span id="docs-info" class="fineprint"></span>
+            <button id="docs-clear" class="link" type="button" hidden>Treu-los</button>
+          </div>
+          <input id="docs-input" type="file" accept="image/*,application/pdf,.pdf" multiple hidden>
         </div>
 
         <button id="btn-import" class="qa card" type="button">
@@ -181,6 +187,7 @@
           <span class="qa-t"><b>Importa un àudio o vídeo</b><small>Notes de veu, àudios de WhatsApp, gravacions de Zoom o Teams…</small></span>
         </button>
 
+        <p class="voicememo-tip yt-tip"><button id="btn-youtube" class="link" type="button">▶ O fes-ne el resum d'un vídeo de YouTube</button></p>
         <p id="call-tip" class="voicememo-tip" hidden>Vols l'acta d'una trucada de telèfon? <button id="btn-call-guide" class="link" type="button">Mira com fer-ho</button></p>
         <p id="voicememo-tip" class="voicememo-tip" hidden>Reunió llarga o necessites fer servir el mòbil mentre graves? <button id="btn-voicememo" class="link" type="button">Grava-la amb Notes de veu</button></p>
 
@@ -248,6 +255,7 @@
         <button type="button" data-lang="en">English</button>
       </div>
       <div id="version-tabs" class="ver-tabs" hidden></div>
+      <div id="result-tags" class="tags result-tags" hidden></div>
       <div class="result-tools">
         <button id="btn-map" class="chip-btn" type="button">Mapa mental</button>
         <button id="btn-speakers" class="chip-btn" type="button">Noms de qui parla</button>
@@ -262,6 +270,14 @@
         <summary>Transcripció completa</summary>
         <button id="btn-tr-edit" class="chip-btn tr-edit" type="button">Edita la transcripció</button>
         <pre id="result-transcript"></pre>
+      </details>
+      <details id="mq" class="card mq" hidden>
+        <summary>Pregunta sobre aquesta reunió</summary>
+        <div id="mq-log" class="ask-log"></div>
+        <div class="ask-box">
+          <textarea id="mq-input" rows="2" placeholder="p. ex. Què va dir la Marta del pressupost?"></textarea>
+          <button id="btn-mq" class="btn primary" type="button">Pregunta</button>
+        </div>
       </details>
 
       <div class="action-bar">
@@ -291,6 +307,7 @@
       <h2>Historial</h2>
       <input id="history-search" class="search" type="search" placeholder="Cerca per títol, persona o tema" autocomplete="off">
       <div id="history-filters" class="type-chips filters" role="group" aria-label="Classificació"></div>
+      <button id="btn-multi" class="btn secondary full multi-btn" type="button" hidden>Resum de diverses reunions</button>
       <ul id="history-list" class="cards"></ul>
       <p class="fineprint" id="history-empty">Encara no hi ha reunions.</p>
     </section>
@@ -366,7 +383,8 @@
           </select></label>
         <label class="field"><span>Instruccions extra <em>(opcional)</em></span>
           <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
-        <label class="check last"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
+        <label class="check"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
+        <label class="check last"><input id="set-quick" type="checkbox"> En obrir Xiu-xiu, preparat per gravar amb un sol toc</label>
       </div>
 
       <h3>Les meves plantilles de resum</h3>
@@ -519,6 +537,7 @@
         <button id="btn-share" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><path d="M15.5 5.5a3 3 0 0 1 0 6M17.5 14.6c1.7.6 2.8 2.2 3.2 4.9"/></svg></span>A altres persones</button>
         <button id="btn-docx" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M8.5 12l1.5 5 2-4 2 4 1.5-5"/></svg></span>Word</button>
         <button id="btn-md" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M6.5 15V9l2.5 3 2.5-3v6M15.5 9v6M13.5 13l2 2 2-2"/></svg></span>Markdown</button>
+        <button id="btn-followup" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M3.5 7l8.5 6 8.5-6"/><path d="M15 15.5h5M17.5 13v5"/></svg></span>Correu a cada assistent</button>
         <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3.5"/></svg></span>Copia el text</button>
       </div>
       <div id="share-panel" class="share-panel" hidden>
@@ -791,8 +810,10 @@
       <div class="sheet-grip"></div>
       <h3>Més opcions</h3>
       <div class="sheet-list">
+        <button id="btn-analysis" class="sheet-row" type="button">📊 Anàlisi de la reunió (qui parla, temes oberts…)</button>
         <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
-        <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📷 Afegeix una foto d'un document</button>
+        <button id="btn-set-tags" class="sheet-row" type="button" data-closes># Etiquetes: <span id="tags-current">cap</span></button>
+        <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📎 Afegeix un document (foto o PDF)</button>
         <button id="btn-pro" class="sheet-row" type="button" data-closes>⭐ Refés-la com a acta professional (punt per punt)</button>
         <button id="btn-toggle-detail" class="sheet-row" type="button" data-closes>✂️ Fes-ne una versió més resumida</button>
         <button id="btn-fix-open" class="sheet-row" type="button">✏️ Corregeix l'acta (dubtes, noms, errors)</button>
@@ -802,6 +823,73 @@
       </div>
       <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
     </div>
+  </div>
+
+  <div id="yt-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Vídeo de YouTube">
+      <div class="sheet-grip"></div>
+      <h3>Vídeo de YouTube</h3>
+      <p class="fineprint left first">Enganxa l'enllaç d'un vídeo públic o «no llistat» (una reunió gravada, una xerrada, una formació…). Google l'escolta directament: no cal descarregar-lo.</p>
+      <input id="yt-url" type="url" inputmode="url" autocapitalize="off" placeholder="https://youtu.be/…">
+      <div class="sheet-list tpl-gap">
+        <button id="btn-yt-summary" class="sheet-row" type="button">✨ Fes-ne el resum<br><small>Amb el tipus de reunió que tens triat</small></button>
+        <button id="btn-yt-text" class="sheet-row" type="button">📝 Només el text<br><small>La transcripció neta</small></button>
+      </div>
+      <p id="yt-msg" class="fineprint"></p>
+      <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+  <div id="an-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Anàlisi de la reunió">
+      <div class="sheet-grip"></div>
+      <h3>Anàlisi de la reunió</h3>
+      <div id="an-body" class="an-body"></div>
+      <p id="an-msg" class="fineprint"></p>
+      <button id="btn-an-redo" class="btn ghost full" type="button" hidden>Torna a fer l'anàlisi</button>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <div id="fu-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Correu a cada assistent">
+      <div class="sheet-grip"></div>
+      <h3>Correu de seguiment a cada assistent</h3>
+      <p class="fineprint left first">Un correu per persona amb el que s'ha decidit i les seves tasques. Revisa'l abans d'enviar-lo: el pots canviar.</p>
+      <p id="fu-msg" class="fineprint"></p>
+      <div id="fu-list" class="fu-list"></div>
+      <p id="fu-empty" class="fineprint" hidden></p>
+      <button id="btn-fu-redo" class="btn ghost full" type="button">Torna a preparar els correus</button>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <div id="multi-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Resum de diverses reunions">
+      <div class="sheet-grip"></div>
+      <h3>Resum de diverses reunions</h3>
+      <p class="fineprint left first">Tria les reunions: Xiu-xiu en farà un recull amb com han evolucionat els temes, les decisions i les tasques pendents.</p>
+      <div class="multi-head"><span id="multi-count" class="fineprint"></span><button id="btn-multi-all" class="link" type="button">Totes / cap</button></div>
+      <div id="multi-list" class="multi-list"></div>
+      <label class="field"><span>Què vols saber? <em>(opcional)</em></span>
+        <input id="multi-ask" type="text" placeholder="p. ex. Com ha anat el pressupost aquest trimestre"></label>
+      <button id="btn-multi-go" class="btn primary full" type="button">Fes el resum</button>
+      <p id="multi-msg" class="fineprint"></p>
+      <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+  <div id="quick-rec" class="quick-rec" hidden>
+    <button id="btn-quick-rec" class="quick-rec-btn" type="button">
+      <span class="qr-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+      <b>Toca per gravar</b>
+      <small id="quick-rec-mode"></small>
+    </button>
+    <button id="btn-quick-no" class="btn ghost" type="button">Ara no</button>
   </div>
 
   <nav id="tabbar" class="tabbar" aria-label="Navegació">
@@ -823,7 +911,7 @@
     </button>
   </nav>
 
-  <input id="photo-input" type="file" accept="image/*" multiple hidden>
+  <input id="photo-input" type="file" accept="image/*,application/pdf,.pdf" multiple hidden>
   <input id="import-input" type="file" multiple accept="audio/*,video/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.flac,.mp4,.mov,.webm" hidden>
   <div id="toast" class="toast" hidden></div>
   <script src="app.js"></script>
