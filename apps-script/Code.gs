@@ -34,6 +34,9 @@ function doPost(e) {
     if (SECRET === 'CANVIA-AQUESTA-CLAU') return json_({ ok: false, error: "Cal canviar la clau secreta (SECRET) de l'script abans de fer-lo servir" });
     if (!data.secret || data.secret !== SECRET) return json_({ ok: false, error: 'unauthorized' });
 
+    // Reunió del calendari que hi ha ara (per omplir títol, assistents i ordre del dia).
+    if (data.action === 'currentEvent') return json_({ ok: true, events: currentEvents_() });
+
     // Enviament a altres persones (botó «Envia a altres persones»).
     if (Array.isArray(data.recipients)) return sendToOthers_(data);
 
@@ -216,6 +219,25 @@ function richText_(el, raw) {
   while ((mm = dubte.exec(text))) t.setForegroundColor(mm.index, mm.index + mm[0].length - 1, '#b45309');
 }
 
+// ---------------------------------------------------------------------------
+// Calendari: esdeveniments d'ara (de 45 min abans a 30 min després)
+// ---------------------------------------------------------------------------
+function currentEvents_() {
+  const now = new Date();
+  const from = new Date(now.getTime() - 45 * 60000), to = new Date(now.getTime() + 30 * 60000);
+  const me = Session.getEffectiveUser().getEmail().toLowerCase();
+  return CalendarApp.getDefaultCalendar().getEvents(from, to)
+    .filter(function (e) { return !e.isAllDayEvent(); })
+    .slice(0, 5)
+    .map(function (e) {
+      const guests = e.getGuestList(true)
+        .filter(function (gu) { return gu.getEmail().toLowerCase() !== me && gu.getGuestStatus() !== CalendarApp.GuestStatus.NO; })
+        .map(function (gu) { return gu.getName() || gu.getEmail().split('@')[0]; });
+      const desc = String(e.getDescription() || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|li|div)>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim().slice(0, 3000);
+      return { title: e.getTitle(), start: e.getStartTime().getTime(), end: e.getEndTime().getTime(), guests: guests.slice(0, 30), description: desc, location: e.getLocation() || '' };
+    });
+}
+
 // Per comprovar des del navegador que l'script està publicat.
 function doGet() {
   return json_({ ok: true, service: 'reunions' });
@@ -226,6 +248,7 @@ function autoritza() {
   GmailApp.getAliases();
   SpreadsheetApp.getActiveSpreadsheet();
   DriveApp.getRootFolder();
+  CalendarApp.getDefaultCalendar();
   DocumentApp.getActiveDocument;
 }
 

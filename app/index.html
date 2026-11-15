@@ -134,7 +134,7 @@
         </div>
 
         <div class="card form-card">
-          <div class="form-head">Detalls <em>opcional</em></div>
+          <div class="form-head">Detalls <em>opcional</em> <button id="btn-cal-fill" class="chip-btn cal-fill" type="button" hidden>📅 Omple-ho amb el calendari</button></div>
           <div class="field" id="type-field">
             <span>Tipus de reunió</span>
             <div id="type-chips" class="type-chips" role="group" aria-label="Tipus de reunió"></div>
@@ -247,10 +247,12 @@
         <button type="button" data-lang="es">Castellano</button>
         <button type="button" data-lang="en">English</button>
       </div>
+      <div id="version-tabs" class="ver-tabs" hidden></div>
       <div class="result-tools">
         <button id="btn-map" class="chip-btn" type="button">Mapa mental</button>
         <button id="btn-speakers" class="chip-btn" type="button">Noms de qui parla</button>
         <a id="doc-link" class="chip-btn" target="_blank" rel="noopener" hidden>Google Doc ↗</a>
+        <button id="btn-ver-delete" class="chip-btn danger-text" type="button" hidden>Esborra aquesta versió</button>
       </div>
       <article id="result-summary" class="summary card"></article>
       <div id="result-photos-wrap" class="photos-wrap" hidden>
@@ -258,6 +260,7 @@
       </div>
       <details class="transcript card">
         <summary>Transcripció completa</summary>
+        <button id="btn-tr-edit" class="chip-btn tr-edit" type="button">Edita la transcripció</button>
         <pre id="result-transcript"></pre>
       </details>
 
@@ -370,7 +373,10 @@
       <div class="card group">
         <p class="fineprint left first">Escriu l'estructura que vols (p. ex. «Acta de patronat» o «Seguiment de client») i surtirà com un tipus de reunió més.</p>
         <div id="stpl-list" class="tpl-list"></div>
-        <button id="btn-stpl-new" class="btn secondary small" type="button">+ Nova plantilla de resum</button>
+        <div class="row2">
+          <button id="btn-gallery" class="btn secondary small" type="button">Biblioteca de plantilles</button>
+          <button id="btn-stpl-new" class="btn secondary small" type="button">+ Crea'n una</button>
+        </div>
       </div>
 
       <h3>Acta en PDF</h3>
@@ -555,6 +561,49 @@
         <button id="btn-import-text" class="sheet-row" type="button">📝 Només el text<br><small>Transcripció neta, per copiar-la a un document o passar-la a un assistent</small></button>
       </div>
       <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+  <!-- Editar la transcripció -->
+  <div id="tr-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Edita la transcripció">
+      <div class="sheet-grip"></div>
+      <h3>Edita la transcripció</h3>
+      <p class="fineprint left first">Corregeix paraules, noms o frases. Després pots refer l'acta amb la transcripció corregida.</p>
+      <textarea id="tr-text" class="fix-manual-text" rows="18"></textarea>
+      <button id="btn-tr-save" class="btn primary full tpl-gap" type="button">Desa la transcripció</button>
+      <button id="btn-tr-original" class="btn ghost full" type="button" hidden>Torna a la transcripció original</button>
+      <button class="btn ghost full" type="button" data-close-sheet>Cancel·la</button>
+      <p id="tr-msg" class="fineprint"></p>
+    </div>
+  </div>
+
+  <!-- Una altra versió de la reunió -->
+  <div id="ver-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Una altra versió">
+      <div class="sheet-grip"></div>
+      <h3>Fes-ne una altra versió</h3>
+      <p class="fineprint left first">A partir de la mateixa reunió (l'acta principal no es toca). Es guarda en una pestanya.</p>
+      <div id="ver-list" class="sheet-list"></div>
+      <label class="field"><span>O descriu què vols</span>
+        <textarea id="ver-custom" rows="2" placeholder="p. ex. Un resum per al butlletí de l'entitat, en to proper"></textarea></label>
+      <button id="btn-ver-custom" class="btn primary full" type="button">Fes-la</button>
+      <p id="ver-msg" class="fineprint"></p>
+      <button class="btn ghost full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <!-- Biblioteca de plantilles -->
+  <div id="gallery-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Biblioteca de plantilles">
+      <div class="sheet-grip"></div>
+      <h3>Biblioteca de plantilles</h3>
+      <p class="fineprint left first">Toca la que vulguis i surtirà com un tipus de reunió més. Després la pots canviar a Ajustos › Les meves plantilles de resum.</p>
+      <div id="gallery-list" class="sheet-list"></div>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
     </div>
   </div>
 

@@ -582,3 +582,14 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .record-btn.starting { opacity: .75; }
 .record-btn.starting .dot { animation: recstart 1s ease-in-out infinite; }
 @keyframes recstart { 50% { transform: scale(.82); opacity: .7; } }
+.form-head .cal-fill { float: right; margin-top: -6px; font-size: 13px; padding: 5px 11px; text-transform: none; letter-spacing: 0; }
+.more-chip { border-style: dashed; color: var(--accent); background: transparent; }
+
+/* Versions de la reunió */
+.ver-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 10px; padding-bottom: 2px; scrollbar-width: none; }
+.ver-tabs::-webkit-scrollbar { display: none; }
+.ver-tab { flex: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 10px; cursor: pointer; white-space: nowrap; }
+.ver-tab[aria-pressed="true"] { color: var(--accent-ink); border-bottom-color: var(--accent); }
+.ver-tab.add { color: var(--accent); font-weight: 500; }
+@media (prefers-color-scheme: dark) { .ver-tab[aria-pressed="true"] { color: var(--accent); } }
+.tr-edit { margin: 0 0 10px; }

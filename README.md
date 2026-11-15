@@ -128,6 +128,13 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Calendari, plantilles, versions i editar (v66)
+
+- **📅 Omple-ho amb el calendari**: a l'inici, agafa el títol, els convidats, el lloc i la convocatòria de la reunió que tens ara al Google Calendar (cal l'script de Google actualitzat i tornar a executar `autoritza`).
+- **Biblioteca de plantilles**: 12 tipus de reunió en català (junta de veïns, consell escolar, patronat, visita a client…) a Ajustos › Plantilles › «Més plantilles». I el tipus **Automàtic**, que mira la transcripció i tria la plantilla que hi encaixa.
+- **Diverses versions**: a la pantalla de l'acta, «+ Una altra versió» crea un resum per a direcció, un correu per al client, les tasques per a l'equip, un WhatsApp, notes personals o el que demanis. Cada versió queda en una pestanya i es pot exportar i enviar.
+- **Editar la transcripció**: a «Transcripció completa», «Edita la transcripció» per corregir-la a mà i refer l'acta amb la versió bona. Sempre pots tornar a l'original.
+
 ## Mapa mental, tasques, noms i Google Docs
 
 - **Mapa mental:** al resultat, toca **«Mapa mental»**. Es fa a partir de l'acta (temes, acords, tasques…), sense afegir-hi res. Es pot desar o compartir com a imatge.

@@ -51,6 +51,8 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   else if (sys.includes('Tradueix') || sys.includes('traductor')) txt = SUMMARY.replace('## Resum', '## Resumen');
   else if (sys.includes("estructura de l'usuari")) txt = '# Patronat\n\n## Assistents\n- Marta\n\n## Acords\n- Cap.\n\n## Tasques\n- Cap.';
   else if (/secretari|resumeix gravacions|document de revisió/.test(sys)) txt = SUMMARY;
+  else if (sys.includes('escriu el document que et demana')) txt = '# Per a direcció\n\n- Pressupost de 5.000 € aprovat.';
+  else if (user.includes('tipus de reunió possibles')) txt = '{"tipus":"comercial"}';
   else if (sys.includes('consultar les seves reunions')) txt = 'El pressupost és de 5.000 € (Reunió de prova).';
   else if (parts.some((x) => x.inlineData || x.fileData)) txt = 'Marta: parlem del pressupost de 5.000 euros.';
   else txt = 'OK';
@@ -61,6 +63,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
 });
 await ctx.route(/script\.google\.com/, async (r) => {
   const d = JSON.parse(r.request().postData() || '{}');
+  if (d.action === 'currentEvent') { log.script.push('calendari'); const t = Date.now(); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, events: [{ title: 'Comitè de pressupostos', start: t - 300000, end: t + 3000000, guests: ['marta@exemple.cat', 'pere@exemple.cat'], location: 'Sala 2', description: '1. Pressupost\n2. Torn obert' }] }) }); }
   log.script.push(d.recipients ? `altres:${d.recipients.join(',')}` : `auto:${d.subject}`);
   await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, sentTo: d.recipients || [d.to], docUrl: 'https://docs.google.com/document/d/PROVA' }) });
 });
@@ -267,6 +270,72 @@ await step('Plantilla de resum pròpia', async () => {
   const m = await meeting(await lastId());
   ok(/^# Patronat/.test(m.summary), 'no fa servir la plantilla');
   await p.click('#btn-tab-home'); await p.click('.type-chip[data-type="general"]');
+});
+await step('Omplir la reunió amb el calendari', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  await p.click('.mode[data-mode="general"]');
+  ok(await p.isVisible('#btn-cal-fill'), 'no surt el botó del calendari');
+  await p.fill('#meeting-title', ''); await p.fill('#meeting-context', '');
+  await p.click('#btn-cal-fill'); await p.waitForTimeout(800);
+  const v = await p.evaluate(() => ({ t: $('#meeting-title').value, c: $('#meeting-context').value }));
+  ok(v.t === 'Comitè de pressupostos', `títol: ${v.t}`);
+  ok(/pere@exemple\.cat/.test(v.c) && /Sala 2/.test(v.c) && /Torn obert/.test(v.c), `context: ${v.c}`);
+  await p.fill('#meeting-title', ''); await p.fill('#meeting-context', '');
+});
+await step('Biblioteca de plantilles i tipus Automàtic', async () => {
+  await p.click('#btn-settings'); await waitView('settings');
+  await p.click('#btn-gallery'); await p.waitForSelector('#gallery-sheet:not([hidden])');
+  const n = await p.$$eval('#gallery-list button', (l) => l.length);
+  await p.click('#gallery-list button:has-text("Junta de veïns")'); await p.waitForTimeout(300);
+  ok(await p.isDisabled('#gallery-list button:has-text("Junta de veïns")'), 'no queda afegida');
+  await p.evaluate(() => closeSheets());
+  await p.click('#btn-tab-home'); await waitView('home');
+  ok(await p.$('.type-chip[data-type^="tpl_"]:has-text("Junta de veïns")'), 'no surt el xip nou');
+  await p.click('.type-chip[data-type="auto"]');
+  await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 60000);
+  const m = await meeting(await lastId());
+  ok(m.type === 'auto' && m.autoType === 'comercial', `tipus ${m.type}/${m.autoType}`);
+  await p.click('#btn-tab-home'); await p.click('.type-chip[data-type="general"]');
+  return `${n} plantilles; detectat: ${m.autoType}`;
+});
+await step('Diverses versions de la reunió', async () => {
+  const id = await lastId(); await p.evaluate((id) => showResult(id), id); await waitView('result');
+  ok(await p.isVisible('#version-tabs'), 'sense pestanyes');
+  await p.click('.ver-tab.add'); await p.waitForSelector('#ver-sheet:not([hidden])');
+  await p.click('#ver-list button:has-text("Resum per a direcció")');
+  await p.waitForFunction(() => (document.querySelector('#result-summary').textContent || '').includes('Per a direcció'), null, { timeout: 30000 });
+  ok(!(await p.isVisible('#lang-switch')) && await p.isVisible('#btn-ver-delete'), 'controls de versió');
+  await p.click('.ver-tab.add'); await p.fill('#ver-custom', 'Un correu curt per al proveïdor'); await p.click('#btn-ver-custom');
+  await p.waitForFunction(() => document.querySelectorAll('.ver-tab').length === 4, null, { timeout: 30000 });
+  // Copiar fa servir la versió que es mira
+  await p.click('#btn-share-open').catch(() => {});
+  await p.evaluate(() => closeSheets());
+  await p.click('.ver-tab >> nth=0'); await p.waitForTimeout(300);
+  ok((await p.textContent('#result-summary')).includes("enviar l'informe"), "no torna a l'acta");
+  await p.click('.ver-tab >> nth=1'); await p.waitForTimeout(200);
+  await p.click('#btn-ver-delete'); await p.waitForTimeout(500);
+  const m = await meeting(id);
+  ok(m.versions.length === 1 && m.summary.includes("enviar l'informe"), `versions ${m.versions.length}`);
+  return `${m.versions.length} versió desada`;
+});
+await step('Editar la transcripció i refer l\'acta', async () => {
+  const id = await lastId();
+  await p.evaluate(() => { document.querySelector('details.transcript').open = true; });
+  await p.click('#btn-tr-edit'); await p.waitForSelector('#tr-sheet:not([hidden])');
+  const before = await p.inputValue('#tr-text');
+  ok(/pressupost/.test(before), 'textarea buida');
+  await p.fill('#tr-text', before.replace(/pressupost/g, 'PRESSUPOST CORREGIT'));
+  const calls = log.gemini.length;
+  await p.click('#btn-tr-save');
+  for (let i = 0; i < 100 && log.gemini.length === calls; i++) await p.waitForTimeout(300);
+  await waitStatus(id, ['done'], 60000); await waitView('result', 60000);
+  const m = await meeting(id);
+  ok(m.transcriptEdited && m.transcriptEdited.includes('PRESSUPOST CORREGIT'), 'no desa');
+  ok(log.gemini.length > calls, "no refà l'acta");
+  ok((await p.textContent('#result-transcript')).includes('PRESSUPOST CORREGIT'), 'no es veu');
+  await p.evaluate(() => { document.querySelector('details.transcript').open = true; });
+  await p.click('#btn-tr-edit'); await p.click('#btn-tr-original'); await p.waitForTimeout(600);
+  ok(!(await meeting(id)).transcriptEdited, 'no torna a la original');
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');
