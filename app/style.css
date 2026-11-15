@@ -577,3 +577,8 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .play-btn { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: 0; border-radius: 99px; padding: 3px 10px; cursor: pointer; }
 .play-btn.playing { background: var(--accent); color: var(--accent-text); }
 #result-transcript .tseg.muted { color: var(--muted); font-style: italic; }
+
+/* Botó de gravar mentre s'inicia */
+.record-btn.starting { opacity: .75; }
+.record-btn.starting .dot { animation: recstart 1s ease-in-out infinite; }
+@keyframes recstart { 50% { transform: scale(.82); opacity: .7; } }

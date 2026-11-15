@@ -1,6 +1,6 @@
 /* Xiu-xiu — grava, transcriu, resumeix i envia per correu. */
 'use strict';
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 
 // ---------------------------------------------------------------------------
 // Configuració
@@ -1215,11 +1215,20 @@ function pickMime() {
   return opts.find((t) => MediaRecorder.isTypeSupported(t)) || '';
 }
 
+// Cap pas de l'inici de la gravació pot quedar-se esperant per sempre.
+const withTimeout = (p, ms, fallback = undefined) => Promise.race([Promise.resolve(p).catch(() => fallback), new Promise((r) => setTimeout(() => r(fallback), ms))]);
+// Prepara el motor d'àudio DINS del toc al botó (a l'iPhone, fora del toc no es pot engegar).
+function primeAudio() {
+  try {
+    if (!rec.audioCtx || rec.audioCtx.state === 'closed') rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (rec.audioCtx.state !== 'running') rec.audioCtx.resume().catch(() => {});
+  } catch { /* sense Web Audio: es grava igualment, sense mesurador */ }
+}
 async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
-      rec.wakeLock = await navigator.wakeLock.request('screen');
-      return true;
+      rec.wakeLock = await withTimeout(navigator.wakeLock.request('screen'), 2000, null);
+      return !!rec.wakeLock;
     }
   } catch { /* no disponible */ }
   return false;
@@ -1273,7 +1282,7 @@ async function openMic() {
       toast("No s'ha pogut fer servir el micròfon: es grava només el so de la trucada (la teva veu potser no hi sortirà).", 9000);
     }
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
+    if (rec.audioCtx.state !== 'running') await withTimeout(rec.audioCtx.resume(), 1500);
     // Barreja: so de la trucada + micròfon -> mixer -> (gravació i mesurador).
     // El mesurador s'ha de connectar al mixer: si es llegeix del flux de sortida
     // del mateix AudioContext, Chrome hi dona silenci i tot semblava mut.
@@ -1293,7 +1302,7 @@ async function openMic() {
   }
   try {
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (rec.audioCtx.state !== 'running') await rec.audioCtx.resume();
+    if (rec.audioCtx.state !== 'running') await withTimeout(rec.audioCtx.resume(), 1500);
     const src = rec.meeting && rec.meeting.source === 'call' && rec.mixer ? rec.mixer : rec.audioCtx.createMediaStreamSource(rec.stream);
     rec.analyser = rec.audioCtx.createAnalyser();
     rec.analyser.fftSize = 1024;
@@ -1317,7 +1326,7 @@ async function startPeakMeter(src) {
       const url = URL.createObjectURL(new Blob([PEAK_WORKLET], { type: 'text/javascript' }));
       rec.audioCtx.xxPeak = rec.audioCtx.audioWorklet.addModule(url);
     }
-    await rec.audioCtx.xxPeak;
+    await withTimeout(rec.audioCtx.xxPeak, 3000);
     const node = new AudioWorkletNode(rec.audioCtx, 'xx-peak', { numberOfOutputs: 0 });
     node.port.onmessage = (e) => { if (!rec.paused) rec.segPeak = Math.max(rec.segPeak || 0, e.data); };
     src.connect(node);
@@ -1448,7 +1457,43 @@ function startSpeech() {
 async function startRecording(cont = null) {
   const miss = missingSetup();
   if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); showView('settings'); return; }
-  if (rec.meeting) return;
+  if (rec.starting) return; // ja s'està iniciant (doble toc)
+  if (rec.meeting) {
+    // Una gravació que ja va: torna-hi. Si era un estat penjat (sense gravadora), es neteja.
+    const alive = rec.recorder && rec.recorder.state !== 'inactive';
+    if (alive || rec.paused) { showView('rec'); return; }
+    rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
+    stopExtraStreams();
+    Object.assign(rec, { meeting: null, stream: null, recorder: null });
+  }
+  primeAudio(); // dins del toc
+  rec.starting = true;
+  const token = uid();
+  rec.startToken = token;
+  const btn = $('#btn-record');
+  btn.classList.add('starting'); btn.disabled = true;
+  const caption = $('#record-caption') ? $('#record-caption').textContent : '';
+  if ($('#record-caption')) $('#record-caption').textContent = 'Iniciant la gravació…';
+  const done = () => { rec.starting = false; btn.classList.remove('starting'); btn.disabled = false; if ($('#record-caption')) $('#record-caption').textContent = caption; };
+  // Vigilant: si en 25 s no ha començat, s'atura i s'avisa (mai no es queda encallat).
+  const watchdog = setTimeout(() => {
+    if (rec.startToken !== token || !rec.starting) return;
+    rec.startToken = null;
+    rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
+    stopExtraStreams();
+    Object.assign(rec, { meeting: null, stream: null, recorder: null });
+    done();
+    toast("No s'ha pogut començar a gravar (el micròfon no ha respost). Torna a tocar el botó. Si passa sovint, tanca Xiu-xiu del tot i torna-la a obrir.", 9000);
+  }, 25000);
+  try {
+    await startRecordingInner(cont, token);
+  } finally {
+    clearTimeout(watchdog);
+    if (rec.startToken === token) { rec.startToken = null; done(); }
+  }
+}
+async function startRecordingInner(cont, token) {
+  const cancelled = () => rec.startToken !== token;
 
   const m = cont || {
     id: uid(),
@@ -1482,6 +1527,7 @@ async function startRecording(cont = null) {
       if (rec.mime === null) throw new Error('Aquest navegador no pot gravar àudio');
       rec.meeting = m; // openMic necessita saber la font (micròfon o videotrucada)
       await openMic();
+      if (cancelled()) { rec.stream && rec.stream.getTracks().forEach((t) => t.stop()); stopExtraStreams(); return; }
     }
     if (cont) {
       // Marca on comença la continuació i demana refer el resum en acabar.
@@ -1510,13 +1556,16 @@ async function startRecording(cont = null) {
     return;
   }
 
-  const hasWake = await requestWakeLock();
-  $('#rec-warning').hidden = false;
-  $('#rec-warning').textContent = m.source === 'call'
+  if (cancelled()) return;
+  // La pantalla de gravació surt de seguida; mantenir la pantalla encesa es demana en paral·lel.
+  const warn = (hasWake) => { $('#rec-warning').textContent = m.source === 'call'
     ? "Pots anar a la pestanya de la videotrucada: Xiu-xiu continua gravant. No tanquis aquesta pestanya ni deixis de compartir."
     : CAN_CAPTURE_CALL
       ? 'No tanquis aquesta pestanya mentre gravis.'
-      : (hasWake ? "No bloquegis el mòbil ni canviïs d'app: el mòbil atura el micròfon de les webs en segon pla." : TXT.noWake);
+      : (hasWake ? "No bloquegis el mòbil ni canviïs d'app: el mòbil atura el micròfon de les webs en segon pla." : TXT.noWake); };
+  $('#rec-warning').hidden = false;
+  warn(true);
+  requestWakeLock().then(warn);
   $('#rec-title').textContent = m.title || fmtDate(m.startedAt);
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
@@ -1598,7 +1647,7 @@ async function togglePause() {
       if (rec.recorder && rec.recorder.xxStopped && rec.recorder.state === 'inactive') await rec.recorder.xxStopped;
       await segmentChain;
       if (!rec.meeting || rec.stopping) return;
-      if (rec.audioCtx && rec.audioCtx.state !== 'running') await rec.audioCtx.resume().catch(() => {});
+      if (rec.audioCtx && rec.audioCtx.state !== 'running') await withTimeout(rec.audioCtx.resume(), 1500);
       rec.paused = false;
       rec.lastTick = performance.now();
       if (!rec.recorder || rec.recorder.state === 'inactive') startSegment();
@@ -1642,7 +1691,8 @@ async function stopRecording() {
     stopExtraStreams();
     if (rec.wakeLock) { rec.wakeLock.release().catch(() => {}); rec.wakeLock = null; }
     try { rec.peakNode && rec.peakNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
-    if (rec.audioCtx && rec.audioCtx.state === 'running') rec.audioCtx.suspend().catch(() => {});
+    // Es tanca (no s'adorm): a l'iPhone, un motor adormit no es pot tornar a engegar fora d'un toc.
+    if (rec.audioCtx) { rec.audioCtx.close().catch(() => {}); rec.audioCtx = null; }
     Object.assign(rec, { meeting: null, stream: null, recorder: null, speech: null, analyser: null, peakNode: null, mixer: null });
     $('#btn-stop').disabled = false;
   }
