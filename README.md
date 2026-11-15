@@ -134,7 +134,7 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Tasques:** a l'inici, **«Totes les tasques →»** mostra les tasques de totes les reunions. Les pots marcar com a fetes, filtrar per persona, **afegir al calendari** (del mòbil o de Google; la data es proposa a partir del termini dit a la reunió) i **enviar a cada persona les seves pendents**.
 - **Noms de qui parla:** al resultat, **«Noms de qui parla»** canvia «Persona 1» pel nom real a tota la transcripció i l'acta, i el recorda per a les properes reunions.
 - **Google Docs:** amb l'script actualitzat, cada acta es desa també com a Google Doc a la carpeta **«Xiu-xiu · Actes»** del teu Drive (i s'actualitza si refàs el resum). L'enllaç surt al correu i al resultat.
-- **Trucades:** l'iPhone (iOS 18.1 o posterior) grava trucades des de l'app Telèfon i les desa a Notes. Desa l'àudio a Fitxers, tria el tipus **«Trucada»** i importa'l. A l'inici hi ha la guia **«Mira com fer-ho»**.
+- **Trucades:** a la UE (Espanya inclosa) l'iPhone no permet gravar trucades des de l'app Telèfon. Alternatives: altaveu i gravar amb un altre aparell; des d'un PC amb Windows i l'app Enllaç mòbil (Xiu-xiu › Videotrucada › Pantalla sencera amb l'àudio del sistema); trucades per Meet/Teams/Zoom; o apps de pagament. Fora de la UE, iOS 18.1+ grava des de Telèfon i ho desa a Notes. A l'inici hi ha la guia **«Mira com fer-ho»**.
 
 ## Gravar sense talls (iPhone) i reunions llargues
 
