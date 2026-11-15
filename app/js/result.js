@@ -483,8 +483,12 @@ async function showResult(id) {
 function openSheet(id) {
   closeSheets();
   $(id).hidden = false;
+  document.body.classList.add('sheet-open'); // que no es mogui la pantalla de darrere
+  const panel = $(id).querySelector('.sheet-panel');
+  if (panel) panel.scrollTop = 0;
 }
 function closeSheets() {
+  document.body.classList.remove('sheet-open');
   document.querySelectorAll('.sheet').forEach((el) => { el.hidden = true; });
   $('#share-panel').hidden = true;
 }

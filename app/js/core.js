@@ -1,6 +1,6 @@
 /* Xiu-xiu · Base: configuració, utilitats, Markdown, base de dades i textos d'error. */
 'use strict';
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 
 
 // ---------------------------------------------------------------------------
@@ -370,3 +370,11 @@ function friendlyError(raw) {
   if (/script|Apps Script|correu/i.test(t)) return t;
   return 'Hi ha hagut un problema inesperat.';
 }
+
+// Tots els fulls inferiors tenen una ✕ a dalt que sempre es veu (encara que la llista sigui llarga).
+document.querySelectorAll('.sheet-panel').forEach((panel) => {
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'sheet-x'; x.setAttribute('aria-label', 'Tanca'); x.dataset.closeSheet = '';
+  x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  panel.prepend(x);
+});

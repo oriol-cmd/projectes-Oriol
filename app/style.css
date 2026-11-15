@@ -638,3 +638,7 @@ button.tag { cursor: pointer; }
 .quick-rec-btn .qr-ic svg { width: 64px; height: 64px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
 .quick-rec-btn b { font-size: 22px; }
 .quick-rec-btn small { font-size: 14px; opacity: .9; }
+.sheet-panel { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.sheet-x { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin: 2px -4px -38px auto; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text); cursor: pointer; box-shadow: var(--shadow); }
+.sheet-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+body.sheet-open { overflow: hidden; }
