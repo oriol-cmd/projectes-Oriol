@@ -520,7 +520,7 @@ async function gfetch(url, opts = {}, ms = 60000) {
   if (!tokenValid()) throw new AuthError('Sessió de Google caducada');
   const res = await fetchWithTimeout(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: `Bearer ${gauth.token}` } }, ms);
   if (res.status === 401) { saveAuth({ token: null, exp: 0 }); throw new AuthError('Sessió de Google caducada'); }
-  if (!res.ok) throw new Error(`Google Drive ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  if (!res.ok) throw new Error(`Google Drive ${res.status}: ${(await res.text()).replace(/\s+/g, ' ').slice(0, 400)}`);
   return res;
 }
 async function loadGoogleProfile() {

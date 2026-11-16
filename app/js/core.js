@@ -1,6 +1,6 @@
 /* Xiu-xiu · Base: configuració, utilitats, Markdown, base de dades i textos d'error. */
 'use strict';
-const APP_VERSION = 68;
+const APP_VERSION = 69;
 
 
 // ---------------------------------------------------------------------------
@@ -357,6 +357,12 @@ document.querySelectorAll('#lang-switch button').forEach((b) => {
 function friendlyError(raw) {
   const t = String(raw || '');
   if (/quota/i.test(t) && /esgotat/i.test(t)) return t;
+  if (/Google Drive/.test(t)) {
+    if (/has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(t)) return "la Google Drive API no està activada al projecte de Google Cloud on has creat l'identificador. Activa-la a APIs i serveis › Biblioteca (si l'acabes d'activar, espera 5 minuts) i toca «Sincronitza ara».";
+    if (/insufficient|scope/i.test(t)) return "no has donat permís a Xiu-xiu per al Drive. Toca «Tanca la sessió» i torna a entrar amb Google acceptant-ho tot.";
+    if (/Google Drive 403/.test(t)) return "Google no deixa fer servir el Drive amb aquest compte (si és d'empresa, potser l'administrador ho té limitat).";
+    if (/Google Drive 5\d\d/.test(t)) return 'el Drive no respon ara mateix. Ho tornarem a provar sols.';
+  }
   if (/clau de Gemini no és vàlida|API key not valid|API_KEY_INVALID/i.test(t)) return 'La clau de Google no és vàlida. Revisa-la a ⚙️ Configuració.';
   if (/No s'ha trobat el fitxer|no accepta (el|aquest) format|massa gran/i.test(t)) return t;
   if (/denegat|PERMISSION_DENIED|Gemini 403/i.test(t)) return "Google no ha permès l'accés amb aquesta clau. Revisa-la a ⚙️ Configuració.";
