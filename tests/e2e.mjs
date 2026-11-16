@@ -49,6 +49,9 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   for (const x of parts) { const md = x.inlineData || x.fileData; if (md) log.mimes.push(md.mimeType || md.fileUri); }
   let txt;
   if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
+  else if (user.includes("fragment curt d'una reunió")) txt = 'Això és el text en directe de prova.';
+  else if (user.includes("Transcriu literalment el text d'aquests documents")) txt = "[Document 1]\nApunts: pressupost 5.000 €\n- Revisar contracte";
+  else if (sys.includes('apunts o documents')) txt = "# Apunts del pressupost\n\n## Resum\nNotes sobre el pressupost.\n\n## Punts principals\n- Pressupost de 5.000 €.\n\n## Dades clau\n- 5.000 €\n\n## Tasques\n- Cap.\n\n## Dubtes de comprensió\n- Cap.";
   else if (user.includes('Proposa etiquetes')) txt = '{"etiquetes":["pressupost","Finances 2027"]}';
   else if (sys.includes('Analitzes una reunió')) txt = '## Temps per tema\n- Pressupost [00:00]–[00:20]\n\n## Temes que han quedat oberts\n- Cap.';
   else if (sys.includes('correus de seguiment')) txt = JSON.stringify({ correus: [{ nom: 'Marta', assumpte: 'Seguiment de la reunió', text: "Hola Marta,\nEt toca enviar l'informe.\nSalutacions," }, { nom: 'Persona 1', assumpte: 'x', text: 'x' }] });
@@ -419,6 +422,33 @@ await step('Resum de diverses reunions', async () => {
   const tasks = await p.evaluate(async () => (await allTasks()).filter((t) => t.m.engine === 'digest').length);
   ok(tasks === 0, 'el recull duplica tasques');
   return `${n} reunions`;
+});
+await step("Fotos d'apunts → resum", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
+  await p.setInputFiles('#notes-input', [{ name: 'apunts1.png', mimeType: 'image/png', buffer: png }, { name: 'apunts2.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') }]);
+  await p.waitForSelector('#import-sheet:not([hidden])');
+  ok(/2 documents/.test(await p.textContent('#import-sheet-title')), 'títol del full');
+  await p.click('#btn-import-summary'); await waitView('result', 60000);
+  const m = await meeting(await lastId());
+  ok(m.engine === 'docs' && m.photos.length === 2, `motor ${m.engine}, ${m.photos.length} docs`);
+  ok(/Revisar contracte/.test(m.segments[0].text) && /^# Apunts del pressupost/.test(m.summary), 'sense text o sense resum');
+  ok(/Revisar contracte/.test(await p.textContent('#result-transcript')), 'no es veu el text');
+  return m.summary.split('\n')[0];
+});
+await step('Text en directe mentre grava', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  await p.evaluate(() => { saveSettings({ source: 'mic', liveSec: 120 }); renderSourceSwitch(); });
+  await p.click('.mode[data-mode="general"]');
+  await p.click('#btn-record'); await waitView('rec', 10000);
+  try {
+    await p.waitForSelector('#live-text p.draft', { timeout: 60000 }).catch(async (e) => {
+      throw new Error(`${e.message.split('\n')[0]} · ${await p.evaluate(() => JSON.stringify({ tap: !!rec.tapNode, live: settings.liveText, st: rec.live && { n: rec.live.n, busy: rec.live.busy, off: rec.live.off, d: rec.live.drafts.length } }))}`);
+    });
+    const t = await p.textContent('#live-text p.draft');
+    ok(/text en directe de prova/.test(t) && /esborrany/.test(await p.textContent('#live-label')), t);
+    return t;
+  } finally { await p.click('#btn-stop'); await waitView('result', 90000); await p.evaluate(() => saveSettings({ liveSec: 10 })); }
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');

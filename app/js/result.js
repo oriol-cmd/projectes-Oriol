@@ -469,7 +469,7 @@ async function showResult(id) {
   $('#tags-current').textContent = (m.tags || []).length ? m.tags.map((t) => `#${t}`).join(' ') : 'cap';
   const digest = m.engine === 'digest';
   ['#btn-pro', '#btn-toggle-detail', '#btn-redo', '#btn-fix-open', '#btn-photo-after', '#btn-analysis'].forEach((sel) => { $(sel).hidden = digest; });
-  $('#btn-analysis').hidden = digest || !m.summary;
+  $('#btn-analysis').hidden = digest || m.engine === 'docs' || !m.summary;
   $('#btn-followup').hidden = !m.summary;
   $('details.transcript').hidden = digest;
   renderResultTags(m);
@@ -609,7 +609,7 @@ async function renderTranscript(m) {
   const box = $('#result-transcript');
   const text = buildTranscript(m) || '(buida)';
   const plain = () => { box.innerHTML = text.split('\n').map(speakerHtml).join('\n'); };
-  if (m.engine === 'device' || m.audioPurged || m.transcriptEdited) { plain(); return; }
+  if (m.engine === 'device' || m.engine === 'docs' || m.audioPurged || m.transcriptEdited) { plain(); return; }
   if (m.engine === 'import') {
     const files = importList(m);
     const blobs = [];

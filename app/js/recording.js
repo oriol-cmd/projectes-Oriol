@@ -76,8 +76,8 @@ const MIC_BUSY = "No s'ha pogut obrir el micròfon: potser el té ocupat un altr
 
 async function openMic() {
   stopExtraStreams();
-  try { rec.peakNode && rec.peakNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
-  rec.peakNode = null; rec.mixer = null;
+  try { rec.peakNode && rec.peakNode.disconnect(); rec.tapNode && rec.tapNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
+  rec.peakNode = null; rec.tapNode = null; rec.mixer = null;
   if (rec.meeting && rec.meeting.source === 'call') {
     // Videotrucada: primer el so de la trucada (mentre el clic encara compta),
     // després el micròfon, i ho barreja tot.
@@ -122,6 +122,7 @@ async function openMic() {
     rec.analyser.fftSize = 1024;
     src.connect(rec.analyser);
     await startPeakMeter(src);
+    await startLiveTap(src);
   } catch { rec.analyser = null; }
 }
 
@@ -146,6 +147,79 @@ async function startPeakMeter(src) {
     src.connect(node);
     rec.peakNode = node;
   } catch { /* sense mesurador continu: es fa servir el del rellotge */ }
+}
+
+// ---- Text en directe (esborrany) --------------------------------------------------
+// Una còpia del so (a 16 kHz) va a part de la gravació: cada ~20 s se n'envia el tros nou a
+// Gemini i el text surt a la pantalla. És només un esborrany: l'acta es fa amb la
+// transcripció completa de cada tram. Si falla, la gravació no se n'assabenta.
+const LIVE_S = 20;
+const TAP_WORKLET = `class T extends AudioWorkletProcessor{constructor(o){super();this.r=o.processorOptions.ratio;this.a=0;this.s=0;this.n=0;this.b=new Float32Array(4000);this.k=0}
+process(i){const ch=i[0]&&i[0][0];if(ch){for(let j=0;j<ch.length;j++){this.s+=ch[j];this.n++;this.a+=1;if(this.a>=this.r){this.a-=this.r;this.b[this.k++]=this.s/this.n;this.s=0;this.n=0;
+if(this.k===this.b.length){this.port.postMessage(this.b);this.b=new Float32Array(4000);this.k=0}}}}return true}}registerProcessor('xx-tap',T);`;
+async function startLiveTap(src) {
+  rec.tapNode = null;
+  try {
+    if (settings.liveText === false || !window.AudioWorkletNode || !rec.audioCtx.audioWorklet) return;
+    if (!rec.audioCtx.xxTap) {
+      const url = URL.createObjectURL(new Blob([TAP_WORKLET], { type: 'text/javascript' }));
+      rec.audioCtx.xxTap = rec.audioCtx.audioWorklet.addModule(url);
+    }
+    await withTimeout(rec.audioCtx.xxTap, 3000);
+    const node = new AudioWorkletNode(rec.audioCtx, 'xx-tap', { numberOfOutputs: 0, processorOptions: { ratio: rec.audioCtx.sampleRate / 16000 } });
+    node.port.onmessage = (e) => { try { liveSamples(e.data); } catch { /* res */ } };
+    src.connect(node);
+    rec.tapNode = node;
+  } catch { /* sense text en directe */ }
+}
+function liveState() {
+  const m = rec.meeting;
+  if (!m) return null;
+  if (!rec.live || rec.live.mid !== m.id) rec.live = { mid: m.id, buf: [], n: 0, atMs: null, busy: false, off: false, drafts: [] };
+  return rec.live;
+}
+function liveSamples(chunk) {
+  const m = rec.meeting;
+  if (!m || m.engine === 'device' || rec.paused || rec.stopping || settings.liveText === false || rec.activeMs > 3 * 3600e3) return;
+  const L = liveState();
+  if (L.off) return;
+  if (!L.n) L.atMs = rec.activeMs;
+  L.buf.push(chunk); L.n += chunk.length;
+  const max = 16000 * 90; // si Gemini va lent, no s'acumula més d'un minut i mig
+  while (L.n > max && L.buf.length > 1) { L.n -= L.buf.shift().length; L.atMs += 250; }
+  if (!L.busy && L.n >= 16000 * LIVE_S && navigator.onLine !== false) liveFlush(m, L);
+}
+async function liveFlush(m, L) {
+  const pcm = new Float32Array(L.n);
+  let o = 0;
+  for (const c of L.buf) { pcm.set(c, o); o += c.length; }
+  const atMs = L.atMs, endMs = rec.activeMs;
+  L.buf = []; L.n = 0;
+  let sum = 0;
+  for (let i = 0; i < pcm.length; i += 4) sum += pcm[i] * pcm[i];
+  if (Math.sqrt(sum / (pcm.length / 4)) < 0.004) return; // silenci: no cal gastar quota
+  L.busy = true;
+  try {
+    if (settings.boost !== false) { // el mateix filtre de veus fluixes, amb l'ús lleuger
+      let peak = 0;
+      for (let i = 0; i < pcm.length; i++) { const v = Math.abs(pcm[i]); if (v > peak) peak = v; }
+      const g = peak > 0 ? Math.min(8, 0.9 / peak) : 1;
+      if (g > 1.05) for (let i = 0; i < pcm.length; i++) pcm[i] *= g;
+    }
+    const prev = L.drafts.slice(-2).map((x) => x.text).join(' ').slice(-400);
+    const text = await gemini([{ inlineData: { mimeType: 'audio/wav', data: await blobToBase64(pcmToWav(pcm, 16000)) } }, { text: [
+      "Transcriu literalment aquest fragment curt d'una reunió que s'està gravant ara mateix (uns segons d'àudio).",
+      settings.lang === 'auto' ? "Pot ser en català, en castellà o barrejat: escriu-ho en l'idioma en què es parla." : `L'idioma principal és el ${LANG_NAMES[settings.lang] || 'català'}.`,
+      'Escriu només el que es diu, sense títols ni comentaris. No posis noms de qui parla.',
+      "No completis ni endevinis paraules: si un tros no s'entén, escriu [dubte de comprensió]. Si no hi ha veu, respon només: [silenci]",
+      prev ? `Per context, el text anterior era (no el repeteixis): «${prev}»` : '',
+      NO_LEAK,
+    ].filter(Boolean).join('\n') }], { task: 'transcribe', thinking: 0, maxTokens: 2048 });
+    const t = (text || '').replace(/^\s*(\[silenci\]\.?\s*)+$/i, '').trim();
+    if (t && rec.meeting === m) { L.drafts.push({ atMs, endMs, text: t }); if (L.drafts.length > 200) L.drafts.shift(); renderLive(); }
+  } catch (e) {
+    if (e instanceof FatalError) L.off = true; // sense quota o clau: no insisteixis
+  } finally { L.busy = false; }
 }
 
 function startSegment() {
@@ -504,7 +578,8 @@ async function stopRecording() {
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
     stopExtraStreams();
     if (rec.wakeLock) { rec.wakeLock.release().catch(() => {}); rec.wakeLock = null; }
-    try { rec.peakNode && rec.peakNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
+    try { rec.peakNode && rec.peakNode.disconnect(); rec.tapNode && rec.tapNode.disconnect(); rec.mixer && rec.mixer.disconnect(); } catch { /* res */ }
+    rec.tapNode = null; rec.live = null;
     // Es tanca (no s'adorm): a l'iPhone, un motor adormit no es pot tornar a engegar fora d'un toc.
     if (rec.audioCtx) { rec.audioCtx.close().catch(() => {}); rec.audioCtx = null; }
     Object.assign(rec, { meeting: null, stream: null, recorder: null, speech: null, analyser: null, peakNode: null, mixer: null });
@@ -561,10 +636,17 @@ function renderLive(interim = '') {
     if (m.liveText) add(m.liveText);
     if (interim) add(interim, 'interim');
   } else {
-    m.segments.slice().sort((a, b) => a.idx - b.idx).forEach((s) => {
+    const segs = m.segments.slice().sort((a, b) => a.idx - b.idx);
+    segs.forEach((s) => {
       if (s.status === 'done' && s.text) s.text.split('\n').filter(Boolean).forEach((l) => add(l));
     });
-    if (m.segments.some((s) => s.status === 'pending')) add('Transcrivint…', 'interim');
+    // Esborrany en directe del que encara no té la transcripció bona.
+    const open = segs.filter((s) => s.status !== 'done').map((s) => s.startMs || 0);
+    const cut = open.length ? Math.min(...open) : (rec.segStartMs || 0);
+    const drafts = rec.live && rec.live.mid === m.id ? rec.live.drafts.filter((x) => x.endMs > cut + 1500) : [];
+    drafts.forEach((x) => add(x.text, 'draft'));
+    $('#live-label').textContent = drafts.length ? 'Transcripció en directe · esborrany' : 'Transcripció en directe';
+    if (!drafts.length && m.segments.some((s) => s.status === 'pending')) add('Transcrivint…', 'interim');
   }
   if (!box.firstChild) add('El text apareixerà aquí mentre parleu.', 'placeholder');
   if (atBottom) box.scrollTop = box.scrollHeight;

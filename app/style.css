@@ -642,3 +642,4 @@ button.tag { cursor: pointer; }
 .sheet-x { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin: 2px -4px -38px auto; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text); cursor: pointer; box-shadow: var(--shadow); }
 .sheet-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 body.sheet-open { overflow: hidden; }
+.live p.draft { color: var(--muted); font-style: italic; }

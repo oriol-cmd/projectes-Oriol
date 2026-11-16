@@ -188,6 +188,7 @@
         </button>
 
         <p class="voicememo-tip yt-tip"><button id="btn-youtube" class="link" type="button">▶ O fes-ne el resum d'un vídeo de YouTube</button></p>
+        <p class="voicememo-tip yt-tip"><button id="btn-notes" class="link" type="button">📷 O fes-ne el resum d'unes fotos d'apunts o d'un PDF</button></p>
         <p id="call-tip" class="voicememo-tip" hidden>Vols l'acta d'una trucada de telèfon? <button id="btn-call-guide" class="link" type="button">Mira com fer-ho</button></p>
         <p id="voicememo-tip" class="voicememo-tip" hidden>Reunió llarga o necessites fer servir el mòbil mentre graves? <button id="btn-voicememo" class="link" type="button">Grava-la amb Notes de veu</button></p>
 
@@ -216,7 +217,7 @@
         <canvas id="meter" width="600" height="60" aria-hidden="true"></canvas>
       </div>
       <div class="live-card card">
-        <div class="live-label">Transcripció en directe</div>
+        <div class="live-label" id="live-label">Transcripció en directe</div>
         <div id="live-text" class="live" aria-live="polite"></div>
       </div>
       <p class="rec-progress" id="rec-progress"></p>
@@ -384,7 +385,8 @@
         <label class="field"><span>Instruccions extra <em>(opcional)</em></span>
           <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
         <label class="check"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
-        <label class="check last"><input id="set-quick" type="checkbox"> En obrir Xiu-xiu, preparat per gravar amb un sol toc</label>
+        <label class="check"><input id="set-quick" type="checkbox"> En obrir Xiu-xiu, preparat per gravar amb un sol toc</label>
+        <label class="check last"><input id="set-live" type="checkbox"> Text en directe mentre grava <em>(un esborrany cada 20 s, abans que arribi la transcripció bona; gasta més quota de Google)</em></label>
       </div>
 
       <h3>Les meves plantilles de resum</h3>
@@ -912,6 +914,7 @@
   </nav>
 
   <input id="photo-input" type="file" accept="image/*,application/pdf,.pdf" multiple hidden>
+  <input id="notes-input" type="file" accept="image/*,application/pdf,.pdf" multiple hidden>
   <input id="import-input" type="file" multiple accept="audio/*,video/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.flac,.mp4,.mov,.webm" hidden>
   <div id="toast" class="toast" hidden></div>
   <script src="js/core.js"></script>

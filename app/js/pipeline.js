@@ -119,7 +119,12 @@ function runPipeline(id, { redoSummary = false } = {}) {
     updateProcView(m);
     try {
       // 1. Transcripció
-      if (m.engine === 'import') {
+      if (m.engine === 'docs') {
+        if (!m.segments.length || m.segments.some((x) => x.status !== 'done')) {
+          m.stage = 'transcribe'; updateProcView(m);
+          await transcribeDocs(m);
+        }
+      } else if (m.engine === 'import') {
         if (!m.segments.length || m.segments.some((x) => x.status !== 'done')) {
           m.stage = 'transcribe'; updateProcView(m);
           await transcribeImport(m);
@@ -596,16 +601,61 @@ $('#btn-import').onclick = () => $('#import-input').click();
 $('#btn-voicememo').onclick = () => openSheet('#voicememo-sheet');
 $('#btn-voicememo-import').onclick = () => { closeSheets(); $('#import-input').click(); };
 if ($('#voicememo-tip')) $('#voicememo-tip').hidden = !IS_IOS;
-let pendingImport = [];
+let pendingImport = [], importKind = 'audio';
 $('#import-input').onchange = (e) => {
+  importKind = 'audio';
   pendingImport = [...e.target.files];
   e.target.value = '';
   if (!pendingImport.length) return;
   $('#import-sheet-title').textContent = pendingImport.length > 1 ? `Què vols fer amb els ${pendingImport.length} àudios?` : "Què vols fer amb l'àudio?";
   openSheet('#import-sheet');
 };
-$('#btn-import-summary').onclick = () => { closeSheets(); importFiles(pendingImport); pendingImport = []; };
-$('#btn-import-text').onclick = () => { closeSheets(); importFiles(pendingImport, { textOnly: true }); pendingImport = []; };
+function importChosen(textOnly) {
+  closeSheets();
+  const files = pendingImport;
+  pendingImport = [];
+  if (importKind === 'notes') importNotes(files, { textOnly }); else importFiles(files, { textOnly });
+  importKind = 'audio';
+}
+$('#btn-import-summary').onclick = () => importChosen(false);
+$('#btn-import-text').onclick = () => importChosen(true);
+
+// Fotos d'apunts o PDF sense àudio: se'n treu el text i se'n fa el resum.
+$('#btn-notes').onclick = () => $('#notes-input').click();
+$('#notes-input').onchange = (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  if (!files.length) return;
+  if (files.length > MAX_PHOTOS) toast(`Com a màxim ${MAX_PHOTOS} documents: agafo els ${MAX_PHOTOS} primers.`, 5000);
+  importKind = 'notes';
+  pendingImport = files.slice(0, MAX_PHOTOS);
+  $('#import-sheet-title').textContent = pendingImport.length > 1 ? `Què vols fer amb els ${pendingImport.length} documents?` : 'Què vols fer amb el document?';
+  openSheet('#import-sheet');
+};
+async function importNotes(files, { textOnly = false } = {}) {
+  const miss = missingSetup();
+  if (miss.length) { toast(`Falta configurar: ${miss.join(', ')}`); return; }
+  if (!files.length) return;
+  const id = uid();
+  const m = {
+    id, title: $('#meeting-title').value.trim(),
+    context: $('#meeting-context').value.trim(),
+    group: $('#meeting-group').value.trim(),
+    startedAt: Date.now(), createdAt: Date.now(), durationMs: 0,
+    engine: 'docs', textOnly,
+    type: ['important', 'revisio'].includes(settings.lastType) ? 'general' : (settings.lastType || 'general'),
+    status: 'processing', segments: [], marks: [], summary: '', email: { status: 'pending' }, photos: [],
+  };
+  await saveMeeting(m);
+  const n = await addPhotos(m, files, null);
+  if (!n) { await db.del('meetings', id); meetingCache.delete(id); toast("No s'ha pogut llegir cap document."); return; }
+  await attachAgendaPhotos(m);
+  $('#meeting-title').value = ''; $('#meeting-context').value = ''; $('#meeting-group').value = '';
+  viewingId = m.id;
+  showView('proc');
+  updateProcView(m);
+  runPipeline(m.id);
+}
 
 // ---------------------------------------------------------------------------
 // Vídeos de YouTube: Gemini els escolta directament (han de ser públics o «no llistats»)

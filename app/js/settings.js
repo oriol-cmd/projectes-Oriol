@@ -17,6 +17,7 @@ function fillSettings() {
   $('#set-precise').checked = settings.precise === true;
   $('#set-short-imports').checked = settings.shortImports !== false;
   $('#set-quick').checked = !!settings.quickStart;
+  $('#set-live').checked = settings.liveText !== false;
   $('#set-detail').value = settings.detail || 'full';
   $('#set-segment').value = settings.liveSec;
   $('#set-audio-days').value = String(settings.audioDays ?? 7);
@@ -43,6 +44,7 @@ function readSettingsForm() {
     precise: $('#set-precise').checked,
     shortImports: $('#set-short-imports').checked,
     quickStart: $('#set-quick').checked,
+    liveText: $('#set-live').checked,
     detail: $('#set-detail').value,
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),
     v: 3,

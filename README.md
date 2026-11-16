@@ -128,6 +128,11 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v70
+
+- **Fotos d'apunts o PDF → resum**: a l'inici, «📷 O fes-ne el resum d'unes fotos d'apunts o d'un PDF» (fins a 15). Gemini primer en treu el text tal com és (es pot llegir i corregir a «Transcripció completa») i després en fa el resum, sense afegir-hi res.
+- **Text en directe**: mentre grava, cada ~20 s surt un esborrany (en cursiva) del que s'està dient; quan arriba la transcripció bona del tros, el substitueix. L'acta es fa sempre amb la transcripció completa. Es pot desactivar a Ajustos (gasta més quota de Google).
+
 ## Novetats de la v67
 
 - **Gravar amb un toc**: a Ajustos, «En obrir Xiu-xiu, preparat per gravar amb un sol toc» (surt un botó gran a tota la pantalla). A Android, mantén premuda la icona › «Grava ara». També funciona l'enllaç `…/projectes-Oriol/?rec=1`.

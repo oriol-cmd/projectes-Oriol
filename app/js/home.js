@@ -46,6 +46,12 @@ function updateProcView(m) {
   const done = m.segments.filter((s) => s.status === 'done').length;
   const segErr = m.segments.find((s) => s.status === 'error');
   if (m.engine === 'device') setStep('step-transcribe', 'done', TXT.dictation);
+  else if (m.engine === 'docs') {
+    const n = (m.photos || []).length;
+    if (m.segments.length && m.segments.every((x) => x.status === 'done')) setStep('step-transcribe', 'done', n > 1 ? `${n} documents llegits` : 'Document llegit');
+    else if (m.status === 'error' && m.stage === 'transcribe') setStep('step-transcribe', 'error', friendlyError(m.error));
+    else setStep('step-transcribe', 'active', m.importProgress || 'Llegint els documents…');
+  }
   else if (m.engine === 'import') {
     const n = importList(m).length;
     if (m.segments.length && m.segments.every((x) => x.status === 'done')) setStep('step-transcribe', 'done', n > 1 ? `${n} àudios transcrits` : 'Fitxer transcrit');
@@ -271,7 +277,7 @@ function meetingCard(m, { withDelete = false, onDelete = null } = {}) {
   const title = m.summary ? summaryTitle(m) : (m.title || 'Reunió');
   li.innerHTML = `<button class="item" type="button"><span class="ticon">${svgIcon(t.svg || 'chat')}</span><span class="body">
       <span class="t">${escapeHtml(title)}</span>
-      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${m.engine === 'digest' ? `Recull de ${(m.digestOf || []).length} reunions` : escapeHtml(fmtDuration(m.durationMs || 0))}${m.group ? ` · ${escapeHtml(m.group)}` : ''}${meetingBadge(m)}</span>${(m.tags || []).length ? `<span class="tags">${m.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></button>`;
+      <span class="m">${escapeHtml(fmtDate(m.startedAt))} · ${m.engine === 'digest' ? `Recull de ${(m.digestOf || []).length} reunions` : m.engine === 'docs' ? `${(m.photos || []).length === 1 ? '1 document' : `${(m.photos || []).length} documents`}` : escapeHtml(fmtDuration(m.durationMs || 0))}${m.group ? ` · ${escapeHtml(m.group)}` : ''}${meetingBadge(m)}</span>${(m.tags || []).length ? `<span class="tags">${m.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></button>`;
   li.querySelector('.item').onclick = () => showResult(m.id);
   if (withDelete) {
     li.classList.add('has-del');
