@@ -56,10 +56,17 @@ function stopExtraStreams() {
 // Obre el micròfon. Si el dispositiu no accepta les opcions (o un altre programa
 // el té ocupat), ho torna a provar amb la configuració més simple.
 async function getMicStream() {
+  const base = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
+  // El micròfon triat a Ajustos (p. ex. un micròfon extern). Si ja no hi és, el de sempre.
+  if (settings.micId) {
+    try { return await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: settings.micId } } }); }
+    catch (e) {
+      if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
+      toast("No trobo el micròfon que vas triar a Ajustos: faig servir el de l'ordinador. Revisa que estigui connectat.", 8000);
+    }
+  }
   try {
-    return await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-    });
+    return await navigator.mediaDevices.getUserMedia({ audio: base });
   } catch (e) {
     if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
     await sleep(300);
@@ -102,8 +109,15 @@ async function openMic() {
     // del mateix AudioContext, Chrome hi dona silenci i tot semblava mut.
     const dest = rec.audioCtx.createMediaStreamDestination();
     const mixer = rec.audioCtx.createGain();
-    rec.audioCtx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(mixer);
-    if (micStream) rec.audioCtx.createMediaStreamSource(micStream).connect(mixer);
+    const callSrc = rec.audioCtx.createMediaStreamSource(new MediaStream(display.getAudioTracks()));
+    callSrc.connect(mixer);
+    rec.inCall = rec.audioCtx.createAnalyser(); rec.inCall.fftSize = 1024; callSrc.connect(rec.inCall);
+    rec.inMic = null;
+    if (micStream) {
+      const micSrc = rec.audioCtx.createMediaStreamSource(micStream);
+      micSrc.connect(mixer);
+      rec.inMic = rec.audioCtx.createAnalyser(); rec.inMic.fftSize = 1024; micSrc.connect(rec.inMic);
+    }
     mixer.connect(dest);
     rec.mixer = mixer;
     display.getVideoTracks().forEach((t) => { t.enabled = false; });
@@ -121,6 +135,8 @@ async function openMic() {
     rec.analyser = rec.audioCtx.createAnalyser();
     rec.analyser.fftSize = 1024;
     src.connect(rec.analyser);
+    if (!(rec.meeting && rec.meeting.source === 'call')) { rec.inCall = null; rec.inMic = rec.analyser; }
+    rec.inMax = { call: 0, mic: 0 }; rec.inWarned = { call: false, mic: false }; rec.inSince = rec.activeMs;
     await startPeakMeter(src);
     await startLiveTap(src);
   } catch { rec.analyser = null; }
@@ -264,9 +280,12 @@ function finishSegment(m, r, chunks, startMs, peak) {
     const blob = new Blob(chunks, { type });
     // Només es descarta com a silenci si el mesurador funcionava (si l'àudio estava aturat, marcaria 0).
     const meterOk = rec.audioCtx && rec.audioCtx.state === 'running';
-    if (m && meterOk && peak < (settings.boost !== false ? SILENCE_PEAK / 2.5 : SILENCE_PEAK)) {
-      // Tram en silenci: no cal enviar-lo.
-      m.segments.push({ idx: m.segments.length, startMs, status: 'done', text: '', silent: true });
+    if (m && meterOk && m.source !== 'call' && peak < (settings.boost !== false ? SILENCE_PEAK / 2.5 : SILENCE_PEAK)) {
+      // Sembla silenci: no s'envia ara, però l'àudio es guarda per si al final no hi ha res
+      // (un micròfon molt fluix pot semblar silenci) i cal tornar-ho a provar.
+      const idx = m.segments.length;
+      if (blob.size > 2000) await db.put('audio', blob, audioKey(m.id, idx));
+      m.segments.push({ idx, startMs, status: 'done', text: '', silent: true });
       await saveMeeting(m);
     } else if (blob.size > 2000 && m) {
       const idx = m.segments.length;
@@ -457,6 +476,10 @@ async function startRecordingInner(cont, token) {
   $('#rec-title').textContent = m.title || fmtDate(m.startedAt);
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
+  $('#rec-warn').hidden = true;
+  $('#rec-inputs').hidden = m.source !== 'call';
+  $('#in-mic').classList.toggle('off', m.source === 'call' && !rec.inMic);
+  rec.inMax = { call: 0, mic: 0 }; rec.inWarned = { call: false, mic: false }; rec.inSince = rec.activeMs;
   showView('rec');
   document.title = m.source === 'call' ? '🔴 Gravant la videotrucada · Xiu-xiu' : '🔴 Gravant · Xiu-xiu';
   renderLive();
@@ -497,10 +520,52 @@ function tick() {
       rotateSegment();
     }
   }
+  if (!rec.paused && rec.meeting.engine !== 'device') updateInputs();
   // Desa la durada de tant en tant per si es talla.
   if (Math.floor(rec.activeMs / 10000) !== Math.floor((rec.activeMs - 250) / 10000)) {
     rec.meeting.durationMs = rec.activeMs;
     saveMeeting(rec.meeting);
+  }
+}
+
+// Indicadors de so (trucada i micròfon) i avís si alguna entrada no rep res.
+function levelOf(an) {
+  if (!an) return 0;
+  const buf = new Float32Array(an.fftSize);
+  an.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (const v of buf) sum += v * v;
+  return Math.min(1, Math.sqrt(sum / buf.length) * 6);
+}
+function updateInputs() {
+  const box = $('#rec-inputs');
+  const call = rec.meeting && rec.meeting.source === 'call';
+  if (!rec.inMax) return;
+  const lc = call ? levelOf(rec.inCall) : 0, lm = levelOf(rec.inMic);
+  rec.inMax.call = Math.max(rec.inMax.call, lc); rec.inMax.mic = Math.max(rec.inMax.mic, lm);
+  box.hidden = !call;
+  if (call) {
+    $('#in-call').classList.toggle('on', lc > 0.03);
+    $('#in-mic').classList.toggle('on', lm > 0.03);
+    $('#in-mic').classList.toggle('off', !rec.inMic);
+  }
+  // Al cap d'una estona, si una entrada no ha rebut mai so, s'avisa (un sol cop).
+  const since = rec.activeMs - (rec.inSince || 0);
+  if (since < 25000) return;
+  const warn = [];
+  if (call && !rec.inWarned.call && rec.inMax.call < 0.02) {
+    rec.inWarned.call = true;
+    warn.push("No arriba el so de la videotrucada. Torna a començar i, en compartir, tria la pestanya de la reunió (o «Tota la pantalla») i marca «Comparteix també l'àudio».");
+  }
+  // En una videotrucada potser només escoltes: el micròfon s'avisa més tard.
+  if (!rec.inWarned.mic && rec.inMic && rec.inMax.mic < 0.02 && (!call || since > 90000)) {
+    rec.inWarned.mic = true;
+    warn.push(`El micròfon no capta res${call ? ' (la teva veu no es gravarà)' : ''}. Si fas servir un micròfon extern, tria'l a Ajustos › Micròfon.`);
+  }
+  if (warn.length) {
+    $('#rec-warn').hidden = false;
+    $('#rec-warn').textContent = `⚠️ ${warn.join(' ')}`;
+    toast(`⚠️ ${warn[0]}`, 9000);
   }
 }
 
@@ -740,3 +805,61 @@ document.addEventListener('visibilitychange', () => {
   if (settings.quickStart && hiddenSince && Date.now() - hiddenSince > 10 * 60000) offerQuickRec();
   hiddenSince = 0;
 });
+
+// ---------------------------------------------------------------------------
+// Triar el micròfon (p. ex. un micròfon extern o uns auriculars) i provar-lo
+// ---------------------------------------------------------------------------
+async function fillMicSelects() {
+  const sels = document.querySelectorAll('.mic-select');
+  let devs = [];
+  try { devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications'); } catch { /* res */ }
+  const named = devs.some((d) => d.label);
+  sels.forEach((sel) => {
+    sel.innerHTML = '<option value="">El de l\'ordinador (per defecte)</option>';
+    devs.forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || `Micròfon ${i + 1}`; sel.appendChild(o); });
+    if (!named) { const o = document.createElement('option'); o.value = '__ask'; o.textContent = '🔍 Mostra els noms dels micròfons…'; sel.appendChild(o); }
+    // Un micròfon triat que ara no hi és (desconnectat): es manté a la llista.
+    if (settings.micId && !devs.some((d) => d.deviceId === settings.micId)) { const o = document.createElement('option'); o.value = settings.micId; o.textContent = `${settings.micLabel || 'Micròfon triat'} (no connectat)`; sel.appendChild(o); }
+    sel.value = settings.micId || '';
+  });
+}
+async function onMicChange(e) {
+  const v = e.target.value;
+  if (v === '__ask') {
+    // Els noms només es veuen després de donar permís al micròfon.
+    try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach((t) => t.stop()); }
+    catch { toast("Cal donar permís al micròfon per veure'n els noms."); }
+    await fillMicSelects();
+    return;
+  }
+  const label = v ? e.target.selectedOptions[0].textContent : '';
+  saveSettings({ micId: v, micLabel: label });
+  document.querySelectorAll('.mic-select').forEach((s) => { s.value = v; });
+  toast(v ? `🎤 Gravaré amb «${label}»` : "🎤 Gravaré amb el micròfon de l'ordinador");
+}
+document.querySelectorAll('.mic-select').forEach((s) => { s.onchange = onMicChange; s.onfocus = () => { if (s.options.length <= 2) fillMicSelects(); }; });
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => fillMicSelects());
+let micTest = null;
+$('#btn-mic-test').onclick = async () => {
+  if (micTest) return;
+  const msg = $('#mic-test-msg'), bar = $('#mic-test-level');
+  if (rec.meeting) { msg.textContent = 'Ara estàs gravant: prova-ho quan acabis.'; return; }
+  let st;
+  try { st = await getMicStream(); } catch (e) { msg.textContent = `✗ ${e.message || "No s'ha pogut obrir el micròfon"}`; return; }
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const an = ctx.createAnalyser(); an.fftSize = 1024;
+  ctx.createMediaStreamSource(st).connect(an);
+  const name = (st.getAudioTracks()[0] || {}).label || 'micròfon';
+  msg.textContent = `Parla ara… (${name})`;
+  let max = 0;
+  const t0 = performance.now();
+  micTest = setInterval(() => {
+    const l = levelOf(an); max = Math.max(max, l);
+    bar.style.width = `${Math.round(l * 100)}%`;
+    if (performance.now() - t0 > 6000) {
+      clearInterval(micTest); micTest = null; bar.style.width = '0';
+      st.getTracks().forEach((t) => t.stop()); ctx.close().catch(() => {});
+      msg.textContent = max > 0.08 ? `✓ Et sento bé amb «${name}».` : max > 0.02 ? `Et sento molt fluix amb «${name}». Apropa't o puja el volum del micròfon.` : `✗ No arriba so de «${name}». Tria un altre micròfon o revisa que no estigui silenciat.`;
+    }
+  }, 100);
+};

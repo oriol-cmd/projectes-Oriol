@@ -1,6 +1,6 @@
 /* Xiu-xiu · Base: configuració, utilitats, Markdown, base de dades i textos d'error. */
 'use strict';
-const APP_VERSION = 70;
+const APP_VERSION = 71;
 
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ function friendlyError(raw) {
   if (/Gemini 5\d\d|UNAVAILABLE|INTERNAL/i.test(t)) return "Els servidors de Google (Gemini) no responen ara mateix. No s'ha perdut res: ho anirem tornant a provar sols.";
   if (/no ha acceptat|INVALID_ARGUMENT|Gemini 400/i.test(t)) return 'Google no ha pogut processar la reunió.';
   if (/bloquejat|SAFETY|no ha respost/i.test(t)) return 'Google no ha volgut generar aquest contingut.';
-  if (/No s'ha captat cap paraula/i.test(t)) return "No s'ha captat cap paraula a la gravació.";
+  if (/No s'ha captat cap paraula/i.test(t)) return t;
   if (/script|Apps Script|correu/i.test(t)) return t;
   return 'Hi ha hagut un problema inesperat.';
 }

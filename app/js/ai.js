@@ -716,7 +716,9 @@ async function detectMeetingType(transcript) {
 
 async function summarize(m, onText = null) {
   const transcript = buildTranscript(m);
-  if (!transcript) throw new FatalError("No s'ha captat cap paraula a la gravació");
+  if (!transcript) throw new FatalError(m.source === 'call'
+    ? "No s'ha captat cap paraula a la gravació. En una videotrucada, en compartir cal triar la pestanya de la reunió (o «Tota la pantalla») i marcar «Comparteix també l'àudio»; i a Ajustos › Micròfon, triar el micròfon que fas servir."
+    : "No s'ha captat cap paraula a la gravació. Comprova que el micròfon funcioni (Ajustos › Micròfon › Prova'l).")
   let type = m.type || 'general';
   if (type === 'auto') { type = await detectMeetingType(transcript); m.autoType = type; }
   const info = [

@@ -18,6 +18,7 @@ function fillSettings() {
   $('#set-short-imports').checked = settings.shortImports !== false;
   $('#set-quick').checked = !!settings.quickStart;
   $('#set-live').checked = settings.liveText !== false;
+  fillMicSelects();
   $('#set-detail').value = settings.detail || 'full';
   $('#set-segment').value = settings.liveSec;
   $('#set-audio-days').value = String(settings.audioDays ?? 7);

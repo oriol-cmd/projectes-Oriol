@@ -215,7 +215,9 @@
         <div class="timer" id="timer">00:00</div>
         <div class="rec-state"><span class="pulse"></span><span id="rec-state-text">Gravant</span></div>
         <canvas id="meter" width="600" height="60" aria-hidden="true"></canvas>
+        <div id="rec-inputs" class="rec-inputs" hidden><span id="in-call" class="in">🔊 So de la trucada</span><span id="in-mic" class="in">🎤 El teu micròfon</span></div>
       </div>
+      <p id="rec-warn" class="banner warn" hidden></p>
       <div class="live-card card">
         <div class="live-label" id="live-label">Transcripció en directe</div>
         <div id="live-text" class="live" aria-live="polite"></div>
@@ -473,6 +475,15 @@
         <p class="fineprint left"><b>Recomanació:</b> activa la <b>facturació</b> a Google AI Studio. Amb la facturació activada, Google no fa servir el contingut de les teves reunions per millorar els seus productes; en el nivell gratuït, sí que el pot fer servir.</p>
       </div>
 
+      <h3>Micròfon</h3>
+      <div class="card group">
+        <label class="field mic-field"><span>Micròfon</span>
+          <select id="set-mic" class="mic-select"><option value="">El de l'ordinador (per defecte)</option></select></label>
+        <div class="mic-test-row"><button id="btn-mic-test" class="btn secondary small" type="button">🎤 Prova'l</button><span class="mic-test-bar"><i id="mic-test-level"></i></span></div>
+        <p id="mic-test-msg" class="fineprint left"></p>
+        <p class="fineprint left last">Si fas servir un micròfon extern o uns auriculars amb micròfon, tria'ls aquí. És el mateix que tries a Zoom, Meet o Teams.</p>
+      </div>
+
       <h3>Avançat</h3>
       <div class="card group">
         <label class="field"><span>Cada quants segons apareix text nou (directe)</span>
@@ -565,6 +576,9 @@
       <div class="consent-msg card" id="consent-msg">📌 Avís: aquesta reunió s'està gravant per fer-ne l'acta i el resum amb Xiu-xiu. Si algú no hi està d'acord, que ho digui ara.
 📌 Aviso: esta reunión se está grabando para elaborar el acta y el resumen con Xiu-xiu. Si alguien no está de acuerdo, que lo diga ahora.</div>
       <button id="btn-consent-copy" class="btn secondary full" type="button">📋 Copia el missatge</button>
+      <label class="field mic-field"><span>Micròfon</span>
+          <select id="consent-mic" class="mic-select"><option value="">El de l'ordinador (per defecte)</option></select></label>
+      <p class="fineprint left">En compartir, tria la <b>pestanya</b> de la reunió (Meet, Teams o Zoom al navegador) o <b>«Tota la pantalla»</b> si fas servir l'app de Zoom o Teams, i marca <b>«Comparteix també l'àudio»</b>.</p>
       <label class="check consent-check"><input id="consent-ok" type="checkbox"> He avisat els participants que es grava la reunió</label>
       <button id="btn-consent-start" class="btn danger full" type="button" disabled>Comença a gravar</button>
       <button class="btn ghost full" type="button" data-close-sheet>Cancel·la</button>

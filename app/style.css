@@ -643,3 +643,12 @@ button.tag { cursor: pointer; }
 .sheet-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 body.sheet-open { overflow: hidden; }
 .live p.draft { color: var(--muted); font-style: italic; }
+.mic-test-row { display: flex; gap: 10px; align-items: center; margin: 4px 0 6px; }
+.mic-test-bar { flex: 1; height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.mic-test-bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .1s; }
+.mic-select { width: 100%; }
+.rec-inputs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+.rec-inputs .in { font-size: 13px; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); transition: background .2s, color .2s; }
+.rec-inputs .in.on { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+.rec-inputs .in.off { text-decoration: line-through; opacity: .6; }
+#rec-warn { margin: 10px 0; }

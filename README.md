@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v71: triar el micròfon
+
+- **Ajustos › Micròfon**: tria el micròfon (extern, auriculars…) i toca «Prova'l» per veure si et sent. També es pot triar a la finestra que surt abans de gravar una videotrucada.
+- **Indicadors mentre grava una videotrucada**: «🔊 So de la trucada» i «🎤 El teu micròfon» s'encenen quan arriba so. Si al cap d'una estona una de les dues entrades no ha rebut res, surt un avís.
+- **En videotrucades, cap tros es descarta com a silenci**, i si al final no surt cap paraula, l'app torna a transcriure els trossos dubtosos abans de donar error.
+
 ## Novetats de la v70
 
 - **Fotos d'apunts o PDF → resum**: a l'inici, «📷 O fes-ne el resum d'unes fotos d'apunts o d'un PDF» (fins a 15). Gemini primer en treu el text tal com és (es pot llegir i corregir a «Transcripció completa») i després en fa el resum, sense afegir-hi res.

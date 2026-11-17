@@ -134,8 +134,9 @@ async function record(mode, secs, { important = false } = {}) {
   await p.click(`.mode[data-mode="${important ? 'important' : 'general'}"]`);
   await p.fill('#meeting-title', `Prova ${mode}`);
   await p.click('#btn-record');
-  if (mode === 'call') { await p.waitForSelector('#consent-sheet:not([hidden])'); await p.check('#consent-ok'); await p.click('#btn-consent-start'); }
+  if (mode === 'call') { await p.waitForSelector('#consent-sheet:not([hidden])'); ok(await p.isVisible('#consent-mic'), 'sense triar micròfon'); await p.check('#consent-ok'); await p.click('#btn-consent-start'); }
   await waitView('rec', 10000);
+  const inputsShown = mode !== 'call' || await p.isVisible('#rec-inputs');
   await p.waitForTimeout(secs * 500);
   await p.click('#btn-mark');
   await p.click('#btn-pause'); await p.waitForTimeout(1200);
@@ -143,6 +144,7 @@ async function record(mode, secs, { important = false } = {}) {
   await p.click('#btn-pause'); await p.waitForTimeout(secs * 500);
   await p.click('#btn-stop');
   await waitView('result', 90000);
+  ok(inputsShown, 'sense indicadors de so');
   const id = await lastId();
   const m = await meeting(id);
   ok(m.summary && m.status === 'done', `estat ${m.status} ${m.error || ''}`);
@@ -449,6 +451,41 @@ await step('Text en directe mentre grava', async () => {
     ok(/text en directe de prova/.test(t) && /esborrany/.test(await p.textContent('#live-label')), t);
     return t;
   } finally { await p.click('#btn-stop'); await waitView('result', 90000); await p.evaluate(() => saveSettings({ liveSec: 10 })); }
+});
+await step('Triar i provar el micròfon', async () => {
+  await p.click('#btn-settings'); await waitView('settings');
+  await p.waitForFunction(() => document.querySelectorAll('#set-mic option').length > 1, null, { timeout: 10000 });
+  const opts = await p.$$eval('#set-mic option', (l) => l.map((o) => [o.value, o.textContent]));
+  const dev = opts.find(([v]) => v && v !== '__ask');
+  ok(dev, `sense micròfons: ${JSON.stringify(opts)}`);
+  await p.selectOption('#set-mic', dev[0]); await p.waitForTimeout(300);
+  ok(await p.evaluate(() => settings.micId) === dev[0], 'no es desa');
+  await p.click('#btn-mic-test');
+  await p.waitForFunction(() => /✓|fluix|No arriba/.test(document.querySelector('#mic-test-msg').textContent), null, { timeout: 15000 });
+  const msg = await p.textContent('#mic-test-msg');
+  // Es grava amb el micròfon triat
+  await p.click('#btn-tab-home'); await waitView('home');
+  await p.evaluate(() => { saveSettings({ source: 'mic' }); renderSourceSwitch(); });
+  await p.click('#btn-record'); await waitView('rec', 10000);
+  const used = await p.evaluate(() => rec.stream.getAudioTracks()[0].getSettings().deviceId);
+  await p.click('#btn-stop'); await waitView('result', 90000);
+  ok(used === dev[0], `grava amb ${used}`);
+  await p.evaluate(() => saveSettings({ micId: '', micLabel: '' }));
+  return `${dev[1]} · ${msg}`;
+});
+await step('Trossos «en silenci»: es tornen a provar abans de donar error', async () => {
+  const id = await p.evaluate(async () => {
+    const id = uid();
+    for (let i = 0; i < 2; i++) await db.put('audio', pcmToWav(new Float32Array(32000), 16000), audioKey(id, i));
+    await saveMeeting({ id, title: 'Micròfon fluix', startedAt: Date.now(), createdAt: Date.now(), durationMs: 120000, engine: 'audio', source: 'mic', type: 'general', status: 'processing', marks: [], summary: '', email: { status: 'pending' },
+      segments: [{ idx: 0, startMs: 0, status: 'done', text: '', silent: true }, { idx: 1, startMs: 60000, status: 'done', text: '', silent: true }] });
+    runPipeline(id);
+    return id;
+  });
+  await waitStatus(id, ['done', 'error'], 60000);
+  const m = await meeting(id);
+  ok(m.status === 'done' && m.segments.every((x) => x.text), `estat ${m.status} ${m.error || ''}`);
+  return 'transcrit a la segona';
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');

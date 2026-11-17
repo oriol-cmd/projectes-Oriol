@@ -8,6 +8,7 @@ $('#btn-record').onclick = () => {
   pendingContinue = null;
   // Videotrucades: abans de gravar, cal avisar els participants.
   if (CAN_CAPTURE_CALL && settings.source === 'call' && !missingSetup().length) {
+    fillMicSelects();
     $('#consent-ok').checked = false;
     $('#btn-consent-start').disabled = true;
     openSheet('#consent-sheet');

@@ -134,6 +134,16 @@ function runPipeline(id, { redoSummary = false } = {}) {
         await saveMeeting(m);
         updateProcView(m);
         await kickQueue(id);
+        // Si no ha sortit cap paraula, torna a provar els trams que semblaven silenci (micròfon fluix).
+        if (!m.segments.some((s) => s.status === 'done' && s.text) && !m.silentRetried) {
+          let n = 0;
+          for (const s of m.segments) {
+            if ((s.silent || s.empty) && await db.get('audio', audioKey(m.id, s.idx))) { s.status = 'pending'; s.retry = true; delete s.silent; n++; }
+          }
+          m.silentRetried = true;
+          await saveMeeting(m);
+          if (n) { updateProcView(m); await kickQueue(id); }
+        }
         const failed = m.segments.filter((s) => s.status !== 'done');
         if (failed.length) throw new Error(failed[0].error || 'Hi ha trams sense transcriure');
       }
