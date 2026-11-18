@@ -209,11 +209,13 @@ try {
   await shot('08-automatismes');
 
   console.log('Configuració');
-  for (const t of ['empresa', 'aparenca', 'camps', 'llistes', 'facturacio', 'plantilles', 'missatges', 'correu', 'usuaris', 'compte']) {
+  for (const t of ['empresa', 'aparenca', 'camps', 'llistes', 'facturacio', 'plantilles', 'missatges', 'correu', 'usuaris', 'copia', 'compte']) {
     await page.goto(`${BASE}/#/configuracio/${t}`);
     await page.waitForSelector('[data-body] *');
   }
   ok(true, 'totes les pestanyes de configuració carreguen');
+  const bk = await page.evaluate(async () => { const r = await fetch('/api/backup'); const b = new Uint8Array(await r.arrayBuffer()); return [r.status, b.length, b[0], b[1]]; });
+  ok(bk[0] === 200 && bk[1] > 1000 && bk[2] === 0x1f && bk[3] === 0x8b, `es descarrega la còpia de seguretat (${bk[1]} bytes)`);
   await page.goto(`${BASE}/#/configuracio/camps`);
   await page.click('button[data-add="worker"]');
   await page.fill('tr[data-e="worker"] input[data-k="label"]', 'Talla samarreta');

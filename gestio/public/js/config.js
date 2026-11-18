@@ -107,7 +107,7 @@ export async function emailsPage(el) {
 // =====================================================================
 // CONFIGURACIÓ
 // =====================================================================
-const TABS = [['empresa', 'Empresa'], ['aparenca', 'Aparença i apartats'], ['camps', 'Camps personalitzats'], ['llistes', 'Llistes'], ['facturacio', 'Facturació i numeració'], ['plantilles', 'Plantilla de factura'], ['missatges', 'Missatges'], ['correu', 'Correu'], ['usuaris', 'Usuaris'], ['compte', 'El meu compte']];
+const TABS = [['empresa', 'Empresa'], ['aparenca', 'Aparença i apartats'], ['camps', 'Camps personalitzats'], ['llistes', 'Llistes'], ['facturacio', 'Facturació i numeració'], ['plantilles', 'Plantilla de factura'], ['missatges', 'Missatges'], ['correu', 'Correu'], ['usuaris', 'Usuaris'], ['copia', 'Còpia de seguretat'], ['compte', 'El meu compte']];
 
 export async function settingsPage(el, tab = 'empresa') {
   setTitle('Configuració');
@@ -268,6 +268,13 @@ export async function settingsPage(el, tab = 'empresa') {
     $$('[data-pw]', body).forEach(b => b.onclick = async () => { const p = prompt('Nova contrasenya (mínim 8 caràcters)'); if (p) { try { await api.put(`/api/users/${b.dataset.pw}`, { password: p }); toast('Contrasenya canviada'); } catch (e) { errorToast(e); } } });
     $$('[data-act]', body).forEach(b => b.onclick = async () => { await api.put(`/api/users/${b.dataset.act}`, { active: Number(b.dataset.v) }); reload(); });
     $$('[data-del]', body).forEach(b => b.onclick = async () => { if (await confirmDialog('Esborrar aquest usuari?', 'Esborra')) { await api.del(`/api/users/${b.dataset.del}`); reload(); } });
+  }
+
+  if (tab === 'copia') {
+    body.innerHTML = `<h3>Còpia de seguretat</h3>
+      <p>Descarrega un fitxer amb <b>totes les dades</b> (treballadors, clients, activitats, pressupostos, factures, configuració) i <b>tots els documents</b> pujats.</p>
+      <p class="muted">Al servidor ja se'n fa una cada nit automàticament, però si el servidor es fes malbé també es perdrien. Descarrega'n una de tant en tant (per exemple, cada mes) i guarda-la al teu ordinador o al Drive.</p>
+      <a class="btn primary" href="/api/backup" download>⬇ Descarrega la còpia de seguretat</a>`;
   }
 
   if (tab === 'compte') passwordForm(body);

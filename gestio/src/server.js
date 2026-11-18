@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const multer = require('multer');
-const { all, get, run, insert, update, pick, addTimeline, UPLOAD_DIR } = require('./db');
+const { db, all, get, run, insert, update, pick, addTimeline, UPLOAD_DIR, DATA_DIR } = require('./db');
+const backup = require('./backup');
 const A = require('./auth');
 const S = require('./services');
 const { PRESETS, TRIGGERS, DEFAULT_AUTOMATIONS } = require('./defaults');
@@ -127,6 +128,15 @@ app.post('/api/settings/test-email', A.requireAdmin, wrap(async (req, res) => {
   const r = await S.sendEmail({ to: req.body.to, subject: 'Prova de correu', text: 'Si llegeixes això, el correu de la plataforma funciona correctament. ✅' });
   res.json(r);
 }));
+
+// Còpia de seguretat descarregable (base de dades + documents)
+app.get('/api/backup', A.requireAdmin, (req, res) => {
+  const tar = backup.backupStream(db, DATA_DIR);
+  res.setHeader('Content-Type', 'application/gzip');
+  res.setHeader('Content-Disposition', `attachment; filename="gestio-${backup.stamp()}.tar.gz"`);
+  tar.stdout.pipe(res);
+  tar.on('error', () => res.destroy());
+});
 
 // Previsualització d'una plantilla de document amb dades d'exemple
 app.post('/api/render-preview', A.requireAdmin, wrap((req, res) => {
@@ -759,7 +769,7 @@ app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(__dirname, '..', 
 
 const PORT = Number(process.env.PORT) || 3000;
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, process.env.HOST || undefined, () => {
     console.log(`Plataforma en marxa a http://localhost:${PORT}`);
     automations.start();
   });

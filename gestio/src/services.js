@@ -39,7 +39,7 @@ let lastSeenOrigin = '';
 function setSeenOrigin(o) { if (o) lastSeenOrigin = o; }
 function baseUrl() {
   const b = (getSettings().email.base_url || '').trim().replace(/\/+$/, '');
-  return b || lastSeenOrigin || `http://localhost:${process.env.PORT || 3000}`;
+  return b || (process.env.PUBLIC_URL || '').replace(/\/+$/, '') || lastSeenOrigin || `http://localhost:${process.env.PORT || 3000}`;
 }
 
 // ---------- Formats ----------
