@@ -118,6 +118,7 @@ Environment=HOST=127.0.0.1
 Environment=PORT=$PORT
 Environment=DATA_DIR=$DATA_DIR
 Environment=TZ=Europe/Madrid
+Environment=TZ=Europe/Madrid
 Environment=PUBLIC_URL=https://$DOMINI
 ExecStart=$NODE_BIN --no-warnings src/server.js
 Restart=always
@@ -177,6 +178,7 @@ Description=Còpia de seguretat de la plataforma
 Type=oneshot
 User=gestio
 Environment=DATA_DIR=$DATA_DIR
+Environment=TZ=Europe/Madrid
 ExecStart=$NODE_BIN --no-warnings $APP_DIR/gestio/src/backup.js $BACKUP_DIR 14
 EOF
 cat > /etc/systemd/system/gestio-backup.timer <<EOF
@@ -195,9 +197,13 @@ cat > /usr/local/bin/gestio-actualitza <<EOF
 # Actualitza la plataforma a l'última versió. Ús: sudo gestio-actualitza [branca]
 set -e
 [[ \$EUID -eq 0 ]] || { echo "Executa-ho amb sudo: sudo gestio-actualitza"; exit 1; }
+source $CONF_DIR/instal.env
+BR="\${1:-\$BRANCA}"
 tmp=\$(mktemp)
-cp $APP_DIR/gestio/deploy/instala.sh "\$tmp"
-BRANCA_NOVA="\${1:-}" bash "\$tmp"
+# fa servir la versió més nova de l'script d'instal·lació
+git -C $APP_DIR fetch -q --depth 1 origin "\$BR"
+git -C $APP_DIR show FETCH_HEAD:gestio/deploy/instala.sh > "\$tmp"
+BRANCA_NOVA="\$BR" bash "\$tmp"
 rm -f "\$tmp"
 EOF
 chmod 755 /usr/local/bin/gestio-actualitza
