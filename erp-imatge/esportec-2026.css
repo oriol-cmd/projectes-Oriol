@@ -7,7 +7,20 @@
    <link href="css/esportec-2026.css" rel="stylesheet" type="text/css" />
    Per tornar enrere: treure la línia.
    ===================================================================== */
-@import url(https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Titillium+Web:wght@600;700&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap);
+
+/* Tipografia corporativa Esportec (Akzidenz-Grotesk, Berthold).
+   Els fitxers .woff2 van a css/fonts/ al servidor. */
+@font-face{
+  font-family: 'Esportec Akzidenz';
+  src: url(fonts/AkzidenzGrotesk-Bold.woff2) format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face{
+  font-family: 'Esportec Akzidenz Extended';
+  src: url(fonts/AkzidenzGrotesk-LightExtended.woff2) format('woff2');
+  font-weight: 300; font-style: normal; font-display: swap;
+}
 
 :root{
   --es-blau: #3EB5E6;        /* blau del logo (línia de la muntanya) */
@@ -25,7 +38,8 @@
   --es-radi: 8px;
   --es-ombra: 0 1px 2px rgba(17,26,33,.06), 0 4px 16px rgba(17,26,33,.06);
   --es-font: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --es-titol: 'Titillium Web', 'Inter', 'Segoe UI', sans-serif;
+  --es-titol: 'Esportec Akzidenz', 'Helvetica Neue', Arial, sans-serif;            /* títols, botons */
+  --es-etiqueta: 'Esportec Akzidenz Extended', 'Helvetica Neue', Arial, sans-serif; /* etiquetes en majúscules, com "OUTDOOR SPORT" */
 }
 
 /* ---------- Base ---------- */
@@ -37,7 +51,7 @@ body{
   -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, h4, h5, h6{ font-family: var(--es-titol); color: var(--es-tinta); font-weight: 700; letter-spacing: -.005em; }
-h1{ font-size: 30px; text-align: left; margin: 8px 0 24px; color: var(--es-tinta); }
+h1{ font-size: 32px; letter-spacing: -.01em; text-align: left; margin: 8px 0 24px; color: var(--es-tinta); }
 h2{ font-size: 20px; margin: 4px 0 14px; }
 h3{ font-size: 17px; }
 a{ color: var(--es-blau-fort); }
@@ -67,7 +81,10 @@ th{ font-weight: 600; }
   border-radius: 6px;
   border: 0;
   color: var(--es-text);
-  font-weight: 500;
+  font-family: var(--es-titol);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .01em;
 }
 .navbar-default .navbar-nav>li>a:hover,
 .navbar-default .navbar-nav>li>a:focus{ background: var(--es-fons); color: var(--es-tinta); }
@@ -97,8 +114,9 @@ th{ font-weight: 600; }
 
 /* ---------- Botons ---------- */
 .btn{
-  font-family: var(--es-font);
-  font-weight: 600;
+  font-family: var(--es-titol);
+  font-weight: 700;
+  letter-spacing: .01em;
   border-radius: 6px;
   padding: 7px 14px;
   transition: background-color .15s, border-color .15s, box-shadow .15s;
@@ -134,10 +152,11 @@ textarea.form-control{ height: auto; }
 }
 .label-filtre{
   text-decoration: none;
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--es-etiqueta);
+  font-size: 10.5px;
+  font-weight: 300;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: .08em;
   color: var(--es-gris);
 }
 
@@ -153,10 +172,11 @@ textarea.form-control{ height: auto; }
 .table>thead>tr>th, #mytable th, #mytable2 th, .table_rrhh th{
   background: #F7F9FB;
   color: var(--es-gris);
-  font-size: 11.5px;
-  font-weight: 600;
+  font-family: var(--es-etiqueta);
+  font-size: 10.5px;
+  font-weight: 300;
   text-transform: uppercase;
-  letter-spacing: .05em;
+  letter-spacing: .07em;
   border-bottom: 1px solid var(--es-linia) !important;
   border-top: 0 !important;
   padding: 10px 12px;
@@ -173,7 +193,7 @@ textarea.form-control{ height: auto; }
 
 /* ---------- Panells, caixes i avisos ---------- */
 .panel{ border: 1px solid var(--es-linia); border-radius: var(--es-radi); box-shadow: var(--es-ombra); }
-.panel-heading{ border-radius: var(--es-radi) var(--es-radi) 0 0; font-weight: 600; }
+.panel-heading{ border-radius: var(--es-radi) var(--es-radi) 0 0; font-family: var(--es-titol); font-weight: 700; }
 .panel-default>.panel-heading{ background: #F7F9FB; border-color: var(--es-linia); color: var(--es-tinta); }
 .panel-primary>.panel-heading{ background: var(--es-blau-fort); border-color: var(--es-blau-fort); }
 .well{ background: var(--es-blanc); border: 1px solid var(--es-linia); box-shadow: none; border-radius: var(--es-radi); }

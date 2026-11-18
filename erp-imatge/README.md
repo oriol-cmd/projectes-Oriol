@@ -13,6 +13,19 @@ no toca cap PHP ni JavaScript, només l'aspecte.
    <link href="css/esportec-2026.css" rel="stylesheet" type="text/css" />
    ```
 
-3. Per tornar enrere: treure aquesta línia.
+3. Tipografia: crear la carpeta `css/fonts/` al servidor i pujar-hi
+   `AkzidenzGrotesk-Bold.woff2` i `AkzidenzGrotesk-LightExtended.woff2`
+   (versió web dels .otf de la carpeta del Drive "TIPOGRAFIA ESPORTEC").
+   No es desen en aquest repositori perquè són fonts de pagament (Berthold).
+   Si no hi són, l'ERP fa servir Helvetica/Arial i tot continua funcionant.
+4. Per tornar enrere: treure aquesta línia.
 
 Recomanat: provar-ho primer amb un sol usuari o en una còpia de la carpeta.
+
+## Tipografia
+
+- **Akzidenz-Grotesk Bold**: títols, menú, botons.
+- **Akzidenz-Grotesk Light Extended**: etiquetes en majúscules (capçaleres de taula, filtres), com "OUTDOOR SPORT" al logo.
+- **Inter** (Google Fonts, gratuïta): text corrent i taules, per llegibilitat.
+
+Cal comprovar que la llicència d'Akzidenz-Grotesk permet l'ús web (@font-face).
