@@ -72,7 +72,7 @@ try {
   }
   await page.waitForSelector('text=Jordi');
   const ws = await api('/api/workers');
-  ok(ws.map(w => `${w.first_name} ${w.last_name}`).sort().join(',') === 'Anna Puig,Jordi Soler', 'dos treballadors creats amb les dades correctes');
+  ok(ws.map(w => `${w.first_name} ${w.last_name}`).sort().join(',') === 'Anna Puig,Jordi Soler', 'dos treballadors creats amb les dades correctes: ' + ws.map(w => `${w.first_name}|${w.last_name}|${w.dni}`).join(', '));
   // document + disponibilitat + accés per a l'Anna
   await page.click('text=Anna');
   await page.click('.tabs a:has-text("Documents")');

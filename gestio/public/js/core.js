@@ -81,7 +81,8 @@ export function modal({ title, body, size = '', actions = [], onOpen }) {
     wrap.addEventListener('mousedown', e => { if (e.target === wrap) close(null); });
     document.body.appendChild(wrap);
     if (onOpen) onOpen(bodyEl, close);
-    const first = $('input:not([type=hidden]),select,textarea', bodyEl); if (first) setTimeout(() => first.focus(), 30);
+    const first = $('input:not([type=hidden]),select,textarea', bodyEl);
+    if (first) requestAnimationFrame(() => { if (!wrap.contains(document.activeElement)) first.focus(); });
   });
 }
 export function confirmDialog(text, okLabel = 'Sí, continua', danger = true) {
