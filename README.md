@@ -1,5 +1,7 @@
 # Xiu-xiu — resums de reunions des del mòbil
 
+> 📁 Aquest repositori conté també la **[Plataforma de gestió](gestio/README.md)** (treballadors, activitats, clients, pressupostos, factures i automatismes), a la carpeta `gestio/`.
+
 App web per a l'iPhone (s'instal·la a la pantalla d'inici com una app normal) que **escolta la conversa, en mostra la transcripció en directe i, en acabar, en fa un resum ordenat**. Sense cap clau de pagament.
 
 1. **Escolta** la reunió amb el micròfon de l'iPhone.
