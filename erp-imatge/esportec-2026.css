@@ -1,0 +1,237 @@
+/* =====================================================================
+   Esportec — imatge 2026 per a "Gestió de grups"
+   Capa de disseny que va DESPRÉS de bootstrap.min.css i main.css.
+   No toca cap PHP ni JavaScript: només canvia l'aspecte.
+
+   Instal·lació: afegir aquesta línia al <head>, sota main.css:
+   <link href="css/esportec-2026.css" rel="stylesheet" type="text/css" />
+   Per tornar enrere: treure la línia.
+   ===================================================================== */
+@import url(https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Titillium+Web:wght@600;700&display=swap);
+
+:root{
+  --es-blau: #3EB5E6;        /* blau del logo (línia de la muntanya) */
+  --es-blau-fort: #0B76A8;   /* blau per a botons i enllaços (contrast AA amb blanc) */
+  --es-blau-suau: #E6F5FC;
+  --es-tinta: #111A21;       /* negre del logo, una mica blavós */
+  --es-text: #2B3A45;
+  --es-gris: #6A7B87;
+  --es-linia: #DCE4EA;
+  --es-fons: #F3F6F8;
+  --es-blanc: #FFFFFF;
+  --es-ok: #1F9D55;
+  --es-avis: #D98A00;
+  --es-error: #D14343;
+  --es-radi: 8px;
+  --es-ombra: 0 1px 2px rgba(17,26,33,.06), 0 4px 16px rgba(17,26,33,.06);
+  --es-font: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --es-titol: 'Titillium Web', 'Inter', 'Segoe UI', sans-serif;
+}
+
+/* ---------- Base ---------- */
+html, body{ background: var(--es-fons) !important; }
+body{
+  font-family: var(--es-font);
+  font-size: 14px;
+  color: var(--es-text);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, h5, h6{ font-family: var(--es-titol); color: var(--es-tinta); font-weight: 700; letter-spacing: -.005em; }
+h1{ font-size: 30px; text-align: left; margin: 8px 0 24px; color: var(--es-tinta); }
+h2{ font-size: 20px; margin: 4px 0 14px; }
+h3{ font-size: 17px; }
+a{ color: var(--es-blau-fort); }
+a:hover, a:focus{ color: var(--es-tinta); }
+label{ font-size: 13px; font-weight: 600; color: var(--es-text); margin-bottom: 4px; }
+th{ font-weight: 600; }
+:focus-visible{ outline: 2px solid var(--es-blau) !important; outline-offset: 2px; }
+#cos{ padding: 24px 28px; }
+
+/* ---------- Barra superior ---------- */
+.navbar-default{
+  background: var(--es-blanc);
+  border: 0 !important;
+  border-bottom: 1px solid var(--es-linia) !important;
+  border-radius: 0;
+  box-shadow: 0 1px 0 rgba(17,26,33,.02);
+  margin-bottom: 0;
+}
+.navbar-header{ height: 64px; }
+.navbar-brand{ height: 64px; padding: 8px 15px; }
+.navbar-brand>img{ height: 48px; margin-top: 0; }
+.navbar-nav{ margin-top: 0; }
+.navbar-default .navbar-nav>li>a,
+.nav>li>a{
+  margin: 14px 2px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 0;
+  color: var(--es-text);
+  font-weight: 500;
+}
+.navbar-default .navbar-nav>li>a:hover,
+.navbar-default .navbar-nav>li>a:focus{ background: var(--es-fons); color: var(--es-tinta); }
+.navbar-default .navbar-nav>.active>a,
+.navbar-default .navbar-nav>.active>a:hover,
+.navbar-default .navbar-nav>.active>a:focus,
+.navbar-default .navbar-nav>.open>a,
+.navbar-default .navbar-nav>.open>a:hover,
+.navbar-default .navbar-nav>.open>a:focus{
+  background: var(--es-blau-suau);
+  color: var(--es-blau-fort);
+  border: 0;
+  box-shadow: inset 0 -2px 0 var(--es-blau);
+}
+.navbar-toggle{ margin-top: 15px !important; border-color: var(--es-linia) !important; }
+
+/* Desplegables */
+.dropdown-menu{
+  border: 1px solid var(--es-linia);
+  border-radius: var(--es-radi);
+  box-shadow: var(--es-ombra);
+  padding: 6px;
+}
+.dropdown-menu>li>a{ border-radius: 5px; padding: 7px 12px; color: var(--es-text); }
+.dropdown-menu>li>a:hover, .dropdown-menu>li>a:focus{ background: var(--es-blau-suau); color: var(--es-blau-fort); }
+.dropdown-menu>.active>a, .dropdown-menu>.active>a:hover{ background: var(--es-blau-fort); }
+
+/* ---------- Botons ---------- */
+.btn{
+  font-family: var(--es-font);
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 7px 14px;
+  transition: background-color .15s, border-color .15s, box-shadow .15s;
+}
+.btn-lg{ padding: 11px 18px; font-size: 15px; }
+.btn-sm, .btn-xs{ padding: 4px 10px; }
+.btn-primary{ background: var(--es-blau-fort); border-color: var(--es-blau-fort); color: #fff; }
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active, .btn-primary.active{
+  background: #09618B !important; border-color: #09618B !important; color: #fff;
+}
+.btn-default{ background: var(--es-blanc); border-color: var(--es-linia); color: var(--es-tinta); }
+.btn-default:hover, .btn-default:focus{ background: var(--es-fons) !important; border-color: #C5D1DA; color: var(--es-tinta); }
+.btn-success{ background: var(--es-ok); border-color: var(--es-ok); }
+.btn-warning{ background: var(--es-avis); border-color: var(--es-avis); }
+.btn-danger{ background: var(--es-error); border-color: var(--es-error); }
+.btn-info{ background: var(--es-blau); border-color: var(--es-blau); color: var(--es-tinta); }
+
+/* ---------- Formularis ---------- */
+.form-control, input[type="text"], input[type="password"], input[type="email"],
+input[type="number"], input[type="date"], select, textarea{
+  border: 1px solid var(--es-linia) !important;
+  border-radius: 6px !important;
+  background: var(--es-blanc);
+  color: var(--es-tinta);
+  box-shadow: none;
+  font-family: var(--es-font);
+}
+.form-control{ height: 36px; padding: 6px 10px; }
+textarea.form-control{ height: auto; }
+.form-control:focus, input:focus, select:focus, textarea:focus{
+  border-color: var(--es-blau) !important;
+  box-shadow: 0 0 0 3px rgba(62,181,230,.22) !important;
+}
+.label-filtre{
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--es-gris);
+}
+
+/* ---------- Taules ---------- */
+.table, #mytable, #mytable2, .table_rrhh, .table_preus{
+  background: var(--es-blanc);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--es-linia);
+  border-radius: var(--es-radi);
+  overflow: hidden;
+}
+.table>thead>tr>th, #mytable th, #mytable2 th, .table_rrhh th{
+  background: #F7F9FB;
+  color: var(--es-gris);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--es-linia) !important;
+  border-top: 0 !important;
+  padding: 10px 12px;
+}
+.table>tbody>tr>td, #mytable td, #mytable2 td, .table_rrhh td{
+  border-top: 1px solid #EDF1F4;
+  padding: 9px 12px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.table-striped>tbody>tr:nth-of-type(odd), .rowTable1{ background: #FAFBFC; }
+.rowTable0{ background: var(--es-blanc); }
+.table-hover>tbody>tr:hover{ background: var(--es-blau-suau); }
+
+/* ---------- Panells, caixes i avisos ---------- */
+.panel{ border: 1px solid var(--es-linia); border-radius: var(--es-radi); box-shadow: var(--es-ombra); }
+.panel-heading{ border-radius: var(--es-radi) var(--es-radi) 0 0; font-weight: 600; }
+.panel-default>.panel-heading{ background: #F7F9FB; border-color: var(--es-linia); color: var(--es-tinta); }
+.panel-primary>.panel-heading{ background: var(--es-blau-fort); border-color: var(--es-blau-fort); }
+.well{ background: var(--es-blanc); border: 1px solid var(--es-linia); box-shadow: none; border-radius: var(--es-radi); }
+.alert{ border-radius: var(--es-radi); border-width: 0 0 0 0; }
+.alert-info{ background: var(--es-blau-suau); color: #0A5A80; }
+.label, .badge{ font-weight: 600; border-radius: 999px; padding: .3em .7em; }
+.label-primary{ background: var(--es-blau-fort); }
+
+/* ---------- Finestres ---------- */
+.modal-content, .finestra_modal{
+  background: var(--es-blanc) !important;
+  border: 1px solid var(--es-linia) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(17,26,33,.25) !important;
+}
+.finestra_modal{ padding: 22px !important; }
+.modal-header{ border-bottom-color: var(--es-linia); }
+.modal-footer{ border-top-color: var(--es-linia); }
+#modal{ background: rgba(17,26,33,.55) !important; opacity: 1 !important; }
+
+/* Menú del botó dret */
+.menu-contextual{ background: var(--es-blanc); border: 1px solid var(--es-linia); border-radius: var(--es-radi); box-shadow: var(--es-ombra); padding: 4px; }
+.menu-contextual ul{ border: 0; background: transparent; }
+.menu-contextual ul li{ border: 0; border-radius: 5px; font-size: 13px; padding: 6px 10px; color: var(--es-text); }
+.menu-contextual ul li:hover{ background: var(--es-blau-suau); border: 0; color: var(--es-blau-fort); }
+
+/* ---------- Calendari (manté els colors d'estat, més nets) ---------- */
+.diaCalendar{ border: 1px solid var(--es-linia) !important; background: var(--es-blanc); border-radius: 6px; }
+.diaCalendar:hover{ border-color: var(--es-blau) !important; }
+.header-calendar{ font-family: var(--es-titol); font-weight: 700; color: var(--es-tinta); }
+.taula_calendari{ border-collapse: separate; border-spacing: 4px; }
+
+/* ---------- Pantalla d'accés ---------- */
+.login-form{
+  max-width: 400px;
+  margin: 10vh auto 0;
+  float: none;
+  background: var(--es-blanc);
+  border: 1px solid var(--es-linia);
+  border-radius: 14px;
+  box-shadow: var(--es-ombra);
+  padding: 32px 32px 28px;
+}
+.login-form .row{ padding: 0; margin: 0; width: 100%; }
+.login-form .logo_ample{ width: 220px; margin: 0 auto 18px; display: block; }
+.form-signin input, .form-signin button{ margin: 0 0 12px; width: 100%; }
+.form-signin .form-control{ height: 44px; padding: 10px 12px; font-size: 15px; }
+.form-signin .btn{ margin-top: 6px; }
+
+/* ---------- Peu i paginació ---------- */
+#footer{ background: transparent; color: var(--es-gris); font-size: 12px; width: 100%; }
+.pagination>li>a, .pagination>li>span{ color: var(--es-text); border-color: var(--es-linia); }
+.pagination>.active>a, .pagination>.active>span{ background: var(--es-blau-fort); border-color: var(--es-blau-fort); }
+
+/* ---------- Mòbil ---------- */
+@media (max-width: 767px){
+  #cos{ padding: 16px; }
+  .login-form{ margin: 24px 16px; padding: 24px 20px; }
+  h1{ font-size: 24px; }
+  .table-responsive, .table{ font-size: 13px; }
+}
