@@ -118,7 +118,6 @@ Environment=HOST=127.0.0.1
 Environment=PORT=$PORT
 Environment=DATA_DIR=$DATA_DIR
 Environment=TZ=Europe/Madrid
-Environment=TZ=Europe/Madrid
 Environment=PUBLIC_URL=https://$DOMINI
 ExecStart=$NODE_BIN --no-warnings src/server.js
 Restart=always

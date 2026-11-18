@@ -51,6 +51,8 @@ Obre http://localhost:3000. El primer cop et demana que creïs l'usuari administ
 Variables opcionals: `PORT` (port, per defecte 3000), `DATA_DIR` (on es desen les dades) i `TZ` (zona horària, per defecte `Europe/Madrid`).
 
 ### Publicar-la a internet
+👉 **Guia pas a pas gratuïta (Google Cloud + DuckDNS): [deploy/GUIA.md](deploy/GUIA.md)**. L'script [`deploy/instala.sh`](deploy/instala.sh) ho instal·la tot amb una sola ordre.
+
 Perquè els clients i els treballadors puguin obrir els enllaços, la plataforma ha d'estar en un servidor accessible des d'internet amb HTTPS. Algunes opcions:
 - un servidor propi (VPS) amb Node i un proxy com Caddy o Nginx;
 - serveis com Render, Railway o Fly.io, amb un **disc persistent** muntat a `DATA_DIR`.
