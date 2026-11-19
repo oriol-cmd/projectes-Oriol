@@ -263,7 +263,10 @@ function availability(date, start, end, excludeActivityId) {
       if (overlap(start, end, b.start_time, b.end_time)) { available = false; reasons.push(`Ja té feina: ${b.title || 'activitat'} ${b.start_time || ''}`); }
       else { warn = true; reasons.push(`Altra feina el mateix dia (${b.start_time}-${b.end_time || ''})`); }
     }
-    return { id: w.id, name: `${w.first_name} ${w.last_name || ''}`.trim(), available, warn, reasons };
+    // càrrega de feina: assignacions 30 dies abans i després (per repartir la feina)
+    const load = get(`SELECT COUNT(*) n FROM assignments s JOIN activities a ON a.id = s.activity_id
+      WHERE s.worker_id = ? AND a.id <> ? AND a.status <> 'cancel·lada' AND s.status <> 'rebutjat' AND a.date BETWEEN date(?, '-30 days') AND date(?, '+30 days')`, w.id, excludeActivityId || 0, date, date).n;
+    return { id: w.id, name: `${w.first_name} ${w.last_name || ''}`.trim(), available, warn, reasons, load };
   });
 }
 app.get('/api/availability', A.requireAdmin, wrap((req, res) => {
@@ -367,7 +370,8 @@ app.get('/api/activities', A.requireAdmin, (req, res) => {
     (SELECT p.color FROM activity_products ap JOIN products p ON p.id = ap.product_id WHERE ap.activity_id = a.id LIMIT 1) AS color,
     (SELECT COUNT(*) FROM assignments s WHERE s.activity_id = a.id) AS n_assigned,
     (SELECT COUNT(*) FROM assignments s WHERE s.activity_id = a.id AND s.status = 'confirmat') AS n_confirmed,
-    (SELECT COUNT(*) FROM assignments s WHERE s.activity_id = a.id AND s.status = 'rebutjat') AS n_rejected
+    (SELECT COUNT(*) FROM assignments s WHERE s.activity_id = a.id AND s.status = 'rebutjat') AS n_rejected,
+    (SELECT IFNULL(SUM(p.workers_needed),0) FROM activity_products ap JOIN products p ON p.id = ap.product_id WHERE ap.activity_id = a.id) AS n_needed
     FROM activities a LEFT JOIN clients c ON c.id = a.client_id WHERE a.date <= ? AND COALESCE(NULLIF(a.end_date,''), a.date) >= ? ORDER BY a.date, a.start_time`, to, from);
   res.json(rows);
 });

@@ -97,8 +97,9 @@ export async function activitiesPage(el) {
   const first = new Date(y, m - 1, 1);
   const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
   const end = new Date(start); end.setDate(start.getDate() + 41);
-  const acts = await api(`/api/activities?from=${isoDate(start)}&to=${isoDate(end)}`);
+  const [acts, products] = await Promise.all([api(`/api/activities?from=${isoDate(start)}&to=${isoDate(end)}`), api('/api/products')]);
   const st = activityStatusMap();
+  const MAX = 4; // barres visibles per dia
   const byDay = {};
   for (const a of acts) {
     const s = new Date(a.date + 'T12:00:00'), e = new Date((a.end_date || a.date) + 'T12:00:00');
@@ -110,31 +111,53 @@ export async function activitiesPage(el) {
     const d = new Date(start); d.setDate(start.getDate() + i);
     const iso = isoDate(d);
     const items = byDay[iso] || [];
+    const shown = items.slice(0, MAX), more = items.length - shown.length;
     cells += `<div class="day ${d.getMonth() !== m - 1 ? 'other' : ''} ${iso === today() ? 'today' : ''}" data-date="${iso}">
       <div class="dn">${d.getDate()}</div>
-      ${items.map(a => `<a class="ev" href="#/activitats/${a.id}" style="--c:${esc(a.color || '#64748b')};--s:${esc((st[a.status] || {}).color || '#999')}" title="${esc(a.title)}">
-        <span>${esc(a.start_time || '')}</span> ${esc(a.title)}${a.n_assigned ? ` <em>${a.n_confirmed}/${a.n_assigned}</em>` : ''}</a>`).join('')}</div>`;
+      ${shown.map(a => evBar(a, st)).join('')}
+      ${more > 0 ? `<button type="button" class="ev-more" data-more="${iso}">+${more} més</button>` : ''}</div>`;
   }
   el.innerHTML = `<div class="card cal">
     <div class="cal-head"><button class="btn ghost" data-prev>‹</button><h3>${esc(monthName)}</h3><button class="btn ghost" data-next>›</button><button class="btn small ghost" data-today>Avui</button>
-      <div class="legend">${(state.me.activity_statuses || []).map(s => `<span><i style="background:${esc(s.color)}"></i>${esc(s.label)}</span>`).join('')}</div></div>
+      <div class="legend">${products.filter(p => p.active).map(p => `<span><i style="background:${esc(p.color)}"></i>${esc(p.name)}</span>`).join('')}</div></div>
     <div class="cal-grid">${['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].map(d => `<div class="wd">${d}</div>`).join('')}${cells}</div>
-    <p class="muted small">Fes clic a un dia per crear-hi una activitat. Els números (p. ex. 2/3) són treballadors confirmats / assignats.</p></div>`;
+    <p class="muted small">Cada color és un tipus d'activitat (el color del producte; el pots canviar a Productes). El punt indica l'estat: ${(state.me.activity_statuses || []).map(s => `<i class="sdot" style="background:${esc(s.color)}"></i> ${esc(s.label)}`).join(' · ')}. Els números (p. ex. 2/3) són treballadors confirmats / necessaris. Fes clic a un dia buit per crear-hi una activitat.</p></div>`;
   const shift = n => { const d = new Date(y, m - 1 + n, 1); cal.month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; activitiesPage(el); };
   $('[data-prev]', el).onclick = () => shift(-1);
   $('[data-next]', el).onclick = () => shift(1);
   $('[data-today]', el).onclick = () => { cal.month = today().slice(0, 7); activitiesPage(el); };
+  $$('[data-more]', el).forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const items = byDay[b.dataset.more] || [];
+    modal({ title: fdate(b.dataset.more, 'long'), body: `<div class="day-list">${items.map(a => evBar(a, st, true)).join('')}</div>`, actions: [{ label: '+ Nova activitat aquest dia', cls: 'primary', onClick: () => { openActivityForm(null, { date: b.dataset.more }).then(id => id && go(`#/activitats/${id}`)); } }] });
+  });
   $$('.day', el).forEach(d => d.addEventListener('click', e => {
-    if (e.target.closest('.ev')) return;
+    if (e.target.closest('.ev,.ev-more')) return;
     openActivityForm(null, { date: d.dataset.date }).then(id => id && go(`#/activitats/${id}`));
   }));
+}
+
+// Barra d'activitat al calendari: color del tipus (producte), punt d'estat i equip
+function textOn(hex) {
+  const m = String(hex || '').match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return '#fff';
+  const [r, g, b] = m.slice(1).map(x => parseInt(x, 16));
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 165 ? '#111827' : '#fff';
+}
+function evBar(a, st, wide) {
+  const color = a.color || '#64748b';
+  const s = st[a.status] || {};
+  const need = Number(a.n_needed) || 0;
+  const team = need || a.n_assigned ? `<em>${a.n_confirmed}/${need || a.n_assigned}</em>` : '';
+  return `<a class="ev ${a.status === 'cancel·lada' ? 'cancel' : ''} ${wide ? 'wide' : ''}" href="#/activitats/${a.id}" style="--c:${esc(color)};--t:${textOn(color)}" title="${esc(`${a.start_time || ''} ${a.title} · ${s.label || a.status}${a.location ? ' · ' + a.location : ''}`)}">
+    <i class="sdot" style="background:${esc(s.color || '#999')}"></i><span class="tm">${esc(a.start_time || '')}</span><span class="tt">${esc(a.title)}</span>${team}</a>`;
 }
 
 async function activitiesList(el) {
   const acts = await api(`/api/activities?from=${today()}`);
   const past = await api(`/api/activities?to=${today()}&from=${isoDate(new Date(Date.now() - 60 * 86400000))}`);
   const st = activityStatusMap();
-  const rows = list => list.map(a => `<tr data-href="#/activitats/${a.id}"><td>${fdate(a.date)}</td><td>${esc(a.start_time || '')}${a.end_time ? '–' + esc(a.end_time) : ''}</td>
+  const rows = list => list.map(a => `<tr data-href="#/activitats/${a.id}"><td><i class="dot" style="background:${esc(a.color || '#64748b')}"></i> ${fdate(a.date)}</td><td>${esc(a.start_time || '')}${a.end_time ? '–' + esc(a.end_time) : ''}</td>
     <td><b>${esc(a.title)}</b><br><small class="muted">${esc(a.product_names || '')}</small></td><td>${esc(a.client_name || '')}</td><td>${esc(a.location || '')}</td>
     <td>${a.n_confirmed}/${a.n_assigned}${a.n_rejected ? ` <span class="chip red">${a.n_rejected} rebutjat</span>` : ''}</td><td>${statusChip(a.status, st)}</td></tr>`).join('');
   el.innerHTML = `<div class="card"><input class="search" placeholder="Filtra…" data-filter>
@@ -194,32 +217,49 @@ export async function openActivityForm(activity, { date } = {}) {
     renderRows();
   };
   const workerName = id => { const w = workers.find(x => x.id === Number(id)); return w ? `${w.first_name} ${w.last_name || ''}`.trim() : '?'; };
+  const neededFor = r => { const prod = products.find(p => p.id === r.product_id); return prod ? Number(prod.workers_needed) || 0 : 0; };
+  const flagOf = av => (av ? (av.available ? (av.warn ? '⚠️' : '✅') : '⛔') : '');
+  // ordre: disponibles sense avisos, amb avisos, no disponibles; dins de cada grup, qui té menys feina
+  const rank = w => { const av = avail[w.id]; if (!av) return 1; return av.available ? (av.warn ? 1 : 0) : 2; };
+  const sortedWorkers = () => workers.filter(w => w.active).sort((a1, b1) => rank(a1) - rank(b1) || ((avail[a1.id] || {}).load || 0) - ((avail[b1.id] || {}).load || 0) || a1.first_name.localeCompare(b1.first_name));
+  const assignedAll = () => new Set(rows.flatMap(x => x.workers.map(w => Number(w.worker_id))));
+  // omple les places que falten amb els millors candidats disponibles
+  const autoFill = r => {
+    const missing = Math.max(0, (neededFor(r) || 1) - r.workers.length);
+    if (!missing) return 0;
+    const taken = assignedAll();
+    const cands = sortedWorkers().filter(w => !taken.has(w.id) && avail[w.id] && avail[w.id].available).slice(0, missing);
+    for (const w of cands) r.workers.push({ worker_id: w.id, role: '' });
+    return cands.length - missing; // negatiu = en falten
+  };
   const renderRows = () => {
     if (!rows.length) { prodBox.innerHTML = '<p class="muted">Encara no hi ha cap producte. Afegeix-ne un a sota.</p>'; return; }
+    const taken = assignedAll();
     prodBox.innerHTML = rows.map((r, i) => {
-      const prod = products.find(p => p.id === r.product_id);
-      const needed = prod ? prod.workers_needed : 0;
-      const assignedIds = rows.flatMap(x => x.workers.map(w => Number(w.worker_id)));
+      const needed = neededFor(r);
+      const full = needed && r.workers.length >= needed;
       return `<div class="ap" data-i="${i}">
         <div class="ap-head"><input data-k="name" value="${esc(r.name)}" class="grow" aria-label="Producte">
           <label>Quant. <input data-k="quantity" type="number" step="0.01" value="${esc(r.quantity)}" class="w70"></label>
           <label>Preu <input data-k="price" type="number" step="0.01" value="${esc(r.price)}" class="w90"></label>
           <button type="button" class="icon-btn" data-rm title="Treu">🗑</button></div>
+        <div class="ap-bar"><span class="slots ${full ? 'ok' : 'miss'}">👥 ${r.workers.length}${needed ? ` / ${needed}` : ''} ${needed ? (full ? 'complet' : `· en falten ${needed - r.workers.length}`) : 'assignats'}</span>
+          <button type="button" class="btn small" data-auto>⚡ Omple automàticament</button>
+          ${r.workers.length ? '<button type="button" class="btn small ghost" data-clear>Treu-los tots</button>' : ''}</div>
         <div class="ap-workers">${r.workers.map((w, j) => {
           const av = avail[w.worker_id];
-          const flag = av ? (av.available ? (av.warn ? '⚠️' : '✅') : '⛔') : '';
-          return `<span class="wchip" title="${esc(av ? av.reasons.join(' · ') : '')}">${flag} ${esc(workerName(w.worker_id))}
+          return `<span class="wchip on" title="${esc(av ? av.reasons.join(' · ') : '')}">${flagOf(av)} ${esc(workerName(w.worker_id))}
             ${roles.length ? `<select data-role="${j}"><option value="">rol…</option>${roles.map(ro => `<option ${ro === w.role ? 'selected' : ''}>${esc(ro)}</option>`).join('')}</select>` : ''}
             ${w.status ? statusChip(w.status, ASSIGN_STATUS) : ''}<button type="button" data-rmw="${j}" aria-label="Treu">✕</button></span>`;
-        }).join('')}
-        <select data-addw><option value="">+ Assigna treballador${needed ? ` (calen ${needed}, n'hi ha ${r.workers.length})` : ''}…</option>
-          ${workers.filter(w => w.active && !r.workers.find(x => Number(x.worker_id) === w.id)).map(w => {
-            const av = avail[w.id];
-            const flag = av ? (av.available ? (av.warn ? '⚠️' : '✅') : '⛔') : '';
-            const dup = assignedIds.includes(w.id) ? ' (ja assignat en un altre producte)' : '';
-            return `<option value="${w.id}">${flag} ${esc(w.first_name)} ${esc(w.last_name || '')}${av && av.reasons.length ? ' — ' + esc(av.reasons.join(' · ')) : ''}${dup}</option>`;
-          }).join('')}</select></div></div>`;
-    }).join('') + `<p class="muted small">✅ disponible · ⚠️ disponible amb avisos · ⛔ no disponible (segons la seva disponibilitat i altres feines)</p>`;
+        }).join('') || '<span class="muted small">Ningú assignat encara.</span>'}</div>
+        <details class="pick" ${full ? '' : 'open'}><summary>Tria treballadors (clica per afegir)</summary><div class="pick-list">
+          ${sortedWorkers().filter(w => !r.workers.find(x => Number(x.worker_id) === w.id)).map(w => {
+            const av = avail[w.id] || { reasons: [], load: 0 };
+            const busy = taken.has(w.id);
+            return `<button type="button" class="pchip ${av.available === false ? 'no' : av.warn ? 'warn' : 'yes'} ${busy ? 'busy' : ''}" data-addw="${w.id}" title="${esc([...av.reasons, busy ? 'Ja assignat en un altre producte d\'aquesta activitat' : ''].filter(Boolean).join(' · '))}">
+              ${flagOf(avail[w.id])} ${esc(w.first_name)} ${esc(w.last_name || '')}<small>${av.load || 0} feines${busy ? ' · ja en un altre' : ''}</small></button>`;
+          }).join('') || '<span class="muted small">No hi ha més treballadors actius.</span>'}</div></details></div>`;
+    }).join('') + `<p class="muted small">✅ disponible · ⚠️ disponible amb avisos · ⛔ no disponible. «Feines» = assignacions 30 dies abans i després: l'assignació automàtica tria primer els disponibles amb menys feina, per repartir-la.</p>`;
   };
   prodBox.addEventListener('input', e => {
     const box = e.target.closest('.ap'); if (!box) return;
@@ -229,21 +269,31 @@ export async function openActivityForm(activity, { date } = {}) {
   prodBox.addEventListener('change', e => {
     const box = e.target.closest('.ap'); if (!box) return;
     const r = rows[box.dataset.i];
-    if (e.target.matches('[data-addw]') && e.target.value) {
-      const av = avail[e.target.value];
-      if (av && !av.available) toast(`Atenció: ${av.reasons.join(' · ')}`, 'warn');
-      r.workers.push({ worker_id: Number(e.target.value), role: '' }); renderRows();
-    }
     if (e.target.matches('[data-role]')) r.workers[e.target.dataset.role].role = e.target.value;
   });
   prodBox.addEventListener('click', e => {
     const box = e.target.closest('.ap'); if (!box) return;
-    if (e.target.matches('[data-rm]')) { rows.splice(box.dataset.i, 1); renderRows(); }
-    if (e.target.matches('[data-rmw]')) { rows[box.dataset.i].workers.splice(e.target.dataset.rmw, 1); renderRows(); }
+    const r = rows[box.dataset.i];
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.matches('[data-rm]')) { rows.splice(box.dataset.i, 1); renderRows(); }
+    else if (t.matches('[data-rmw]')) { r.workers.splice(t.dataset.rmw, 1); renderRows(); }
+    else if (t.matches('[data-clear]')) { r.workers = []; renderRows(); }
+    else if (t.matches('[data-addw]')) {
+      const av = avail[t.dataset.addw];
+      if (av && !av.available) toast(`Atenció: ${av.reasons.join(' · ')}`, 'warn');
+      r.workers.push({ worker_id: Number(t.dataset.addw), role: '' }); renderRows();
+    } else if (t.matches('[data-auto]')) {
+      const short = autoFill(r); renderRows();
+      if (short < 0) toast(`No hi ha prou treballadors disponibles: en falten ${-short}`, 'warn');
+      else toast('Equip proposat. Revisa\'l abans de desar.');
+    }
   });
   $('[data-add-product]', body).onchange = e => {
     const p = products.find(x => x.id === Number(e.target.value)); if (!p) return;
-    rows.push({ product_id: p.id, name: p.name, quantity: 1, price: p.price, vat: p.vat, workers: [] });
+    const r = { product_id: p.id, name: p.name, quantity: 1, price: p.price, vat: p.vat, workers: [] };
+    rows.push(r);
+    // proposa l'equip automàticament amb els disponibles que tenen menys feina
+    if (Object.keys(avail).length && Number(p.workers_needed) > 0) { const short = autoFill(r); if (short < 0) toast(`Només hi ha ${Number(p.workers_needed) + short} treballadors disponibles per a ${p.name}`, 'warn'); }
     e.target.value = ''; renderRows();
   };
 

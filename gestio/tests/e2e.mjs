@@ -108,11 +108,13 @@ try {
   await page.fill('.modal input[name="client.address"]', 'Carrer del Bosc, 5');
   await page.selectOption('.modal [data-add-product]', { label: 'Taller d\'escalada — 250,00 €' });
   await page.waitForSelector('.modal .ap');
-  const opts = await page.$$eval('.modal [data-addw] option', os => os.map(o => o.textContent));
-  ok(opts.some(o => o.includes('✅') && o.includes('Anna')), 'l\'Anna surt disponible el dissabte');
-  ok(opts.some(o => o.includes('Jordi')), 'el Jordi surt a la llista');
-  await page.selectOption('.modal [data-addw]', { index: 1 });
-  await page.selectOption('.modal [data-addw]', { index: 1 });
+  await page.waitForSelector('.modal .ap .wchip');
+  const chips = await page.$$eval('.modal .ap .wchip', cs => cs.map(c => c.textContent));
+  ok(chips.length === 2 && chips.some(c => c.includes('✅') && c.includes('Anna')), 'en afegir el producte, proposa automàticament els 2 treballadors disponibles');
+  await page.click('.modal [data-clear]');
+  await page.click('.modal [data-auto]');
+  ok((await page.$$('.modal .ap .wchip')).length === 2, 'el botó «Omple automàticament» torna a omplir l\'equip');
+  ok(await page.isVisible('.modal .slots.ok'), 'indica que l\'equip està complet');
   await page.fill('.modal input[name=whatsapp_link]', 'https://chat.whatsapp.com/ABCdef123');
   await shot('04-activitat-form');
   await page.click('.modal button:has-text("Crea l\'activitat")');
@@ -229,6 +231,7 @@ try {
   await shot('09-plantilla');
   await page.goto(`${BASE}/#/activitats`);
   await page.waitForSelector('.ev');
+  ok(await page.$eval('.ev', e => getComputedStyle(e).height) === '24px', 'el calendari mostra barres de color d\'alçada fixa');
   await shot('10-calendari');
 
   console.log('Portal del treballador');
