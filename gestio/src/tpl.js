@@ -8,7 +8,7 @@ function lookup(ctx, p) {
   if (p === 'this' || p === '.') return ctx.this;
   let cur = ctx;
   for (const part of p.split('.')) {
-    if (cur == null) return undefined;
+    if (cur == null) { cur = undefined; break; }
     cur = cur[part];
   }
   if (cur === undefined && ctx.__parent) return lookup(ctx.__parent, p);

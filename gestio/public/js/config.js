@@ -1,4 +1,5 @@
 // Automatismes, correus enviats i Configuració
+import { templateTab as contractTemplateTab } from './contracts.js';
 import { api, state, esc, $, $$, fdate, toast, errorToast, modal, confirmDialog, formHtml, readForm, setTitle, go, reload, debounce } from './core.js';
 
 const VARS = {
@@ -7,11 +8,13 @@ const VARS = {
   invoice: ['factura.numero', 'factura.total', 'factura.enllac', 'factura.venciment', 'factura.senyal', 'factura.pendent', 'factura.senyal_estat'],
   worker: ['treballador.nom', 'treballador.cognoms', 'activitat.titol', 'activitat.data', 'activitat.hora', 'activitat.lloc', 'activitat.whatsapp', 'activitat.notes_treballadors', 'assignacio.producte', 'assignacio.rol', 'enllac_confirmacio', 'empresa.nom'],
   activity: ['activitat.titol', 'activitat.data', 'activitat.hora', 'activitat.lloc'],
+  contract: ['contracte.numero', 'contracte.titol', 'contracte.enllac'],
 };
 function varsFor(trigger) {
   if (trigger.startsWith('quote')) return [...VARS.client, ...VARS.quote];
   if (trigger.startsWith('invoice') || trigger.startsWith('deposit')) return [...VARS.client, ...VARS.invoice];
   if (trigger === 'activity_client_reminder') return [...VARS.client, ...VARS.activity];
+  if (trigger.startsWith('contract')) return [...VARS.client, ...VARS.contract];
   return VARS.worker;
 }
 function varChips(list) {
@@ -107,7 +110,7 @@ export async function emailsPage(el) {
 // =====================================================================
 // CONFIGURACIÓ
 // =====================================================================
-const TABS = [['empresa', 'Empresa'], ['aparenca', 'Aparença i apartats'], ['camps', 'Camps personalitzats'], ['llistes', 'Llistes'], ['facturacio', 'Facturació i numeració'], ['plantilles', 'Plantilla de factura'], ['missatges', 'Missatges'], ['correu', 'Correu'], ['usuaris', 'Usuaris'], ['copia', 'Còpia de seguretat'], ['compte', 'El meu compte']];
+const TABS = [['empresa', 'Empresa'], ['aparenca', 'Aparença i apartats'], ['camps', 'Camps personalitzats'], ['llistes', 'Llistes'], ['facturacio', 'Facturació i numeració'], ['plantilles', 'Disseny dels documents'], ['contracte', 'Contracte tipus'], ['missatges', 'Missatges'], ['correu', 'Correu'], ['usuaris', 'Usuaris'], ['copia', 'Còpia de seguretat'], ['compte', 'El meu compte']];
 
 export async function settingsPage(el, tab = 'empresa') {
   setTitle('Configuració');
@@ -130,7 +133,7 @@ export async function settingsPage(el, tab = 'empresa') {
   }
 
   if (tab === 'aparenca') {
-    const MODS = [['tauler', 'Tauler'], ['activitats', 'Activitats'], ['clients', 'Clients'], ['treballadors', 'Treballadors'], ['productes', 'Productes'], ['pressupostos', 'Pressupostos'], ['factures', 'Factures'], ['automatismes', 'Automatismes'], ['correus', 'Correus enviats']];
+    const MODS = [['tauler', 'Tauler'], ['activitats', 'Activitats'], ['clients', 'Clients'], ['treballadors', 'Treballadors'], ['productes', 'Productes'], ['pressupostos', 'Pressupostos'], ['factures', 'Factures'], ['contractes', 'Contractes'], ['automatismes', 'Automatismes'], ['correus', 'Correus enviats']];
     const F = [{ name: 'app_name', label: 'Nom de la plataforma' }, { name: 'primary_color', label: 'Color principal', type: 'color' },
       { name: 'font', label: 'Tipus de lletra dels documents', type: 'select', empty: false, options: [{ value: "'Helvetica Neue', Arial, sans-serif", label: 'Helvetica / Arial' }, { value: "Georgia, 'Times New Roman', serif", label: 'Georgia (serif)' }, { value: "'Trebuchet MS', Verdana, sans-serif", label: 'Trebuchet' }, { value: "'Courier New', monospace", label: 'Courier' }] }];
     body.innerHTML = `${formHtml(F, s.appearance)}<h3>Apartats del menú</h3><p class="muted">Activa o amaga apartats i canvia'ls el nom.</p>
@@ -195,7 +198,19 @@ export async function settingsPage(el, tab = 'empresa') {
     const t = { ...s.templates };
     const draw = () => {
       const presetKey = kind === 'invoice' ? 'invoice_preset' : 'quote_preset', htmlKey = kind === 'invoice' ? 'invoice_html' : 'quote_html';
-      body.innerHTML = `<div class="row gap wrap"><div class="seg"><button data-k="invoice" class="${kind === 'invoice' ? 'on' : ''}">Factura</button><button data-k="quote" class="${kind === 'quote' ? 'on' : ''}">Pressupost</button></div>
+      body.innerHTML = `<h3>🎨 Colors i estil de l'empresa</h3>
+        <p class="muted small">S'apliquen a factures, pressupostos i contractes. Si no poses colors, es fa servir el color principal de la plataforma.</p>
+        <div class="grid-form design">
+          <div class="field"><label>Color principal</label><input type="color" data-o="color" value="${esc(t.color || s.appearance.primary_color)}"></div>
+          <div class="field"><label>Color secundari (detalls, descomptes)</label><input type="color" data-o="color2" value="${esc(t.color2 || '#1f2937')}"></div>
+          <div class="field"><label>Mida del logotip (px)</label><input type="number" min="20" max="200" data-o="logo_height" value="${esc(t.logo_height || 70)}"></div>
+          <div class="field full"><label>Eslògan (surt sota el logotip)</label><input data-o="tagline" value="${esc(t.tagline || '')}" placeholder="Ex.: Experiències castelleres per a empreses"></div>
+          <label class="check"><input type="checkbox" data-o="show_service" ${t.show_service !== false ? 'checked' : ''}> Mostra el requadre del servei (data i lloc)</label>
+          <label class="check"><input type="checkbox" data-o="show_vat_column" ${t.show_vat_column !== false ? 'checked' : ''}> Mostra la columna d'IVA</label>
+          <label class="check"><input type="checkbox" data-o="quote_signature" ${t.quote_signature ? 'checked' : ''}> Espai per signar la conformitat al pressupost</label>
+        </div>
+        <h3>Disseny</h3>
+        <div class="row gap wrap"><div class="seg"><button data-k="invoice" class="${kind === 'invoice' ? 'on' : ''}">Factura</button><button data-k="quote" class="${kind === 'quote' ? 'on' : ''}">Pressupost</button></div>
         <label>Disseny base <select data-preset>${presets.map(p => `<option ${p === t[presetKey] ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         <label class="check"><input type="checkbox" data-custom ${t[htmlKey] ? 'checked' : ''}> Personalitza l'HTML</label></div>
         <p class="muted small">Tria un disseny i ajusta'l: el logotip, el color i les dades surten de «Empresa» i «Aparença». Si vols que sigui <b>idèntica a la teva factura actual</b>, activa «Personalitza l'HTML» i edita el codi (o demana que te l'adaptin a partir d'un PDF teu). Les factures existents també es veuen amb la plantilla nova.</p>
@@ -223,6 +238,8 @@ export async function settingsPage(el, tab = 'empresa') {
         preview();
       };
       ta.oninput = () => { t[htmlKey] = ta.value; preview(); };
+      const readOpts = () => { for (const i of $$('[data-o]', body)) t[i.dataset.o] = i.type === 'checkbox' ? i.checked : i.type === 'number' ? Number(i.value) : i.value; };
+      $$('[data-o]', body).forEach(i => i.addEventListener(i.type === 'checkbox' || i.type === 'color' ? 'change' : 'input', async () => { readOpts(); await api.put('/api/settings', { templates: { color: t.color, color2: t.color2, logo_height: t.logo_height, tagline: t.tagline, show_service: t.show_service, show_vat_column: t.show_vat_column, quote_signature: t.quote_signature } }); preview(); }));
       preview();
       onSave(() => api.put('/api/settings', { templates: { ...t, [htmlKey]: $('[data-custom]', body).checked ? ta.value : '' } }));
     };
@@ -238,8 +255,10 @@ export async function settingsPage(el, tab = 'empresa') {
       { name: 'quote_body', label: 'Enviament de pressupost — missatge', type: 'textarea', rows: 10, full: true },
       { name: 'invoice_subject', label: 'Enviament de factura — assumpte', full: true },
       { name: 'invoice_body', label: 'Enviament de factura — missatge', type: 'textarea', rows: 10, full: true },
+      { name: 'contract_subject', label: 'Enviament de contracte — assumpte', full: true },
+      { name: 'contract_body', label: 'Enviament de contracte — missatge', type: 'textarea', rows: 10, full: true },
     ];
-    body.innerHTML = formHtml(F, s.messages) + varChips([...new Set([...VARS.worker, ...VARS.client, ...VARS.quote, ...VARS.invoice])]) + saveBtn;
+    body.innerHTML = formHtml(F, s.messages) + varChips([...new Set([...VARS.worker, ...VARS.client, ...VARS.quote, ...VARS.invoice, ...VARS.contract])]) + saveBtn;
     bindVarChips(body);
     onSave(() => api.put('/api/settings', { messages: readForm(body, F) }));
   }
@@ -276,6 +295,8 @@ export async function settingsPage(el, tab = 'empresa') {
       <p class="muted">Al servidor ja se'n fa una cada nit automàticament, però si el servidor es fes malbé també es perdrien. Descarrega'n una de tant en tant (per exemple, cada mes) i guarda-la al teu ordinador o al Drive.</p>
       <a class="btn primary" href="/api/backup" download>⬇ Descarrega la còpia de seguretat</a>`;
   }
+
+  if (tab === 'contracte') await contractTemplateTab(body, s);
 
   if (tab === 'compte') passwordForm(body);
 }

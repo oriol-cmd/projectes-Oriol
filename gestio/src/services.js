@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { all, get, run, insert, update, addTimeline } = require('./db');
-const { DEFAULT_SETTINGS, PRESETS } = require('./defaults');
+const { DEFAULT_SETTINGS, PRESETS, CONTRACT_DOC } = require('./defaults');
 const { render, esc } = require('./tpl');
 
 // ---------- Configuració ----------
@@ -65,23 +65,33 @@ function parseTs(s) {
 function nowISO() { return new Date().toISOString(); }
 
 // ---------- Imports ----------
-function computeTotals(lines, depositType, depositValue) {
-  let subtotal = 0; const vatMap = {};
+function computeTotals(lines, depositType, depositValue, discountType, discountValue) {
+  let gross = 0, lineDiscounts = 0; const buckets = {};
   const clean = (lines || []).filter(l => l && (l.description || l.price)).map(l => {
     const quantity = Number(l.quantity) || 0, price = Number(l.price) || 0, vat = Number(l.vat) || 0;
-    const discount = Number(l.discount) || 0;
-    const amount = round2(quantity * price * (1 - discount / 100));
-    subtotal += amount;
-    vatMap[vat] = (vatMap[vat] || 0) + amount * vat / 100;
+    const discount = Math.min(100, Math.max(0, Number(l.discount) || 0));
+    const full = round2(quantity * price);
+    const amount = round2(full * (1 - discount / 100));
+    lineDiscounts += full - amount;
+    gross += amount;
+    buckets[vat] = (buckets[vat] || 0) + amount;
     return { product_id: l.product_id || null, description: l.description || '', quantity, price, vat, discount, amount };
   });
+  gross = round2(gross);
+  // descompte general sobre el subtotal (es reparteix entre els tipus d'IVA)
+  let discount_amount = 0;
+  if (discountType === 'percent') discount_amount = round2(gross * Math.min(100, Math.max(0, Number(discountValue) || 0)) / 100);
+  else if (discountType === 'amount') discount_amount = round2(Math.min(gross, Math.max(0, Number(discountValue) || 0)));
+  const factor = gross ? (gross - discount_amount) / gross : 1;
+  const vatMap = {};
+  for (const [rate, base] of Object.entries(buckets)) vatMap[rate] = base * factor * Number(rate) / 100;
+  const subtotal = round2(gross - discount_amount);
   const vat_total = round2(Object.values(vatMap).reduce((a, b) => a + b, 0));
-  subtotal = round2(subtotal);
   const total = round2(subtotal + vat_total);
   let deposit_amount = 0;
   if (depositType === 'percent') deposit_amount = round2(total * (Number(depositValue) || 0) / 100);
   else if (depositType === 'amount') deposit_amount = round2(Number(depositValue) || 0);
-  return { lines: clean, subtotal, vat_total, total, deposit_amount, vatMap };
+  return { lines: clean, gross, discount_amount, line_discounts: round2(lineDiscounts), subtotal, vat_total, total, deposit_amount, vatMap };
 }
 
 // ---------- Numeració ----------
@@ -89,7 +99,7 @@ function nextNumber(kind) { // kind: invoice | quote
   const s = getSettings();
   const n = { ...s.numbering };
   const year = new Date().getFullYear();
-  if (n.reset_yearly && n.year !== year) { n.year = year; n.invoice_next = 1; n.quote_next = 1; }
+  if (n.reset_yearly && n.year !== year) { n.year = year; n.invoice_next = 1; n.quote_next = 1; n.contract_next = 1; }
   const prefix = (n[`${kind}_prefix`] || '').replace('{ANY}', year).replace('{AA}', String(year).slice(2));
   const value = n[`${kind}_next`] || 1;
   const number = prefix + String(value).padStart(Number(n.digits) || 1, '0');
@@ -125,7 +135,7 @@ function workerCtx(w) {
 }
 
 function docFinance(doc) {
-  const t = computeTotals(doc.lines, doc.deposit_type, doc.deposit_value);
+  const t = computeTotals(doc.lines, doc.deposit_type, doc.deposit_value, doc.discount_type, doc.discount_value);
   const paidDeposit = !!doc.deposit_paid_at;
   const paid = !!doc.paid_at;
   const pending = paid ? 0 : round2(t.total - (paidDeposit ? t.deposit_amount : 0));
@@ -138,11 +148,21 @@ function docFinance(doc) {
 
 function quoteCtx(q) {
   const f = docFinance(q);
-  return { numero: q.number, total: money(f.t.total), data: fdate(q.date), validesa: fdate(q.valid_until), enllac: baseUrl() + '/p/' + q.token, titol: q.title || '', senyal: f.senyal, te_senyal: f.te_senyal };
+  return { numero: q.number, total: money(f.t.total), data: fdate(q.date), validesa: fdate(q.valid_until), enllac: baseUrl() + '/p/' + q.token, titol: q.title || '', senyal: f.senyal, te_senyal: f.te_senyal,
+    descompte: f.t.discount_amount + f.t.line_discounts > 0 ? money(f.t.discount_amount + f.t.line_discounts) : '' };
 }
 function invoiceCtx(inv) {
   const f = docFinance(inv);
   return { numero: inv.number, total: money(f.t.total), data: fdate(inv.date), venciment: fdate(inv.due_date), enllac: baseUrl() + '/f/' + inv.token, senyal: f.senyal, senyal_estat: inv.deposit_paid_at ? 'pagat' : 'pendent', te_senyal: f.te_senyal, pendent: f.pendent };
+}
+
+function styleCtx() {
+  const s = getSettings();
+  const t = s.templates;
+  return {
+    estil: { color: t.color || s.appearance.primary_color, color2: t.color2 || '#1f2937', font: s.appearance.font, logo_h: Math.min(200, Math.max(20, Number(t.logo_height) || 70)) },
+    opt: { caixa_servei: t.show_service !== false, columna_iva: t.show_vat_column !== false, eslogan: t.tagline || '' },
+  };
 }
 
 function buildDocContext(kind, doc, { absolute = false } = {}) {
@@ -151,19 +171,26 @@ function buildDocContext(kind, doc, { absolute = false } = {}) {
   const activity = doc.activity_id ? get('SELECT * FROM activities WHERE id = ?', doc.activity_id) : null;
   const f = docFinance(doc);
   const ivas = Object.entries(f.t.vatMap).filter(([, v]) => v > 0).map(([k, v]) => ({ tipus: num(k), quota: money(v) }));
+  const discText = doc.discount_type === 'percent' ? `Descompte (${num(doc.discount_value)}%)` : 'Descompte';
+  const saving = round2(f.t.discount_amount + f.t.line_discounts);
   return {
-    estil: { color: s.appearance.primary_color, font: s.appearance.font },
+    ...styleCtx(),
     empresa: companyCtx(absolute),
     client: clientCtx(client),
     activitat: activityCtx(activity),
-    linies: f.t.lines.map(l => ({ descripcio: l.description, quantitat: num(l.quantity), preu: money(l.price), iva: num(l.vat), descompte: l.discount ? num(l.discount) + '%' : '', import: money(l.amount) })),
+    linies: f.t.lines.map(l => ({ descripcio: l.description, quantitat: num(l.quantity), preu: money(l.price), iva: num(l.vat), descompte: l.discount ? '−' + num(l.discount) + '%' : '', import: money(l.amount) })),
     doc: {
       tipus: kind === 'invoice' ? 'FACTURA' : 'PRESSUPOST', numero: doc.number || '', data: fdate(doc.date),
       venciment: fdate(kind === 'invoice' ? doc.due_date : doc.valid_until),
       etiqueta_venciment: kind === 'invoice' ? 'Venciment' : 'Vàlid fins',
+      te_dte_linia: f.t.lines.some(l => l.discount > 0),
+      te_descompte: f.t.discount_amount > 0, brut: money(f.t.gross), descompte: money(f.t.discount_amount), descompte_text: discText,
+      estalvi_total: saving > 0, estalvi: money(saving),
       base: money(f.t.subtotal), iva: money(f.t.vat_total), ivas, total: money(f.t.total),
       te_senyal: f.te_senyal, senyal: f.senyal, senyal_estat: kind === 'invoice' ? f.senyal_estat : '', pendent: f.pendent,
       notes: doc.notes || '', condicions: kind === 'quote' ? (doc.conditions || '') : '', titol: doc.title || '',
+      intro: kind === 'quote' ? (doc.intro || '') : '',
+      signatura: kind === 'quote' && s.templates.quote_signature,
     },
   };
 }
@@ -311,6 +338,81 @@ function whatsappLink(assignmentId) {
   return { url, text, phone };
 }
 
+// ---------- Contractes ----------
+function quoteTableHtml(q) {
+  if (!q) return '';
+  const f = docFinance(q);
+  const rows = f.t.lines.map(l => `<tr><td>${esc(l.description)}</td><td style="text-align:right">${num(l.quantity)}</td><td style="text-align:right">${money(l.price)}${l.discount ? ` <small>(−${num(l.discount)}%)</small>` : ''}</td><td style="text-align:right">${money(l.amount)}</td></tr>`).join('');
+  const disc = f.t.discount_amount > 0 ? `<tr><td colspan="3" style="text-align:right">Descompte</td><td style="text-align:right">−${money(f.t.discount_amount)}</td></tr>` : '';
+  return `<table><thead><tr><th>Concepte</th><th style="text-align:right">Quant.</th><th style="text-align:right">Preu</th><th style="text-align:right">Import</th></tr></thead><tbody>${rows}${disc}
+    <tr><td colspan="3" style="text-align:right">Base imposable</td><td style="text-align:right">${money(f.t.subtotal)}</td></tr>
+    <tr><td colspan="3" style="text-align:right">IVA</td><td style="text-align:right">${money(f.t.vat_total)}</td></tr>
+    <tr><td colspan="3" style="text-align:right"><b>Total</b></td><td style="text-align:right"><b>${money(f.t.total)}</b></td></tr></tbody></table>`;
+}
+
+// variables disponibles per omplir el contracte tipus
+function contractFillCtx({ client, quote, activity }) {
+  const ctx = messageCtx({ client, quote, activity });
+  ctx.client = ctx.client || clientCtx(null);
+  ctx.activitat = ctx.activitat || {};
+  ctx.pressupost = ctx.pressupost || {};
+  if (quote) ctx.pressupost.taula = quoteTableHtml(quote);
+  // si no hi ha activitat, el servei és el títol del pressupost o els seus conceptes
+  if (!ctx.activitat.titol && quote) ctx.activitat.titol = quote.title || (quote.lines || []).map(l => String(l.description || '').split('\n')[0]).filter(Boolean).join(', ');
+  ctx.avui = new Date().toLocaleDateString('ca-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  return ctx;
+}
+
+function fillContractTemplate(body, refs) { return render(body || getSettings().contract.body, contractFillCtx(refs)); }
+
+function sanitizeHtml(html) {
+  return String(html || '')
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*(script|iframe|object|embed|link|meta)[^>]*\/?>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+}
+
+function contractDocCtx(c, { absolute = false } = {}) {
+  const client = c.client_id ? get('SELECT * FROM clients WHERE id = ?', c.client_id) : null;
+  return {
+    ...styleCtx(),
+    empresa: companyCtx(absolute),
+    client: clientCtx(client),
+    contracte: {
+      titol: c.title || 'Contracte', numero: c.number || '', data: fdate(String(c.created_at || '').slice(0, 10) || todayISO()),
+      cos: sanitizeHtml(c.body), signat: c.status === 'signat' && !!c.signature,
+      signatura: /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(c.signature || '') ? c.signature : '',
+      signant: c.signer_name || '', signant_nif: c.signer_nif || '', ip: c.signer_ip || '',
+      data_signatura: c.signed_at ? new Date(c.signed_at).toLocaleString('ca-ES') : '',
+    },
+  };
+}
+function renderContract(c, opts) { return render(CONTRACT_DOC, contractDocCtx(c, opts)); }
+
+function contractMsgCtx(c) {
+  const client = c.client_id ? get('SELECT * FROM clients WHERE id = ?', c.client_id) : null;
+  const ctx = messageCtx({ client });
+  ctx.contracte = { numero: c.number, titol: c.title, enllac: baseUrl() + '/k/' + c.token };
+  return { ctx, client };
+}
+
+async function sendContract(id, { subject, body } = {}) {
+  const c = get('SELECT * FROM contracts WHERE id = ?', id);
+  if (!c) throw new Error('Contracte no trobat');
+  if (!c.token) { c.token = token(); update('contracts', c.id, { token: c.token }); }
+  const { ctx, client } = contractMsgCtx(c);
+  const m = getSettings().messages;
+  const r = await sendEmail({ to: client && client.email, subject: renderMessage(subject || m.contract_subject, ctx), text: renderMessage(body || m.contract_body, ctx), related_type: 'contract', related_id: c.id });
+  if (r.status !== 'error') {
+    const patch = { sent_at: c.sent_at || nowISO() };
+    if (c.status === 'esborrany') patch.status = 'enviat';
+    update('contracts', c.id, patch);
+  }
+  addTimeline('contract', c.id, 'enviat', `Enviat a ${client?.email || '(sense correu)'} — ${r.status}${r.error ? ': ' + r.error : ''}`);
+  return r;
+}
+
 // Quan s'obre un correu o un enllaç públic
 function markOpened(type, id, via) {
   const now = nowISO();
@@ -325,6 +427,12 @@ function markOpened(type, id, via) {
     const inv = get('SELECT * FROM invoices WHERE id = ?', id); if (!inv) return;
     update('invoices', id, { open_count: (inv.open_count || 0) + 1, first_opened_at: inv.first_opened_at || now });
     if (!inv.first_opened_at) addTimeline('invoice', id, 'vist', `El client l'ha oberta (${via})`);
+  } else if (type === 'contract') {
+    const c = get('SELECT * FROM contracts WHERE id = ?', id); if (!c) return;
+    const patch = { open_count: (c.open_count || 0) + 1, first_opened_at: c.first_opened_at || now };
+    if (c.status === 'enviat') patch.status = 'vist';
+    update('contracts', id, patch);
+    if (!c.first_opened_at) addTimeline('contract', id, 'vist', `El client l'ha obert (${via})`);
   } else if (type === 'assignment') {
     const a = get('SELECT * FROM assignments WHERE id = ?', id); if (!a) return;
     if (['pendent', 'enviat'].includes(a.status)) update('assignments', id, { status: 'rebut', received_at: now });
@@ -336,4 +444,5 @@ module.exports = {
   getSettings, saveSettings, setSeenOrigin, baseUrl, money, num, fdate, round2, token, todayISO, addDays, parseTs, nowISO,
   computeTotals, nextNumber, buildDocContext, renderDoc, templateFor, messageCtx, renderMessage, sendEmail, smtpConfigured,
   sendQuote, sendInvoice, sendAssignment, whatsappLink, markOpened, docFinance, assignmentBundle,
+  fillContractTemplate, contractFillCtx, renderContract, sendContract, sanitizeHtml, contractMsgCtx, styleCtx, companyCtx,
 };

@@ -14,7 +14,7 @@ const PORT = 3900 + Math.floor(Math.random() * 90);
 const BASE = `http://localhost:${PORT}`;
 const SHOTS = process.env.SHOTS || '';
 
-const server = spawn(process.execPath, ['--no-warnings', 'src/server.js'], { cwd: root, env: { ...process.env, PORT, DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, ['--no-warnings', 'src/server.js'], { cwd: root, env: { ...process.env, PORT, DATA_DIR: dataDir, SEED_TGT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = '';
 server.stdout.on('data', d => (serverLog += d)); server.stderr.on('data', d => (serverLog += d));
 await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('El servidor no arrenca\n' + serverLog)), 8000); server.stdout.on('data', d => { if (String(d).includes('en marxa')) { clearTimeout(t); res(); } }); });
@@ -172,6 +172,54 @@ try {
   await page.reload(); await page.waitForSelector('text=Seguiment');
   await shot('06-pressupost');
 
+  console.log('Descomptes');
+  const qd = await api('/api/quotes', { client_id: clients[0].id, title: 'Amb descompte', intro: 'Benvolguts, aquí teniu la proposta.', discount_type: 'percent', discount_value: 10,
+    lines: [{ description: 'Taller', quantity: 2, price: 100, vat: 21, discount: 50 }, { description: 'Material', quantity: 1, price: 100, vat: 21 }] });
+  const qdd = await api(`/api/quotes/${qd.id}`);
+  // línies: 100 + 100 = 200; −10% = 180; IVA 21% = 37,80; total 217,80
+  ok(qdd.subtotal === 180 && qdd.total === 217.8, `descompte per línia i general calculats (total ${qdd.total})`);
+  const qhtml = await page.evaluate(async id => (await fetch(`/api/quotes/${id}/html`)).text(), qd.id);
+  ok(qhtml.includes('Descompte (10%)') && qhtml.includes('−50%') && qhtml.includes('Estalvi aplicat') && qhtml.includes('Benvolguts, aquí teniu la proposta.'), 'el pressupost mostra el descompte, l\'estalvi i el text de presentació');
+  await page.goto(`${BASE}/#/pressupostos/${qd.id}`);
+  await page.waitForSelector('.totals .disc');
+  ok((await page.textContent('[data-totals]')).includes('217,80'), 'l\'editor mostra el total amb descompte');
+
+  console.log('Contractes');
+  await page.click('button:has-text("Més")').catch(() => {});
+  await page.click('button[data-to-contract]');
+  await page.waitForSelector('.rte-body');
+  const kid = Number(page.url().split('/').pop());
+  let k = await api(`/api/contracts/${kid}`);
+  ok(k.body.includes('Escola Bosc SL') && k.body.includes('B11223344') && k.body.includes('217,80'), 'el contracte tipus s\'omple amb les dades del client i del pressupost');
+  await page.click('.rte-body');
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type(' Clàusula afegida a mà.');
+  await page.click('button[data-save]');
+  await page.waitForSelector('text=Contracte desat');
+  k = await api(`/api/contracts/${kid}`);
+  ok(k.body.includes('Clàusula afegida a mà.'), 'el contracte es pot editar');
+  await shot('12-contracte-editor');
+  await page.click('button[data-send]');
+  await page.click('.modal button:has-text("Envia")');
+  await page.waitForSelector('text=Desat a la safata');
+  k = await api(`/api/contracts/${kid}`);
+  ok(k.status === 'enviat', 'contracte enviat al client');
+  const kp = await anon.newPage();
+  await kp.goto(k.public_url);
+  ok(await kp.isVisible('text=Signa el contracte'), 'el client veu el contracte i el formulari de signatura');
+  const box = await kp.locator('#pad').boundingBox();
+  await kp.mouse.move(box.x + 30, box.y + 100); await kp.mouse.down();
+  for (let i = 1; i <= 12; i++) await kp.mouse.move(box.x + 30 + i * 25, box.y + 100 + (i % 2 ? -40 : 40));
+  await kp.mouse.up();
+  await kp.check('input[name=accept]');
+  await kp.click('button:has-text("Signa el contracte")');
+  await kp.waitForSelector('text=Contracte signat');
+  k = await api(`/api/contracts/${kid}`);
+  ok(k.status === 'signat' && k.signature.startsWith('data:image/png') && k.signer_name === 'Escola Bosc SL', 'el client signa el contracte en línia');
+  const khtml = await page.evaluate(async id => (await fetch(`/api/contracts/${id}/html`)).text(), kid);
+  ok(khtml.includes('Signat electrònicament per Escola Bosc SL') && khtml.includes('data:image/png'), 'el contracte signat mostra la signatura');
+  if (SHOTS) await kp.screenshot({ path: path.join(SHOTS, '13-contracte-signat.png'), fullPage: false });
+
   console.log('Factura amb paga i senyal');
   const inv = await api(`/api/quotes/${qid}/to-invoice`, {});
   await page.goto(`${BASE}/#/factures/${inv.id}`);
@@ -211,7 +259,7 @@ try {
   await shot('08-automatismes');
 
   console.log('Configuració');
-  for (const t of ['empresa', 'aparenca', 'camps', 'llistes', 'facturacio', 'plantilles', 'missatges', 'correu', 'usuaris', 'copia', 'compte']) {
+  for (const t of ['empresa', 'aparenca', 'camps', 'llistes', 'facturacio', 'plantilles', 'contracte', 'missatges', 'correu', 'usuaris', 'copia', 'compte']) {
     await page.goto(`${BASE}/#/configuracio/${t}`);
     await page.waitForSelector('[data-body] *');
   }

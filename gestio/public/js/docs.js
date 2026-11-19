@@ -38,7 +38,7 @@ export async function editor(el, kind, idParam) {
     <button class="btn" data-preview>👁 Previsualitza / PDF</button><button class="btn primary" data-send>✉️ Envia al client</button>
     <div class="dropdown"><button class="btn">Més ▾</button><div class="menu">
       ${doc.public_url ? '<button data-copy>🔗 Copia l\'enllaç per al client</button>' : ''}
-      ${kind === 'quote' ? '<button data-accept>✅ Marca com acceptat</button><button data-reject>❌ Marca com rebutjat</button><button data-to-act>📅 Crea l\'activitat</button><button data-to-inv>🧾 Converteix en factura</button>' : ''}
+      ${kind === 'quote' ? '<button data-accept>✅ Marca com acceptat</button><button data-reject>❌ Marca com rebutjat</button><button data-to-act>📅 Crea l\'activitat</button><button data-to-inv>🧾 Converteix en factura</button><button data-to-contract>📄 Crea el contracte</button>' : ''}
       ${kind === 'invoice' ? '<button data-cancel>🚫 Anul·la la factura</button>' : ''}
       <button data-del class="danger-t">🗑 Esborra</button></div></div>`);
 
@@ -46,6 +46,11 @@ export async function editor(el, kind, idParam) {
     ? [{ name: 'number', label: 'Número', placeholder: 'Automàtic' }, { name: 'title', label: 'Títol / concepte' }, { name: 'date', label: 'Data', type: 'date' }, { name: 'valid_until', label: 'Vàlid fins', type: 'date' }]
     : [{ name: 'number', label: 'Número', placeholder: 'Automàtic' }, { name: 'date', label: 'Data', type: 'date' }, { name: 'due_date', label: 'Venciment', type: 'date' },
       { name: 'status', label: 'Estat', type: 'select', options: Object.entries(INVOICE_STATUS).map(([value, s]) => ({ value, label: s.label })), empty: false }];
+  const discFields = [
+    { name: 'discount_type', label: 'Descompte general', type: 'select', empty: false, options: [{ value: 'none', label: 'Sense descompte' }, { value: 'percent', label: 'Percentatge (%)' }, { value: 'amount', label: 'Import fix (€)' }] },
+    { name: 'discount_value', label: 'Valor del descompte', type: 'number', step: '0.01', min: 0 },
+  ];
+  const introFields = kind === 'quote' ? [{ name: 'intro', label: 'Text de presentació (surt a dalt del pressupost)', type: 'textarea', full: true, placeholder: 'Ex.: Benvolguts, us fem arribar la proposta per a la vostra jornada d\'equip…' }] : [];
   const tailFields = [
     { name: 'deposit_type', label: 'Paga i senyal', type: 'select', empty: false, options: [{ value: 'none', label: 'Sense paga i senyal' }, { value: 'percent', label: 'Percentatge del total' }, { value: 'amount', label: 'Import fix' }] },
     { name: 'deposit_value', label: 'Valor del senyal (% o €)', type: 'number', step: '0.01' },
@@ -62,9 +67,11 @@ export async function editor(el, kind, idParam) {
         ${kind === 'invoice' && doc.paid_at ? `<span class="chip green">Pagada ${fdate(doc.paid_at)}</span>` : ''}</div>` : ''}
       ${formHtml(headFields, doc)}
       <h4>Client</h4>${clientPickerHtml(doc.client)}
+      ${introFields.length ? formHtml(introFields, doc) : ''}
       <h4>Conceptes</h4>
       <div class="table-wrap"><table class="table lines-ed"><thead><tr><th>Concepte</th><th>Quant.</th><th>Preu</th><th>Dte %</th><th>IVA %</th><th class="r">Import</th><th></th></tr></thead><tbody data-lines></tbody></table></div>
       <div class="row gap wrap"><select data-addp><option value="">+ Afegeix un producte…</option>${products.filter(p => p.active).map(p => `<option value="${p.id}">${esc(p.name)} — ${money(p.price)}</option>`).join('')}</select><button type="button" class="btn small" data-addl>+ Línia lliure</button></div>
+      <div class="disc-box"><h4>🎁 Descompte</h4><p class="muted small">Pots posar un descompte a cada línia (columna «Dte %») i/o un descompte general sobre el total. Al document es veu el descompte i l'estalvi.</p>${formHtml(discFields, { discount_type: 'none', ...doc })}</div>
       <div class="totals" data-totals></div>
       ${formHtml(tailFields, doc)}
       <div class="row end gap"><button class="btn primary" data-save>${isNew ? 'Crea' : 'Desa els canvis'}</button></div></form></section>
@@ -85,12 +92,25 @@ export async function editor(el, kind, idParam) {
   const tbody = $('[data-lines]', el);
   const form = $('[data-f]', el);
   const calc = () => {
-    let base = 0, vat = 0;
-    for (const l of lines) { const a = (Number(l.quantity) || 0) * (Number(l.price) || 0) * (1 - (Number(l.discount) || 0) / 100); base += a; vat += a * (Number(l.vat) || 0) / 100; }
+    let gross = 0, lineDisc = 0; const buckets = {};
+    for (const l of lines) {
+      const full = (Number(l.quantity) || 0) * (Number(l.price) || 0);
+      const a = full * (1 - Math.min(100, Number(l.discount) || 0) / 100);
+      lineDisc += full - a; gross += a; buckets[Number(l.vat) || 0] = (buckets[Number(l.vat) || 0] || 0) + a;
+    }
+    const kt = form.discount_type.value, kv = Math.max(0, Number(form.discount_value.value) || 0);
+    const disc = kt === 'percent' ? gross * Math.min(100, kv) / 100 : kt === 'amount' ? Math.min(gross, kv) : 0;
+    const factor = gross ? (gross - disc) / gross : 1;
+    const base = gross - disc;
+    const vat = Object.entries(buckets).reduce((acc, [r, b]) => acc + b * factor * Number(r) / 100, 0);
     const total = base + vat;
     const dt = form.deposit_type.value, dv = Number(form.deposit_value.value) || 0;
     const dep = dt === 'percent' ? total * dv / 100 : dt === 'amount' ? dv : 0;
-    $('[data-totals]', el).innerHTML = `<div><span>Base imposable</span><b>${money(base)}</b></div><div><span>IVA</span><b>${money(vat)}</b></div><div class="big"><span>Total</span><b>${money(total)}</b></div>${dep ? `<div><span>Paga i senyal</span><b>${money(dep)}</b></div><div><span>Resta</span><b>${money(total - dep)}</b></div>` : ''}`;
+    const saving = disc + lineDisc;
+    $('[data-totals]', el).innerHTML = `${disc ? `<div><span>Subtotal</span><b>${money(gross)}</b></div><div class="disc"><span>Descompte${kt === 'percent' ? ` (${kv}%)` : ''}</span><b>−${money(disc)}</b></div>` : ''}
+      <div><span>Base imposable</span><b>${money(base)}</b></div><div><span>IVA</span><b>${money(vat)}</b></div><div class="big"><span>Total</span><b>${money(total)}</b></div>
+      ${saving > 0.004 ? `<div class="disc"><span>🎁 Estalvi per al client</span><b>${money(saving)}</b></div>` : ''}
+      ${dep ? `<div><span>Paga i senyal</span><b>${money(dep)}</b></div><div><span>Resta</span><b>${money(total - dep)}</b></div>` : ''}`;
     $$('tr', tbody).forEach((tr, i) => { const l = lines[i]; $('.amt', tr).textContent = money((Number(l.quantity) || 0) * (Number(l.price) || 0) * (1 - (Number(l.discount) || 0) / 100)); });
   };
   const renderLines = () => {
@@ -109,11 +129,11 @@ export async function editor(el, kind, idParam) {
     lines.push({ product_id: p.id, description: p.name + (p.description ? `\n${p.description}` : ''), quantity: 1, price: p.price, vat: p.vat });
     e.target.value = ''; renderLines();
   };
-  form.deposit_type.onchange = calc; form.deposit_value.oninput = calc;
+  form.deposit_type.onchange = calc; form.deposit_value.oninput = calc; form.discount_type.onchange = calc; form.discount_value.oninput = calc;
   renderLines();
 
   const save = async () => {
-    const data = readForm(form, [...headFields, ...tailFields]);
+    const data = readForm(form, [...headFields, ...introFields, ...discFields, ...tailFields]);
     data.client = getClient();
     if (!data.client) data.client_id = null;
     data.lines = lines.map(l => ({ ...l, quantity: Number(l.quantity), price: Number(l.price), vat: Number(l.vat), discount: Number(l.discount) || 0 }));
@@ -139,6 +159,7 @@ export async function editor(el, kind, idParam) {
   act('[data-accept]', async () => { await api.put(`${k.api}/${doc.id}`, { status: 'acceptat' }); reload(); });
   act('[data-reject]', async () => { await api.put(`${k.api}/${doc.id}`, { status: 'rebutjat' }); reload(); });
   act('[data-cancel]', async () => { if (await confirmDialog('Anul·lar aquesta factura?', 'Anul·la')) { await api.put(`${k.api}/${doc.id}`, { status: 'anul·lada' }); reload(); } });
+  act('[data-to-contract]', async () => { await save(); const r = await api.post(`/api/quotes/${doc.id}/to-contract`); go(`#/contractes/${r.id}`); });
   act('[data-to-inv]', async () => { const r = await api.post(`/api/quotes/${doc.id}/to-invoice`); go(`#/factures/${r.id}`); });
   act('[data-to-act]', async () => {
     const res = await modal({ title: 'Crea l\'activitat', body: formHtml([{ name: 'date', label: 'Data', type: 'date', required: true }, { name: 'location', label: 'Lloc' }], { date: today() }),

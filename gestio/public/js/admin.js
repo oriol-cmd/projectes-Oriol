@@ -28,6 +28,7 @@ export async function dashboard(el) {
       <div><b>${esc(p.first_name)} ${esc(p.last_name || '')}</b><small>${fdate(p.date, 'short')} · ${esc(p.title)}</small></div><div class="r">${statusChip(p.status, ASSIGN_STATUS)}</div></a></li>`).join('')}</ul>` : '<p class="muted">Tothom ha confirmat. 👍</p>'}</section>
     <section class="card"><h3>Pressupostos en seguiment</h3>${d.quotes.length ? `<ul class="list">${d.quotes.map(q => `<li><a href="#/pressupostos/${q.id}">
       <div><b>${esc(q.number)}</b> ${esc(q.client_name || '')}<small>Enviat ${fdate(q.sent_at)} · obert ${q.open_count || 0} cops</small></div><div class="r">${statusChip(q.status, QUOTE_STATUS)}<small>${money(q.total)}</small></div></a></li>`).join('')}</ul>` : '<p class="muted">Cap pressupost pendent de resposta.</p>'}</section>
+    ${(d.contracts || []).length ? `<section class="card"><h3>Contractes pendents de signar</h3><ul class="list">${d.contracts.map(k => `<li><a href="#/contractes/${k.id}"><div><b>${esc(k.number)}</b> ${esc(k.client_name || '')}<small>Enviat ${fdate(k.sent_at)}</small></div><div class="r"><span class="chip ${k.status === 'vist' ? 'amber' : 'blue'}">${k.status === 'vist' ? 'Vist' : 'Enviat'}</span></div></a></li>`).join('')}</ul></section>` : ''}
     <section class="card"><h3>Factures pendents de cobrar</h3>${d.unpaid.length ? `<ul class="list">${d.unpaid.map(i => `<li><a href="#/factures/${i.id}">
       <div><b>${esc(i.number)}</b> ${esc(i.client_name || '')}<small>Venç ${fdate(i.due_date)}${i.deposit_amount > 0 && !i.deposit_paid_at ? ' · senyal pendent' : ''}</small></div><div class="r">${statusChip(i.status, INVOICE_STATUS)}<small>${money(i.total)}</small></div></a></li>`).join('')}</ul>` : '<p class="muted">Tot cobrat.</p>'}</section>
   </div>`;
@@ -328,7 +329,7 @@ export async function activityDetail(el, id) {
   const st = activityStatusMap();
   setTitle(a.title, `<button class="btn" data-edit>✏️ Edita</button><button class="btn primary" data-send-all>✉️ Envia convocatòries</button>
     <div class="dropdown"><button class="btn">Més ▾</button><div class="menu">
-      <button data-quote>📝 Crea pressupost</button><button data-invoice>🧾 Crea factura</button><button data-dup>📄 Duplica</button><button data-del class="danger-t">🗑 Esborra</button></div></div>`);
+      <button data-quote>📝 Crea pressupost</button><button data-invoice>🧾 Crea factura</button><button data-contract>✍️ Crea contracte</button><button data-dup>📄 Duplica</button><button data-del class="danger-t">🗑 Esborra</button></div></div>`);
   const pendingCount = a.assignments.filter(s => ['pendent', 'enviat'].includes(s.status)).length;
   el.innerHTML = `<div class="cols">
     <section class="card"><h3>Detalls ${statusChip(a.status, st)}</h3>
@@ -366,6 +367,7 @@ export async function activityDetail(el, id) {
     reload();
   };
   $('[data-quote]').onclick = async () => { const r = await api.post(`/api/activities/${id}/to-quote`); go(`#/pressupostos/${r.id}`); };
+  $('[data-contract]').onclick = async () => { const r = await api.post(`/api/activities/${id}/to-contract`); go(`#/contractes/${r.id}`); };
   $('[data-invoice]').onclick = async () => { const r = await api.post(`/api/activities/${id}/to-invoice`); go(`#/factures/${r.id}`); };
   $('[data-dup]').onclick = async () => {
     const res = await modal({ title: 'Duplica l\'activitat', body: `${formHtml([{ name: 'date', label: 'Nova data', type: 'date', required: true }, { name: 'withWorkers', label: 'Copia també els treballadors', type: 'checkbox' }], { date: a.date })}`,

@@ -33,7 +33,15 @@ function fail(status, msg) { const e = new Error(msg); e.status = status; throw 
 const idp = req => Number(req.params.id);
 
 // Primera execució: automatismes per defecte
-if (!get('SELECT id FROM automations LIMIT 1')) for (const a of DEFAULT_AUTOMATIONS) insert('automations', a);
+if (!get('SELECT id FROM automations LIMIT 1')) { for (const a of DEFAULT_AUTOMATIONS) insert('automations', a); run(`INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_contract_auto', '"fet"')`); }
+// instal·lacions existents: afegeix una sola vegada el recordatori de contractes
+if (!get(`SELECT value FROM settings WHERE key = 'seed_contract_auto'`)) {
+  const a = DEFAULT_AUTOMATIONS.find(x => x.trigger === 'contract_not_signed');
+  if (a && !get(`SELECT id FROM automations WHERE trigger = 'contract_not_signed'`)) insert('automations', a);
+  run(`INSERT INTO settings (key, value) VALUES ('seed_contract_auto', '"fet"')`);
+}
+// productes i dades de Top Green Towers (una sola vegada)
+if (process.env.SEED_TGT !== '0') require('./seed-tgt').seedTopGreenTowers(S);
 
 // ================= AUTENTICACIÓ =================
 app.get('/api/setup-status', (req, res) => {
@@ -104,6 +112,7 @@ app.put('/api/settings', A.requireAdmin, wrap((req, res) => {
   S.saveSettings(body);
   res.json({ ok: true });
 }));
+app.get('/api/settings/default-contract', A.requireAdmin, (req, res) => res.json({ body: require('./presets').DEFAULT_CONTRACT }));
 app.get('/api/settings/preset/:name', A.requireAdmin, (req, res) => res.json({ html: PRESETS[req.params.name] || '' }));
 app.post('/api/settings/logo', A.requireAdmin, upload.single('file'), wrap((req, res) => {
   if (!req.file) fail(400, 'Cap fitxer');
@@ -455,13 +464,13 @@ app.put('/api/assignments/:id', A.requireAdmin, wrap((req, res) => {
 }));
 
 // ================= PRESSUPOSTOS I FACTURES =================
-const QUOTE_FIELDS = ['number', 'title', 'date', 'valid_until', 'status', 'notes', 'conditions', 'activity_id', 'deposit_type', 'deposit_value', 'response_note'];
-const INVOICE_FIELDS = ['number', 'date', 'due_date', 'status', 'notes', 'activity_id', 'quote_id', 'deposit_type', 'deposit_value', 'payment_method', 'deposit_paid_at', 'paid_at'];
+const QUOTE_FIELDS = ['number', 'title', 'date', 'valid_until', 'status', 'notes', 'conditions', 'activity_id', 'deposit_type', 'deposit_value', 'response_note', 'discount_type', 'discount_value', 'intro'];
+const INVOICE_FIELDS = ['number', 'date', 'due_date', 'status', 'notes', 'activity_id', 'quote_id', 'deposit_type', 'deposit_value', 'payment_method', 'deposit_paid_at', 'paid_at', 'discount_type', 'discount_value'];
 
 function docPatch(body, fields) {
   const data = pick(body, fields);
   if (body.lines) {
-    const t = S.computeTotals(body.lines, body.deposit_type, body.deposit_value);
+    const t = S.computeTotals(body.lines, body.deposit_type, body.deposit_value, body.discount_type, body.discount_value);
     Object.assign(data, { lines: t.lines, subtotal: t.subtotal, vat_total: t.vat_total, total: t.total });
     if (fields === INVOICE_FIELDS) data.deposit_amount = t.deposit_amount;
   }
@@ -524,7 +533,7 @@ app.get('/api/quotes/:id/email-preview', A.requireAdmin, wrap((req, res) => {
 }));
 app.post('/api/quotes/:id/to-invoice', A.requireAdmin, wrap((req, res) => {
   const q = get('SELECT * FROM quotes WHERE id = ?', idp(req)); if (!q) fail(404, 'No trobat');
-  res.json({ id: createInvoice({ client_id: q.client_id, activity_id: q.activity_id, quote_id: q.id, lines: q.lines, notes: q.notes, deposit_type: q.deposit_type, deposit_value: q.deposit_value }) });
+  res.json({ id: createInvoice({ client_id: q.client_id, activity_id: q.activity_id, quote_id: q.id, lines: q.lines, notes: q.notes, deposit_type: q.deposit_type, deposit_value: q.deposit_value, discount_type: q.discount_type, discount_value: q.discount_value }) });
 }));
 app.post('/api/quotes/:id/to-activity', A.requireAdmin, wrap((req, res) => {
   const q = get('SELECT * FROM quotes WHERE id = ?', idp(req)); if (!q) fail(404, 'No trobat');
@@ -598,6 +607,80 @@ app.post('/api/activities/:id/to-quote', A.requireAdmin, wrap((req, res) => {
   res.json({ id });
 }));
 
+// ================= CONTRACTES =================
+const CONTRACT_FIELDS = ['number', 'title', 'quote_id', 'activity_id', 'body', 'status', 'signed_at', 'signer_name', 'signer_nif'];
+function contractRefs({ client_id, quote_id, activity_id }) {
+  const quote = quote_id ? get('SELECT * FROM quotes WHERE id = ?', quote_id) : null;
+  const actId = activity_id || (quote && quote.activity_id);
+  const activity = actId ? get('SELECT * FROM activities WHERE id = ?', actId) : null;
+  const cid = client_id || (quote && quote.client_id) || (activity && activity.client_id);
+  const client = cid ? get('SELECT * FROM clients WHERE id = ?', cid) : null;
+  return { quote, activity, client };
+}
+function createContract(body) {
+  const s = S.getSettings();
+  const client_id = resolveClient(body) || null;
+  const refs = contractRefs({ client_id, quote_id: body.quote_id, activity_id: body.activity_id });
+  const data = {
+    number: body.number || S.nextNumber('contract'), title: body.title || s.contract.title,
+    client_id: refs.client ? refs.client.id : null, quote_id: refs.quote ? refs.quote.id : null, activity_id: refs.activity ? refs.activity.id : null,
+    body: S.sanitizeHtml(body.body || S.fillContractTemplate(s.contract.body, refs)), status: 'esborrany', token: S.token(),
+  };
+  const id = insert('contracts', data);
+  addTimeline('contract', id, 'creat', 'Contracte creat' + (refs.quote ? ` a partir del pressupost ${refs.quote.number}` : ''));
+  return id;
+}
+app.get('/api/contracts', A.requireAdmin, (req, res) => res.json(all(`SELECT k.id, k.number, k.title, k.status, k.sent_at, k.open_count, k.signed_at, k.created_at, c.name AS client_name, q.number AS quote_number
+  FROM contracts k LEFT JOIN clients c ON c.id = k.client_id LEFT JOIN quotes q ON q.id = k.quote_id ORDER BY k.id DESC`)));
+app.get('/api/contracts/:id', A.requireAdmin, wrap((req, res) => {
+  const k = get('SELECT * FROM contracts WHERE id = ?', idp(req)); if (!k) fail(404, 'No trobat');
+  k.client = k.client_id ? get('SELECT * FROM clients WHERE id = ?', k.client_id) : null;
+  k.quote = k.quote_id ? get('SELECT id, number, total, status FROM quotes WHERE id = ?', k.quote_id) : null;
+  k.activity = k.activity_id ? get('SELECT id, title, date FROM activities WHERE id = ?', k.activity_id) : null;
+  k.timeline = all(`SELECT * FROM timeline WHERE entity_type = 'contract' AND entity_id = ? ORDER BY id DESC`, k.id);
+  k.emails = all(`SELECT id, to_addr, subject, status, error, opened_at, created_at, automation_id FROM emails WHERE related_type = 'contract' AND related_id = ? ORDER BY id DESC`, k.id);
+  k.public_url = S.baseUrl() + '/k/' + k.token;
+  delete k.signature_raw;
+  res.json(k);
+}));
+app.post('/api/contracts', A.requireAdmin, wrap((req, res) => res.json({ id: createContract(req.body || {}) })));
+app.put('/api/contracts/:id', A.requireAdmin, wrap((req, res) => {
+  const k = get('SELECT * FROM contracts WHERE id = ?', idp(req)); if (!k) fail(404, 'No trobat');
+  const data = pick(req.body, CONTRACT_FIELDS);
+  if (data.body !== undefined) data.body = S.sanitizeHtml(data.body);
+  if ('client' in req.body || 'client_id' in req.body) data.client_id = resolveClient(req.body);
+  if (data.status && data.status !== k.status) addTimeline('contract', k.id, 'estat', `Estat canviat manualment: ${k.status} → ${data.status}`);
+  if (data.status === 'signat' && !k.signed_at) data.signed_at = S.nowISO();
+  update('contracts', k.id, data);
+  res.json({ ok: true });
+}));
+app.delete('/api/contracts/:id', A.requireAdmin, (req, res) => { run('DELETE FROM contracts WHERE id = ?', idp(req)); res.json({ ok: true }); });
+app.post('/api/contracts/:id/regenerate', A.requireAdmin, wrap((req, res) => {
+  const k = get('SELECT * FROM contracts WHERE id = ?', idp(req)); if (!k) fail(404, 'No trobat');
+  if (k.status === 'signat') fail(400, 'Un contracte signat no es pot regenerar');
+  const body = S.sanitizeHtml(S.fillContractTemplate(S.getSettings().contract.body, contractRefs(k)));
+  update('contracts', k.id, { body });
+  res.json({ body });
+}));
+app.get('/api/contracts/:id/html', A.requireAdmin, wrap((req, res) => { const k = get('SELECT * FROM contracts WHERE id = ?', idp(req)); if (!k) fail(404, 'No trobat'); res.type('html').send(S.renderContract(k)); }));
+app.get('/api/contracts/:id/email-preview', A.requireAdmin, wrap((req, res) => {
+  const k = get('SELECT * FROM contracts WHERE id = ?', idp(req)); if (!k) fail(404, 'No trobat');
+  const { ctx, client } = S.contractMsgCtx(k); const m = S.getSettings().messages;
+  res.json({ to: client?.email || '', subject: S.renderMessage(m.contract_subject, ctx), body: S.renderMessage(m.contract_body, ctx) });
+}));
+app.post('/api/contracts/:id/send', A.requireAdmin, wrap(async (req, res) => res.json(await S.sendContract(idp(req), req.body || {}))));
+app.post('/api/quotes/:id/to-contract', A.requireAdmin, wrap((req, res) => { const q = get('SELECT * FROM quotes WHERE id = ?', idp(req)); if (!q) fail(404, 'No trobat'); res.json({ id: createContract({ quote_id: q.id, client_id: q.client_id, activity_id: q.activity_id }) }); }));
+app.post('/api/activities/:id/to-contract', A.requireAdmin, wrap((req, res) => { const a = get('SELECT * FROM activities WHERE id = ?', idp(req)); if (!a) fail(404, 'No trobada'); res.json({ id: createContract({ activity_id: a.id, client_id: a.client_id, quote_id: a.quote_id }) }); }));
+// vista prèvia del contracte tipus amb dades d'exemple
+app.post('/api/contract-template-preview', A.requireAdmin, wrap((req, res) => {
+  const sampleQuote = { number: 'P2026-0001', token: 'exemple', lines: [{ description: 'Taller Greentowers', quantity: 1, price: 900, vat: 21 }], deposit_type: 'percent', deposit_value: 30, date: S.todayISO() };
+  const refs = { client: { name: 'Client d\'exemple SL', nif: 'B12345678', address: 'Carrer Major, 1', postal_code: '08001', city: 'Barcelona', email: 'client@exemple.cat' },
+    activity: { title: 'Taller Greentowers', date: S.addDays(S.todayISO(), 20), start_time: '10:00', end_time: '12:00', location: 'Cal Figarot, Vilafranca del Penedès' }, quote: sampleQuote };
+  const body = S.fillContractTemplate(req.body.body || S.getSettings().contract.body, refs);
+  const html = S.renderContract({ title: req.body.title || S.getSettings().contract.title, number: 'C2026-0001', body, status: 'esborrany', created_at: S.todayISO() });
+  res.type('html').send(html.replace('<b>El client: </b>', '<b>El client: Client d\'exemple SL</b>'));
+}));
+
 // ================= AUTOMATISMES =================
 const AUTO_FIELDS = ['name', 'trigger', 'delay_value', 'delay_unit', 'repeat_every', 'max_runs', 'subject', 'body', 'active'];
 app.get('/api/automations', A.requireAdmin, (req, res) => res.json({
@@ -631,6 +714,7 @@ app.get('/api/dashboard', A.requireAdmin, (req, res) => {
       pendingAmount: get(`SELECT IFNULL(SUM(total - CASE WHEN deposit_paid_at IS NOT NULL THEN deposit_amount ELSE 0 END),0) n FROM invoices WHERE status IN ('emesa','senyal_pagat')`).n,
       openQuotes: get(`SELECT COUNT(*) n FROM quotes WHERE status IN ('enviat','vist')`).n,
     },
+    contracts: all(`SELECT k.id, k.number, k.title, k.status, k.sent_at, c.name AS client_name FROM contracts k LEFT JOIN clients c ON c.id = k.client_id WHERE k.status IN ('enviat','vist') ORDER BY k.sent_at DESC LIMIT 10`),
     smtpConfigured: S.smtpConfigured(),
   });
 });
@@ -728,6 +812,63 @@ app.post('/p/:token/respond', express.urlencoded({ extended: false }), (req, res
     if (to) S.sendEmail({ to, subject: `Pressupost ${q.number} ${req.body.status}`, text: `El pressupost ${q.number} ha estat ${req.body.status} pel client.${req.body.note ? '\n\nComentari: ' + req.body.note : ''}`, related_type: 'quote_notice', related_id: q.id }).catch(() => {});
   }
   res.redirect(`/p/${encodeURIComponent(req.params.token)}`);
+});
+
+
+// --- Contracte: veure'l i signar-lo en línia
+app.get('/k/:token', (req, res) => {
+  const k = get('SELECT * FROM contracts WHERE token = ?', req.params.token);
+  if (!k) return res.status(404).send(publicPage('No trobat', '<div class="wrap"><div class="card">Aquest contracte no existeix o ja no està disponible.</div></div>'));
+  if (!isAdminViewer(req)) S.markOpened('contract', k.id, 'enllaç');
+  const fresh = get('SELECT * FROM contracts WHERE id = ?', k.id);
+  const client = fresh.client_id ? get('SELECT * FROM clients WHERE id = ?', fresh.client_id) : null;
+  const docHtml = S.renderContract(fresh, { absolute: true });
+  const signed = fresh.status === 'signat';
+  const form = signed
+    ? `<div class="msg">✅ Contracte signat el ${esc(new Date(fresh.signed_at).toLocaleString('ca-ES'))} per ${esc(fresh.signer_name || '')}. Gràcies!</div>`
+    : fresh.status === 'rebutjat' ? '<div class="msg bad">Aquest contracte s\'ha rebutjat. Posa\'t en contacte amb nosaltres si vols fer-hi canvis.</div>'
+    : `<form method="post" action="/k/${esc(k.token)}/sign" id="f"><p><b>Signa el contracte</b> — llegeix-lo a sota i, si hi estàs d'acord, omple les dades i signa amb el dit o el ratolí.</p>
+      <div class="grid2"><label>Nom i cognoms<input name="name" required value="${esc(client ? client.name : '')}"></label><label>DNI / NIF<input name="nif" value="${esc(client ? client.nif || '' : '')}"></label></div>
+      <p style="margin:10px 0 4px">Signatura <button type="button" class="link" id="clr">Esborra</button></p>
+      <canvas id="pad" width="600" height="180"></canvas>
+      <input type="hidden" name="signature" id="sig">
+      <label class="chk"><input type="checkbox" name="accept" value="1" required> He llegit el contracte i n'accepto les condicions.</label>
+      <p style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn ok">✍️ Signa el contracte</button><button class="btn ko" type="submit" formnovalidate name="reject" value="1">No el vull signar</button></p></form>
+      <script>
+      (function(){var c=document.getElementById('pad'),x=c.getContext('2d'),d=false,has=false;x.lineWidth=2.5;x.lineCap='round';x.strokeStyle='#111827';
+      function p(e){var r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*c.width/r.width,y:(e.clientY-r.top)*c.height/r.height}}
+      c.addEventListener('pointerdown',function(e){d=true;has=true;var q=p(e);x.beginPath();x.moveTo(q.x,q.y);c.setPointerCapture(e.pointerId)});
+      c.addEventListener('pointermove',function(e){if(!d)return;var q=p(e);x.lineTo(q.x,q.y);x.stroke()});
+      c.addEventListener('pointerup',function(){d=false});
+      document.getElementById('clr').onclick=function(){x.clearRect(0,0,c.width,c.height);has=false};
+      document.getElementById('f').addEventListener('submit',function(e){if(e.submitter&&e.submitter.name==='reject'){if(!confirm('Segur que no vols signar el contracte?'))e.preventDefault();return}
+        if(!has){e.preventDefault();alert('Falta la signatura: signa dins del requadre.');return}document.getElementById('sig').value=c.toDataURL('image/png')});})();
+      </script>`;
+  res.send(publicPage(`Contracte ${fresh.number}`, `<div class="bar"><b>${esc(fresh.title || 'Contracte')} ${esc(fresh.number)}</b><button class="btn ghost" onclick="document.getElementById('d').contentWindow.print()">Imprimir / PDF</button></div>
+    <div class="wrap"><div class="card noprint">${form}</div><iframe id="d" srcdoc="${esc(docHtml)}" onload="this.style.height=this.contentDocument.body.scrollHeight+40+'px'"></iframe></div>`,
+    `<style>canvas{width:100%;max-width:600px;height:auto;aspect-ratio:600/180;border:2px dashed #cbd5e1;border-radius:10px;background:#fff;touch-action:none;display:block}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid2 label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:#374151}
+    .grid2 input{border:1px solid #d1d5db;border-radius:8px;padding:9px;font:inherit}.chk{display:flex;gap:8px;align-items:center;margin:12px 0}
+    .link{border:0;background:none;color:#2563eb;cursor:pointer;font:inherit;font-size:13px}@media(max-width:600px){.grid2{grid-template-columns:1fr}}</style>`));
+});
+app.post('/k/:token/sign', express.urlencoded({ extended: false, limit: '2mb' }), (req, res) => {
+  const k = get('SELECT * FROM contracts WHERE token = ?', req.params.token);
+  if (k && !['signat', 'rebutjat'].includes(k.status)) {
+    const notify = (subject, text) => { const s = S.getSettings(); const to = s.email.reply_to || s.company.email; if (to) S.sendEmail({ to, subject, text, related_type: 'contract_notice', related_id: k.id }).catch(() => {}); };
+    if (req.body.reject) {
+      update('contracts', k.id, { status: 'rebutjat' });
+      addTimeline('contract', k.id, 'rebutjat', 'El client NO ha volgut signar el contracte');
+      notify(`Contracte ${k.number} rebutjat`, `El client ha indicat que no vol signar el contracte ${k.number}.`);
+    } else {
+      const sig = String(req.body.signature || '');
+      if (req.body.accept && req.body.name && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(sig) && sig.length < 1500000) {
+        update('contracts', k.id, { status: 'signat', signed_at: S.nowISO(), signer_name: String(req.body.name).slice(0, 120), signer_nif: String(req.body.nif || '').slice(0, 30), signer_ip: req.ip, signer_agent: String(req.get('user-agent') || '').slice(0, 250), signature: sig });
+        addTimeline('contract', k.id, 'signat', `SIGNAT pel client: ${req.body.name}${req.body.nif ? ' (' + req.body.nif + ')' : ''} · IP ${req.ip}`);
+        notify(`Contracte ${k.number} signat ✅`, `El client ${req.body.name} ha signat el contracte ${k.number}.`);
+      }
+    }
+  }
+  res.redirect(`/k/${encodeURIComponent(req.params.token)}`);
 });
 
 app.get('/f/:token', (req, res) => {

@@ -3,6 +3,7 @@ import * as Admin from './admin.js';
 import * as Docs from './docs.js';
 import * as Config from './config.js';
 import * as Worker from './worker.js';
+import * as Contracts from './contracts.js';
 
 const ADMIN_MENU = [
   { key: 'tauler', path: '#/', icon: '🏠', label: 'Tauler' },
@@ -12,6 +13,7 @@ const ADMIN_MENU = [
   { key: 'productes', path: '#/productes', icon: '📦', label: 'Productes' },
   { key: 'pressupostos', path: '#/pressupostos', icon: '📝', label: 'Pressupostos' },
   { key: 'factures', path: '#/factures', icon: '🧾', label: 'Factures' },
+  { key: 'contractes', path: '#/contractes', icon: '✍️', label: 'Contractes' },
   { key: 'automatismes', path: '#/automatismes', icon: '⚙️', label: 'Automatismes' },
   { key: 'correus', path: '#/correus', icon: '✉️', label: 'Correus enviats' },
   { key: 'configuracio', path: '#/configuracio', icon: '🛠️', label: 'Configuració', always: true },
@@ -36,6 +38,8 @@ const ADMIN_ROUTES = [
   [/^\/pressupostos\/(\d+|nou)$/, 'pressupostos', (el, m) => Docs.editor(el, 'quote', m[1])],
   [/^\/factures\/?$/, 'factures', el => Docs.listPage(el, 'invoice')],
   [/^\/factures\/(\d+|nova)$/, 'factures', (el, m) => Docs.editor(el, 'invoice', m[1])],
+  [/^\/contractes\/?$/, 'contractes', el => Contracts.listPage(el)],
+  [/^\/contractes\/(\d+|nou)$/, 'contractes', (el, m) => Contracts.editor(el, m[1])],
   [/^\/automatismes\/?$/, 'automatismes', el => Config.automationsPage(el)],
   [/^\/correus\/?$/, 'correus', el => Config.emailsPage(el)],
   [/^\/configuracio(?:\/(\w+))?$/, 'configuracio', (el, m) => Config.settingsPage(el, m[1])],

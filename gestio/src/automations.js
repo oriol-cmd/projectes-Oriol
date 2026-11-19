@@ -33,6 +33,16 @@ function candidates(trigger) {
       for (const q of all(`SELECT * FROM quotes WHERE status IN ('enviat','vist') AND valid_until IS NOT NULL AND valid_until <> ''`))
         out.push({ entity_type: 'quote', entity_id: q.id, ref: endOfDay(q.valid_until), mode: 'before', send: mailClient('quote', q, 'quote') });
       break;
+    case 'contract_not_signed':
+      for (const k of all(`SELECT * FROM contracts WHERE status IN ('enviat','vist') AND sent_at IS NOT NULL`)) {
+        out.push({ entity_type: 'contract', entity_id: k.id, ref: S.parseTs(k.sent_at), mode: 'after', send: async auto => {
+          const { ctx, client } = S.contractMsgCtx(k);
+          const r = await S.sendEmail({ to: client && client.email, subject: S.renderMessage(auto.subject, ctx), text: S.renderMessage(auto.body, ctx), related_type: 'contract', related_id: k.id, automation_id: auto.id });
+          addTimeline('contract', k.id, 'automatisme', `«${auto.name}» enviat a ${client?.email || '(sense correu)'} — ${r.status}`);
+          return r;
+        } });
+      }
+      break;
     case 'quote_accepted':
       for (const q of all(`SELECT * FROM quotes WHERE status = 'acceptat' AND responded_at IS NOT NULL`))
         out.push({ entity_type: 'quote', entity_id: q.id, ref: S.parseTs(q.responded_at), mode: 'after', send: mailClient('quote', q, 'quote') });

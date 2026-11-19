@@ -242,6 +242,42 @@ CREATE TABLE IF NOT EXISTS automation_runs (
 );
 `);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS contracts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT,
+  title TEXT,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  quote_id INTEGER,
+  activity_id INTEGER,
+  body TEXT,
+  status TEXT DEFAULT 'esborrany',  -- esborrany | enviat | vist | signat | rebutjat
+  token TEXT UNIQUE,
+  sent_at TEXT,
+  first_opened_at TEXT,
+  open_count INTEGER DEFAULT 0,
+  signed_at TEXT,
+  signer_name TEXT,
+  signer_nif TEXT,
+  signer_ip TEXT,
+  signer_agent TEXT,
+  signature TEXT,
+  response_note TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+`);
+
+// Columnes afegides en versions noves (les bases de dades antigues s'actualitzen soles)
+function ensureColumn(table, column, def) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
+}
+ensureColumn('quotes', 'discount_type', "TEXT DEFAULT 'none'");
+ensureColumn('quotes', 'discount_value', 'REAL DEFAULT 0');
+ensureColumn('quotes', 'intro', 'TEXT');
+ensureColumn('invoices', 'discount_type', "TEXT DEFAULT 'none'");
+ensureColumn('invoices', 'discount_value', 'REAL DEFAULT 0');
+
 // ---- Ajudes ----
 const JSON_FIELDS = new Set(['weekly', 'extra', 'lines']);
 

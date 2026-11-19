@@ -249,3 +249,23 @@ pre.box { background: var(--soft); border: 1px solid var(--line); border-radius:
 .lines-ed .amt { white-space: nowrap; }
 .weekly input[type=time] { width: 120px; }
 details summary { cursor: pointer; margin: 16px 0; font-weight: 600; }
+
+/* Descomptes */
+.disc-box { border: 1px dashed var(--line); border-radius: 10px; padding: 4px 14px 0; margin: 14px 0; background: var(--soft); }
+.disc-box h4 { margin-top: 10px; }
+.totals .disc { color: #b45309; font-weight: 600; }
+
+/* Editor de text enriquit (contractes) */
+.rte { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+.rte-bar { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); background: var(--soft); position: sticky; top: 0; z-index: 2; align-items: center; }
+.rte-bar button { border: 0; background: none; color: inherit; font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.rte-bar button:hover { background: var(--card); }
+.rte-bar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.rte-bar select { margin-left: auto; font-size: 13px; padding: 4px 8px; }
+.rte-body { min-height: 420px; max-height: 70vh; overflow-y: auto; padding: 18px 22px; line-height: 1.6; outline: none; background: #fff; color: #1f2937; }
+.rte.ro .rte-body { background: var(--soft); }
+.rte-body h2 { font-size: 17px; margin: 18px 0 6px; } .rte-body h3 { font-size: 15px; margin: 14px 0 4px; }
+.rte-body table { border-collapse: collapse; width: 100%; } .rte-body td, .rte-body th { border: 1px solid #e5e7eb; padding: 4px 6px; }
+.field-l { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 6px 0; }
+.sig-prev { max-width: 100%; max-height: 110px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.design input[type=color] { width: 100%; }
