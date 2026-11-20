@@ -32,12 +32,10 @@ const DIES_AGENDA = 30;           // Quants dies endavant de l'agenda veu el sec
 const PLANTILLA = 'recordatori';  // Plantilla de WhatsApp per escriure't fora de la finestra de 24 h
 const PLANTILLA_IDIOMA = 'ca';
 const NOM = 'Secretari';
-// Colors de les cites segons de què són. Pots afegir-ne més o canviar-los
-// (BLUE, GREEN, RED, YELLOW, ORANGE, CYAN, GRAY, MAUVE, PALE_BLUE, PALE_GREEN, PALE_RED).
-const CATEGORIES = {
-  esportec: CalendarApp.EventColor.BLUE,
-  personal: CalendarApp.EventColor.GREEN
-};
+// Els 11 colors de Google Calendar (nom → codi de Google). Cada persona pot tenir fins a 11 grups, un per color.
+const COLORS = { vermell: '11', rosa: '4', taronja: '6', groc: '5', 'verd clar': '2', verd: '10', turquesa: '7', blau: '9', lavanda: '1', lila: '3', gris: '8' };
+// Grups amb què comença cada persona. Cadascú en pot crear més o canviar-ne el color per WhatsApp.
+const GRUPS_PER_DEFECTE = { esportec: 'blau', personal: 'verd' };
 
 // ── Constants ───────────────────────────────────────────────────────────────
 const GRAPH = 'https://graph.facebook.com/v23.0/';
@@ -148,7 +146,7 @@ const ESQUEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          tipus: { type: 'STRING', enum: ['crear_cita', 'crear_tasca', 'modificar', 'esborrar', 'fet'] },
+          tipus: { type: 'STRING', enum: ['crear_cita', 'crear_tasca', 'modificar', 'esborrar', 'fet', 'definir_grup', 'esborrar_grup'] },
           ref: { type: 'STRING', description: 'E1, T2… per a modificar, esborrar o fet' },
           titol: { type: 'STRING' },
           inici: { type: 'STRING', description: 'AAAA-MM-DDTHH:MM, o AAAA-MM-DD si és de tot el dia' },
@@ -161,11 +159,12 @@ const ESQUEMA = {
           repeticio: { type: 'STRING', enum: ['cap', 'diaria', 'setmanal', 'mensual', 'anual'] },
           repeteix_fins: { type: 'STRING', description: 'AAAA-MM-DD' },
           tota_la_serie: { type: 'BOOLEAN' },
-          categoria: { type: 'STRING', enum: ['cap'].concat(Object.keys(CATEGORIES)), description: 'De què és la cita: dona-li color' }
+          categoria: { type: 'STRING', description: 'Grup de la cita o tasca (li dona color), o «cap»' },
+          color: { type: 'STRING', enum: Object.keys(COLORS), description: 'Per a definir_grup' }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
         required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria'],
-        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'repeticio', 'repeteix_fins', 'tota_la_serie']
+        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria', 'color', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'repeticio', 'repeteix_fins', 'tota_la_serie']
       }
     },
     resposta: { type: 'STRING', description: "Missatge de WhatsApp per a l'usuari" }
@@ -176,8 +175,9 @@ const ESQUEMA = {
 function aten_(parts, u) {
   const cal = calendari_(u);
   const ara = new Date();
-  const ctx = context_(cal, ara);
+  const ctx = context_(cal, ara, grups_(u));
   const historial = JSON.parse(estat_(u, 'HISTORIAL') || '[]');
+  const grups = grups_(u);
 
   const sistema = [
     'Ets el secretari personal ' + (u.nom ? 'de ' + u.nom : "de l'usuari") + ' i hi parles per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.',
@@ -187,7 +187,8 @@ function aten_(parts, u) {
     '- crear_cita: tot el que passa un dia concret (reunions, metge, viatges, sopars…). Si no diu hora, és de tot el dia.',
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
-    '- Categoria (dona color a la cita o tasca): ' + Object.keys(CATEGORIES).join(', ') + '. Posa-la quan l\'usuari ho digui («és d\'Esportec», «és personal») o quan sigui evident (feina, clients, reunions d\'equip → esportec; metge, família, amics → personal). Si no és clar, «cap». Per canviar-la d\'una cita existent, modificar amb la nova categoria.',
+    '- Grups: cada cita o tasca pot tenir un grup, que li dona color al calendari. Grups d\'aquesta persona (nom → color): ' + llistaGrups_(grups) + '. Posa «categoria» = nom del grup quan l\'usuari ho digui («és d\'Esportec», «és personal») o quan sigui evident (p. ex. feina, clients, reunions d\'equip → esportec; metge, família, amics → personal). Si no és clar, «cap». Per canviar el grup d\'una cita existent, modificar amb la nova categoria.',
+    '- Per crear un grup o canviar-ne el color («crea el grup Mar Aventura en taronja», «posa Esportec en vermell»): definir_grup amb titol = nom del grup i color. Per esborrar-lo: esborrar_grup amb titol. Colors possibles: ' + Object.keys(COLORS).join(', ') + '. Cada grup té un color diferent, així que com a màxim hi pot haver ' + Object.keys(COLORS).length + ' grups. Si demana un color que ja és d\'un altre grup, o ja no en queden de lliures, digues-li quins colors queden lliures. Si demana els grups que té, digues-los amb el color.',
     '- A cada acció omple SEMPRE tipus, ref, titol, inici, fi, recorda_a i categoria (cadena buida "" si no cal, «cap» a categoria). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
     "- Recordatoris: «recorda'm X a les 17h», «avisa'm demà a les 9 que…», «el dia 20 recorda'm que el 25 he de pagar» → crear_tasca amb recorda_a = el dia i l'hora exactes de l'avís (AAAA-MM-DDTHH:MM) i inici = el dia de la tasca. Per a una cita amb hora, l'avís previ va a avis_minuts (p. ex. «avisa'm una hora abans» → 60).",
     '',
@@ -227,7 +228,7 @@ function aten_(parts, u) {
     ]);
   }
   // Si a alguna acció li falta una dada (p. ex. el dia), li demanem a Gemini que la corregeixi.
-  const problemes = problemesAccions_(res.accions, ctx.refs);
+  const problemes = problemesAccions_(res.accions, ctx.refs, grups);
   if (problemes.length) {
     registre_('Accions incompletes, ho torno a demanar: ' + JSON.stringify(res.accions) + ' → ' + problemes.join('; '));
     res = gemini_(sistema, [
@@ -238,9 +239,11 @@ function aten_(parts, u) {
   }
   registre_((u.nom || u.numero) + ' → ' + (res.peticio || '') + ' | accions: ' + JSON.stringify(res.accions || []));
   const errors = [];
-  (res.accions || []).forEach(function (a) {
+  // Primer els canvis de grups, perquè una cita nova ja pugui fer servir un grup creat en el mateix missatge.
+  const ordre = function (a) { return /_grup$/.test(a.tipus) ? 0 : 1; };
+  (res.accions || []).slice().sort(function (a, b) { return ordre(a) - ordre(b); }).forEach(function (a) {
     try {
-      executa_(a, cal, ctx.refs);
+      executa_(a, cal, ctx.refs, u, grups);
     } catch (err) {
       errors.push('⚠️ No he pogut fer «' + (a.titol || a.ref || a.tipus) + '»: ' + (err && err.message ? err.message : err));
     }
@@ -256,11 +259,21 @@ function aten_(parts, u) {
 }
 
 /** Comprova que les accions tenen les dades necessàries abans de fer-les. */
-function problemesAccions_(accions, refs) {
+function problemesAccions_(accions, refs, grups) {
   const problemes = [];
+  const nousGrups = (accions || []).filter(function (a) { return a.tipus === 'definir_grup'; }).map(function (a) { return nomGrup_(a.titol); });
   (accions || []).forEach(function (a, i) {
     const nom = 'l\'acció ' + (i + 1) + ' (' + a.tipus + ')';
-    if (a.tipus === 'crear_cita') {
+    const cat = nomGrup_(a.categoria);
+    if (cat && cat !== 'cap' && !(grups || {})[cat] && nousGrups.indexOf(cat) < 0) {
+      problemes.push(nom + ' fa servir el grup «' + a.categoria + '», que no existeix (grups: ' + Object.keys(grups || {}).join(', ') + '). Fes servir un d\'aquests, «cap», o crea\'l amb definir_grup si l\'usuari ho demana');
+    }
+    if (a.tipus === 'definir_grup') {
+      if (!nomGrup_(a.titol)) problemes.push(nom + ' no té el nom del grup a «titol»');
+      if (!COLORS[String(a.color || '').toLowerCase()]) problemes.push(nom + ' no té un «color» vàlid (' + Object.keys(COLORS).join(', ') + ')');
+    } else if (a.tipus === 'esborrar_grup') {
+      if (!(grups || {})[nomGrup_(a.titol)]) problemes.push(nom + ': no hi ha cap grup «' + (a.titol || '') + '»');
+    } else if (a.tipus === 'crear_cita') {
       if (!a.titol) problemes.push(nom + ' no té «titol»');
       if (!a.inici) problemes.push(nom + ' no té «inici» (el dia i l\'hora)');
       else { try { data_(a.inici); } catch (err) { problemes.push(nom + ' té un «inici» no vàlid: ' + a.inici + ' (format AAAA-MM-DDTHH:MM)'); } }
@@ -275,7 +288,7 @@ function problemesAccions_(accions, refs) {
   return problemes;
 }
 
-function context_(cal, ara) {
+function context_(cal, ara, grups) {
   const refs = {};
   const agenda = [];
   const tasques = [];
@@ -294,13 +307,39 @@ function context_(cal, ara) {
     if (ev.getEndTime() <= avui) return;
     const r = 'E' + (agenda.length + 1);
     refs[r] = ev;
-    const cat = categoria_(ev);
+    const cat = categoria_(ev, grups);
     agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (cat ? ' | ' + cat : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
   });
   return { refs: refs, agenda: agenda, tasques: tasques };
 }
 
-function executa_(a, cal, refs) {
+function executa_(a, cal, refs, u, grups) {
+  grups = grups || grups_(u);
+  if (a.tipus === 'definir_grup') {
+    const nom = nomGrup_(a.titol);
+    const color = String(a.color || '').toLowerCase();
+    if (!nom || !COLORS[color]) throw new Error('falta el nom del grup o el color');
+    const altre = Object.keys(grups).filter(function (k) { return k !== nom && grups[k] === color; })[0];
+    if (altre) throw new Error('el color ' + color + ' ja és del grup «' + altre + '». Colors lliures: ' + (colorsLliures_(grups).join(', ') || 'cap'));
+    const abans = grups[nom];
+    grups[nom] = color;
+    desaEstat_(u, 'GRUPS', JSON.stringify(grups));
+    // Si el grup canvia de color, també les cites i tasques que ja en són.
+    if (abans && abans !== color) {
+      Object.keys(refs).forEach(function (r) {
+        if (String(refs[r].getColor()) === COLORS[abans]) refs[r].setColor(COLORS[color]);
+      });
+    }
+    return;
+  }
+  if (a.tipus === 'esborrar_grup') {
+    const nom = nomGrup_(a.titol);
+    if (!grups[nom]) throw new Error('no hi ha cap grup «' + a.titol + '»');
+    delete grups[nom];
+    desaEstat_(u, 'GRUPS', JSON.stringify(grups));
+    return;
+  }
+
   const opcions = {};
   if (a.lloc) opcions.location = a.lloc;
   if (a.notes) opcions.description = a.notes;
@@ -320,7 +359,7 @@ function executa_(a, cal, refs) {
       ev = rec ? cal.createEventSeries(a.titol, ini, fi, rec, opcions) : cal.createEvent(a.titol, ini, fi, opcions);
     }
     if (a.avis_minuts != null && a.avis_minuts !== AVIS_PER_DEFECTE) ev.setTag('avis', String(a.avis_minuts));
-    posaColor_(ev, a.categoria);
+    posaColor_(ev, a.categoria, grups);
     return;
   }
 
@@ -329,7 +368,7 @@ function executa_(a, cal, refs) {
     const dia = a.inici ? data_(a.inici.slice(0, 10)) : iniciDia_(new Date());
     const ev = cal.createAllDayEvent(TASCA + a.titol, dia, opcions);
     if (a.recorda_a) ev.setTag('recorda_a', data_(a.recorda_a) && a.recorda_a.slice(0, 16));
-    posaColor_(ev, a.categoria);
+    posaColor_(ev, a.categoria, grups);
     return;
   }
 
@@ -357,23 +396,42 @@ function executa_(a, cal, refs) {
       ev.setTime(ev.getStartTime(), data_(a.fi));
     }
     if (a.lloc) ev.setLocation(a.lloc);
-    posaColor_(ev, a.categoria);
+    posaColor_(ev, a.categoria, grups);
     if (a.notes) ev.setDescription(a.notes);
     if (a.avis_minuts != null) ev.setTag('avis', String(a.avis_minuts));
     if (a.recorda_a) ev.setTag('recorda_a', data_(a.recorda_a) && a.recorda_a.slice(0, 16));
   }
 }
 
-/** Pinta la cita del color de la seva categoria (esportec, personal…). */
-function posaColor_(ev, categoria) {
-  const color = CATEGORIES[String(categoria || '').toLowerCase()];
+/** Els grups d'una persona (nom → color). Al principi, els de GRUPS_PER_DEFECTE. */
+function grups_(u) {
+  const desat = u && estat_(u, 'GRUPS');
+  return desat ? JSON.parse(desat) : JSON.parse(JSON.stringify(GRUPS_PER_DEFECTE));
+}
+
+function nomGrup_(s) { return String(s || '').trim().toLowerCase(); }
+
+function colorsLliures_(grups) {
+  const usats = Object.keys(grups).map(function (k) { return grups[k]; });
+  return Object.keys(COLORS).filter(function (c) { return usats.indexOf(c) < 0; });
+}
+
+function llistaGrups_(grups) {
+  const noms = Object.keys(grups);
+  return (noms.length ? noms.map(function (k) { return k + ' → ' + grups[k]; }).join(', ') : '(cap)') +
+    ' (colors lliures: ' + (colorsLliures_(grups).join(', ') || 'cap') + ')';
+}
+
+/** Pinta la cita del color del seu grup (esportec, personal…). */
+function posaColor_(ev, categoria, grups) {
+  const color = COLORS[(grups || {})[nomGrup_(categoria)]];
   if (color) ev.setColor(color);
 }
 
-/** La categoria d'una cita segons el seu color, per mostrar-la a l'agenda. */
-function categoria_(ev) {
-  const color = ev.getColor();
-  return Object.keys(CATEGORIES).filter(function (k) { return String(CATEGORIES[k]) === String(color); })[0] || '';
+/** El grup d'una cita segons el seu color, per mostrar-lo a l'agenda. */
+function categoria_(ev, grups) {
+  const color = String(ev.getColor());
+  return Object.keys(grups || {}).filter(function (k) { return COLORS[grups[k]] === color; })[0] || '';
 }
 
 function recurrencia_(a) {
@@ -679,7 +737,7 @@ function provaPersona() {
     registre_('Persona: ' + JSON.stringify(u));
     const cal = calendari_(u);
     registre_('Calendari: «' + cal.getName() + '» (' + cal.getId() + ')');
-    registre_('Context que veu el secretari:\n' + JSON.stringify(context_(cal, new Date()), null, 1).slice(0, 3000));
+    registre_('Context que veu el secretari:\n' + JSON.stringify(context_(cal, new Date(), grups_(u)), null, 1).slice(0, 3000));
     registre_('Resposta del secretari: ' + aten_([{ text: 'Apunta una prova del secretari demà a les 12' }], u));
   } catch (err) {
     registre_('ERROR: ' + (err && err.stack ? err.stack : err));

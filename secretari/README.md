@@ -164,7 +164,10 @@ A dalt de `Secretari.gs`:
 | `HORA_RESUM_VESPRE` | `21` | Hora del repàs del vespre (`null` = cap) |
 | `DIES_AGENDA` | `30` | Quants dies endavant té en compte en respondre |
 
-**Colors:** si li dius que una cita és **d'Esportec** (🔵 blau) o **personal** (🟢 verd), la pinta d'aquest color al calendari. Si és evident (una reunió d'equip, el metge…), ho endevina sol. Per canviar-ne una: «el sopar de divendres és personal». Els colors i les categories es canvien a `CATEGORIES`, a dalt de `Secretari.gs`.
+**Grups i colors:** cada persona pot tenir fins a **11 grups**, un per cada color de Google Calendar (vermell, rosa, taronja, groc, verd clar, verd, turquesa, blau, lavanda, lila i gris). Al principi tothom té **Esportec** (blau) i **Personal** (verd). Tot es fa per WhatsApp:
+- «Crea el grup Mar Aventura en taronja» · «Posa Esportec en vermell» (les cites que ja en són també canvien) · «Esborra el grup Mar Aventura» · «Quins grups tinc?»
+- «Sortida en kayak dissabte a les 10, Mar Aventura» → la pinta de taronja. Si és evident (una reunió d'equip, el metge…), el grup l'endevina sol.
+- Els grups de cada persona són seus: el que fa una no canvia els de les altres. Els grups inicials es canvien a `GRUPS_PER_DEFECTE`, a dalt de `Secretari.gs`.
 
 Per a una cita concreta, només cal demanar-ho: «avisa'm una hora abans», «no cal que m'avisis».
 
