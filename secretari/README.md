@@ -164,6 +164,8 @@ A dalt de `Secretari.gs`:
 | `HORA_RESUM_VESPRE` | `21` | Hora del repàs del vespre (`null` = cap) |
 | `DIES_AGENDA` | `30` | Quants dies endavant té en compte en respondre |
 
+**Colors:** si li dius que una cita és **d'Esportec** (🔵 blau) o **personal** (🟢 verd), la pinta d'aquest color al calendari. Si és evident (una reunió d'equip, el metge…), ho endevina sol. Per canviar-ne una: «el sopar de divendres és personal». Els colors i les categories es canvien a `CATEGORIES`, a dalt de `Secretari.gs`.
+
 Per a una cita concreta, només cal demanar-ho: «avisa'm una hora abans», «no cal que m'avisis».
 
 Després de canviar els ajustos o d'enganxar-hi una versió nova del codi: desa, torna a executar **`configura`** i fes **Implementa > Gestiona les implementacions > ✏️ > Versió: Versió nova > Implementa**. L'URL no canvia i les claus es conserven.

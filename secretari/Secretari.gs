@@ -32,6 +32,12 @@ const DIES_AGENDA = 30;           // Quants dies endavant de l'agenda veu el sec
 const PLANTILLA = 'recordatori';  // Plantilla de WhatsApp per escriure't fora de la finestra de 24 h
 const PLANTILLA_IDIOMA = 'ca';
 const NOM = 'Secretari';
+// Colors de les cites segons de què són. Pots afegir-ne més o canviar-los
+// (BLUE, GREEN, RED, YELLOW, ORANGE, CYAN, GRAY, MAUVE, PALE_BLUE, PALE_GREEN, PALE_RED).
+const CATEGORIES = {
+  esportec: CalendarApp.EventColor.BLUE,
+  personal: CalendarApp.EventColor.GREEN
+};
 
 // ── Constants ───────────────────────────────────────────────────────────────
 const GRAPH = 'https://graph.facebook.com/v23.0/';
@@ -154,11 +160,12 @@ const ESQUEMA = {
           recorda_a: { type: 'STRING', description: 'Per a tasques: AAAA-MM-DDTHH:MM' },
           repeticio: { type: 'STRING', enum: ['cap', 'diaria', 'setmanal', 'mensual', 'anual'] },
           repeteix_fins: { type: 'STRING', description: 'AAAA-MM-DD' },
-          tota_la_serie: { type: 'BOOLEAN' }
+          tota_la_serie: { type: 'BOOLEAN' },
+          categoria: { type: 'STRING', enum: ['cap'].concat(Object.keys(CATEGORIES)), description: 'De què és la cita: dona-li color' }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
-        required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a'],
-        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'repeticio', 'repeteix_fins', 'tota_la_serie']
+        required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria'],
+        propertyOrdering: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria', 'tot_el_dia', 'lloc', 'notes', 'avis_minuts', 'repeticio', 'repeteix_fins', 'tota_la_serie']
       }
     },
     resposta: { type: 'STRING', description: "Missatge de WhatsApp per a l'usuari" }
@@ -180,7 +187,8 @@ function aten_(parts, u) {
     '- crear_cita: tot el que passa un dia concret (reunions, metge, viatges, sopars…). Si no diu hora, és de tot el dia.',
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
-    '- A cada acció omple SEMPRE tipus, ref, titol, inici, fi i recorda_a (cadena buida "" si no cal). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
+    '- Categoria (dona color a la cita o tasca): ' + Object.keys(CATEGORIES).join(', ') + '. Posa-la quan l\'usuari ho digui («és d\'Esportec», «és personal») o quan sigui evident (feina, clients, reunions d\'equip → esportec; metge, família, amics → personal). Si no és clar, «cap». Per canviar-la d\'una cita existent, modificar amb la nova categoria.',
+    '- A cada acció omple SEMPRE tipus, ref, titol, inici, fi, recorda_a i categoria (cadena buida "" si no cal, «cap» a categoria). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
     "- Recordatoris: «recorda'm X a les 17h», «avisa'm demà a les 9 que…», «el dia 20 recorda'm que el 25 he de pagar» → crear_tasca amb recorda_a = el dia i l'hora exactes de l'avís (AAAA-MM-DDTHH:MM) i inici = el dia de la tasca. Per a una cita amb hora, l'avís previ va a avis_minuts (p. ex. «avisa'm una hora abans» → 60).",
     '',
     'Regles:',
@@ -286,7 +294,8 @@ function context_(cal, ara) {
     if (ev.getEndTime() <= avui) return;
     const r = 'E' + (agenda.length + 1);
     refs[r] = ev;
-    agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
+    const cat = categoria_(ev);
+    agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (cat ? ' | ' + cat : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
   });
   return { refs: refs, agenda: agenda, tasques: tasques };
 }
@@ -311,6 +320,7 @@ function executa_(a, cal, refs) {
       ev = rec ? cal.createEventSeries(a.titol, ini, fi, rec, opcions) : cal.createEvent(a.titol, ini, fi, opcions);
     }
     if (a.avis_minuts != null && a.avis_minuts !== AVIS_PER_DEFECTE) ev.setTag('avis', String(a.avis_minuts));
+    posaColor_(ev, a.categoria);
     return;
   }
 
@@ -319,6 +329,7 @@ function executa_(a, cal, refs) {
     const dia = a.inici ? data_(a.inici.slice(0, 10)) : iniciDia_(new Date());
     const ev = cal.createAllDayEvent(TASCA + a.titol, dia, opcions);
     if (a.recorda_a) ev.setTag('recorda_a', data_(a.recorda_a) && a.recorda_a.slice(0, 16));
+    posaColor_(ev, a.categoria);
     return;
   }
 
@@ -346,10 +357,23 @@ function executa_(a, cal, refs) {
       ev.setTime(ev.getStartTime(), data_(a.fi));
     }
     if (a.lloc) ev.setLocation(a.lloc);
+    posaColor_(ev, a.categoria);
     if (a.notes) ev.setDescription(a.notes);
     if (a.avis_minuts != null) ev.setTag('avis', String(a.avis_minuts));
     if (a.recorda_a) ev.setTag('recorda_a', data_(a.recorda_a) && a.recorda_a.slice(0, 16));
   }
+}
+
+/** Pinta la cita del color de la seva categoria (esportec, personal…). */
+function posaColor_(ev, categoria) {
+  const color = CATEGORIES[String(categoria || '').toLowerCase()];
+  if (color) ev.setColor(color);
+}
+
+/** La categoria d'una cita segons el seu color, per mostrar-la a l'agenda. */
+function categoria_(ev) {
+  const color = ev.getColor();
+  return Object.keys(CATEGORIES).filter(function (k) { return String(CATEGORIES[k]) === String(color); })[0] || '';
 }
 
 function recurrencia_(a) {
