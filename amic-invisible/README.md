@@ -16,9 +16,13 @@ Funciona en dues fases, perquè tothom jugui amb les mateixes opcions:
 
 ## On s'obre la pàgina
 
-La pàgina per a la família es publica a **GitHub Pages**, al mateix lloc que la Xiu-xiu: `https://oriol-cmd.github.io/projectes-Oriol/amic-invisible/`. El full de Google continua guardant-ho tot, però la pàgina hi parla sense fer servir cap compte de Google. Així s'obre bé en qualsevol mòbil, també si hi ha diversos comptes de Google oberts. (Si s'obre directament des de Google, aquests mòbils donen l'error «No s'ha pogut obrir el fitxer en aquest moment».)
+La pàgina per a la família es publica a **GitHub Pages**, al mateix lloc que la Xiu-xiu: `https://oriol-cmd.github.io/projectes-Oriol/amic-invisible-bove-palau/`. El full de Google continua guardant-ho tot, però la pàgina hi parla sense fer servir cap compte de Google. Així s'obre bé en qualsevol mòbil, també si hi ha diversos comptes de Google oberts. (Si s'obre directament des de Google, aquests mòbils donen l'error «No s'ha pogut obrir el fitxer en aquest moment».)
 
-Els enllaços personals són del tipus `…/amic-invisible/?s=<identificador de l'aplicació>&codi=K7MPQ2`, i els genera el full sol. Si a Configuració l'«Adreça de la pàgina» és buida, els enllaços van directament a Google.
+Els enllaços personals són curts, del tipus `https://oriol-cmd.github.io/projectes-Oriol/amic-invisible-bove-palau/?codi=K7MPQ2`, i els genera el full sol. Funcionen perquè la pàgina publicada ja porta l'identificador de l'aplicació de Google, que és a [`app-id.txt`](app-id.txt). Si mai fas una implementació **nova** (no una versió nova), l'identificador canvia: posa el nou a `app-id.txt`.
+
+Si a Configuració l'«Adreça de la pàgina» és buida, els enllaços van directament a Google.
+
+El primer cop que algú obre el seu enllaç, li surt un full amb el cargol que explica com funciona, i l'ha d'acceptar amb **«Entesos, som-hi!»**. Després el pot tornar a consultar amb el botó **«Com funciona?»**, a baix de tot.
 
 ## Accés: un enllaç per persona
 
@@ -105,7 +109,7 @@ Fes-ho des d'un ordinador. Millor amb un **compte de Google personal** (Gmail): 
 2. A cadascú, per privat: el seu missatge amb el botó **Envia-li ➜**.
 
 ### Si alguna cosa no va
-- **«No s'ha pogut obrir el fitxer en aquest moment»:** l'enllaç va directament a Google i el mòbil té més d'un compte de Google obert. Comprova que a Configuració l'«Adreça de la pàgina» és `https://oriol-cmd.github.io/projectes-Oriol/amic-invisible/` i torna a prémer **Genera codis i enllaços**: els enllaços passaran a anar a GitHub.
+- **«No s'ha pogut obrir el fitxer en aquest moment»:** l'enllaç va directament a Google i el mòbil té més d'un compte de Google obert. Comprova que a Configuració l'«Adreça de la pàgina» és `https://oriol-cmd.github.io/projectes-Oriol/amic-invisible-bove-palau/` i torna a prémer **Genera codis i enllaços**: els enllaços passaran a anar a GitHub.
 - **«No s'ha trobat el fitxer HTML Index»:** el fitxer HTML no es diu exactament `Index`.
 - **La família no hi pot entrar o els demana iniciar sessió:** a la implementació, «Qui hi té accés» ha de ser **Qualsevol**. Si no surt aquesta opció, és un compte d'empresa: fes-ho amb un Gmail personal.
 - **Els enllaços acaben en `/dev`:** aquests només funcionen per a tu. Enganxa a Configuració l'URL que acaba en `/exec`.
