@@ -121,7 +121,8 @@ Fes-ho des d'un ordinador. Millor amb un **compte de Google personal** (Gmail): 
 Qui tingui **Sí** a la columna «Pot configurar» de Participants veu una tercera pestanya, **Ajustos**, a l'aplicació. Des d'allà, sense obrir el full:
 
 - **Data límit:** dia i hora. Quan la canvies, els missatges de WhatsApp ja porten la data nova.
-- **Textos:** títol, família i avís (pressupost, dia de l'intercanvi…).
+- **Textos:** títol, família i avís (dia de l'intercanvi, lloc…).
+- **Pressupost:** sense límit, o una quantitat màxima en euros.
 - **Joc:** temes per persona, colors i exemples.
 - **Família:** per a cada persona, el botó **WhatsApp** (obre el xat amb el missatge i el seu enllaç), **Copia l'enllaç**, el **mòbil** (opcional, només perquè el WhatsApp s'obri directament al seu xat), **Treu** i la casella **Ajustos** per donar-li o treure-li l'accés. A sota, **Persona nova**: nom i, si vols, mòbil.
 - **Instruccions per al grup:** obre la targeta del cargol.
@@ -148,7 +149,8 @@ Tot això també es pot canviar des de la pestanya **Ajustos** de l'aplicació.
 | Enllaç de l'aplicació | (buit) | L'URL que acaba en `/exec`. Amb ella es fan els enllaços personals. |
 | Títol | Amic invisible | Surt a dalt de tot. |
 | Família | Bové Palau | Surt sota el títol, amb les inicials (BP) en un cercle. Si és buit, hi surt un paquet de regal. |
-| Avís | Pressupost: uns 20 €… | Text per a tothom: pressupost, data de l'intercanvi, lloc… Si és buit, no surt. |
+| Avís | Intercanvi el dia de Nadal… | Text per a tothom: data de l'intercanvi, lloc… Si és buit, no surt. |
+| Pressupost màxim | (buit) | Quants euros com a màxim. Si és buit, no hi ha límit i no surt enlloc. Als Ajustos: casella «Hi ha un pressupost màxim» i la quantitat. |
 | Data límit | 07/12/2026 22:00 | Fins quan es poden escriure i canviar els temes (dia/mes/any hora:minuts). Després s'obre la tria. Si és buit, es pot triar des del principi. |
 | Temes per persona | 2 | 1, 2 o 3. |
 | Estil | avet | Colors: **avet** (verd i vermell), **nit** (blau i daurat), **gerd** (granat i taronja) o **neu** (blau gris i vermell). Cadascun té versió fosca, que surt sola si el mòbil està en mode fosc. |
