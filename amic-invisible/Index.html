@@ -90,14 +90,20 @@ input:focus { border-color: var(--pine); outline: none; }
 .tag .meta a { color: var(--pine); overflow-wrap: anywhere; }
 .tag .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 .tag .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.tag .hints { font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
+.themes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.themes li { font-weight: 600; overflow-wrap: anywhere; padding-left: 14px; position: relative; }
+.themes li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; border-radius: 50%; background: var(--pine); }
+.tag.is-mine .themes li::before, .pick .themes li::before { background: var(--berry); }
+.tag.is-taken .themes li { color: var(--taken); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tag.is-taken .themes li::before { background: var(--line); }
+.pick .themes li { font-weight: 500; }
 .tag.is-empty { border-style: dashed; background: transparent; }
 .tag.is-empty .text { color: var(--muted); font-weight: 500; }
 .tag.is-mine .who { color: var(--berry); }
 .pick { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 4px; }
 .pick .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--berry); }
 .pick-name { font: 700 22px/1.2 var(--font-display); }
-.pick-theme { color: var(--muted); overflow-wrap: anywhere; }
+.pick .themes { margin-top: 6px; }
 .pick .hint { margin-top: 2px; }
 .pick.chosen { border-color: var(--berry); background: var(--berry-soft); }
 .tag.is-mine { border-color: var(--berry); background: var(--berry-soft); }
@@ -157,24 +163,27 @@ input:focus { border-color: var(--pine); outline: none; }
   <section id="app" hidden>
     <div style="display:grid;gap:20px">
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" id="tabMine" aria-selected="true">El meu tema</button>
+        <button type="button" role="tab" id="tabMine" aria-selected="true">Els meus temes</button>
         <button type="button" role="tab" id="tabOthers" aria-selected="false">A qui regalo</button>
       </div>
 
       <div id="paneMine" style="display:grid;gap:16px">
         <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Proposa un tema per al regal que t'agradaria rebre. Algú el triarà, però tu no sabràs qui fins al dia de l'intercanvi.</p>
+          Escriu 3 temes per al regal que t'agradaria rebre. Qui te'l faci els llegirà i hi pensarà el que cregui. No sabràs qui és fins al dia de l'intercanvi.</p>
         <div class="tags" id="mineView"></div>
         <form class="add" id="themeForm">
-          <h3 id="formTitle">Quin tema proposes?</h3>
-          <label for="tText">Tema
-            <input id="tText" type="text" maxlength="120" required placeholder="P. ex. alguna cosa per a la cuina">
+          <h3 id="formTitle">Quins 3 temes proposes?</h3>
+          <label for="t1">Tema 1
+            <input id="t1" type="text" maxlength="120" required placeholder="P. ex. cuina">
           </label>
-          <label for="tHints">Pistes (opcional)
-            <input id="tHints" type="text" maxlength="300" placeholder="P. ex. m'agrada el menjar japonès, no tinc wok">
+          <label for="t2">Tema 2
+            <input id="t2" type="text" maxlength="120" required placeholder="P. ex. Japó">
+          </label>
+          <label for="t3">Tema 3
+            <input id="t3" type="text" maxlength="120" required placeholder="P. ex. alguna cosa petita">
           </label>
           <div class="actions">
-            <button class="btn" type="submit" id="saveBtn">Desa el tema</button>
+            <button class="btn" type="submit" id="saveBtn">Desa els temes</button>
             <button class="btn secondary" type="button" id="cancelEdit" hidden>Cancel·la</button>
           </div>
         </form>
@@ -257,6 +266,12 @@ input:focus { border-color: var(--pine); outline: none; }
 
   // ---------- Pintar ----------
 
+  function themeList(themes) {
+    const ul = el('ul', 'themes');
+    themes.filter(Boolean).forEach((x) => ul.appendChild(el('li', null, x)));
+    return ul;
+  }
+
   function el(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -271,11 +286,10 @@ input:focus { border-color: var(--pine); outline: none; }
     const form = $('themeForm');
     if (state.mine && !editing) {
       const t = el('article', 'tag');
-      t.appendChild(el('div', 'who', 'El teu tema'));
-      t.appendChild(el('div', 'text', state.mine.text));
-      if (state.mine.hints) t.appendChild(el('div', 'hints', state.mine.hints));
+      t.appendChild(el('div', 'who', 'Els teus temes'));
+      t.appendChild(themeList(state.mine.themes));
       const bar = el('div', 'bar');
-      const ed = el('button', 'small', 'Canvia-ho'); ed.type = 'button';
+      const ed = el('button', 'small', 'Canvia\'ls'); ed.type = 'button';
       ed.onclick = startEdit;
       bar.appendChild(ed);
       t.appendChild(bar);
@@ -292,11 +306,11 @@ input:focus { border-color: var(--pine); outline: none; }
       pb.className = 'pick chosen';
       pb.appendChild(el('div', 'who', 'Regales a'));
       pb.appendChild(el('div', 'pick-name', state.myPick.name));
-      pb.appendChild(el('div', 'pick-theme', 'Tema: ' + state.myPick.text));
+      pb.appendChild(themeList(state.myPick.themes));
     } else {
       pb.className = 'pick';
       pb.appendChild(el('div', 'pick-name', 'Tria a qui regales'));
-      pb.appendChild(el('p', 'hint', 'Tria el tema d\'una persona. Els altres veuran que ja està triat, però ningú sabrà que has estat tu.'));
+      pb.appendChild(el('p', 'hint', 'Llegeix els temes i tria una persona: serà a qui regales. Els altres veuran que ja està triada, però ningú sabrà que has estat tu.'));
     }
 
     const list = $('othersList');
@@ -306,23 +320,22 @@ input:focus { border-color: var(--pine); outline: none; }
       if (!th) {
         const t = el('article', 'tag is-empty');
         t.appendChild(el('div', 'who', p.name));
-        t.appendChild(el('div', 'text', 'Encara no ha posat el tema'));
+        t.appendChild(el('div', 'text', 'Encara no ha posat els temes'));
         list.appendChild(t);
         return;
       }
       const t = el('article', 'tag' + (th.status === 'mine' ? ' is-mine' : th.status === 'taken' ? ' is-taken' : ''));
       t.appendChild(el('div', 'who', p.name));
-      t.appendChild(el('div', 'text', th.text));
-      if (th.hints) t.appendChild(el('div', 'hints', th.hints));
+      t.appendChild(themeList(th.themes));
       const bar = el('div', 'bar');
-      bar.appendChild(el('span', 'chip ' + th.status, th.status === 'free' ? 'Lliure' : th.status === 'mine' ? 'El regales tu' : 'Ja està triat'));
+      bar.appendChild(el('span', 'chip ' + th.status, th.status === 'free' ? 'Lliure' : th.status === 'mine' ? 'Li regales tu' : 'Ja està triada'));
       if (th.status === 'free') {
-        const b = el('button', 'small mark', state.myPick ? 'Canvia a aquest' : 'El trio'); b.type = 'button';
+        const b = el('button', 'small mark', state.myPick ? 'Canvia a aquesta' : 'La trio'); b.type = 'button';
         b.onclick = () => call('tria', th.id).then((s) => s && !s.error && toast('Regales a ' + p.name + '. Ningú sabrà que has estat tu.'));
         bar.appendChild(b);
       } else if (th.status === 'mine') {
         const b = el('button', 'small', 'Desfés'); b.type = 'button';
-        b.onclick = () => call('desfes').then((s) => s && toast('Desfet. El tema torna a estar lliure.'));
+        b.onclick = () => call('desfes').then((s) => s && toast('Desfet. ' + p.name + ' torna a estar lliure.'));
         bar.appendChild(b);
       }
       t.appendChild(bar);
@@ -334,16 +347,16 @@ input:focus { border-color: var(--pine); outline: none; }
 
   function startEdit() {
     editing = true;
-    $('tText').value = state.mine.text; $('tHints').value = state.mine.hints;
-    $('formTitle').textContent = 'Canvia el teu tema';
+    ['t1', 't2', 't3'].forEach((k, i) => { $(k).value = state.mine.themes[i] || ''; });
+    $('formTitle').textContent = 'Canvia els teus temes';
     $('cancelEdit').hidden = false;
     render();
-    $('tText').focus();
+    $('t1').focus();
   }
   function stopEdit() {
     editing = false;
     $('themeForm').reset();
-    $('formTitle').textContent = 'Quin tema proposes?';
+    $('formTitle').textContent = 'Quins 3 temes proposes?';
     $('cancelEdit').hidden = true;
     if (state) render();
   }
@@ -351,13 +364,13 @@ input:focus { border-color: var(--pine); outline: none; }
 
   $('themeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const theme = { text: $('tText').value, hints: $('tHints').value };
-    if (!theme.text.trim()) return;
+    const theme = ['t1', 't2', 't3'].map((k) => $(k).value);
+    if (theme.some((x) => !x.trim())) { toast('Escriu els 3 temes.'); return; }
     const wasNew = !state.mine;
     $('saveBtn').disabled = true;
     const s = await call('desa', theme);
     $('saveBtn').disabled = false;
-    if (s && !s.error) { toast(wasNew ? 'Tema desat. Ara tria a qui regales.' : 'Tema canviat.'); stopEdit(); }
+    if (s && !s.error) { toast(wasNew ? 'Temes desats. Ara tria a qui regales.' : 'Temes canviats.'); stopEdit(); }
   });
 
   // ---------- Pestanyes ----------

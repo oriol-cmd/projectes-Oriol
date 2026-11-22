@@ -63,12 +63,14 @@ ok(again.every((p, i) => p[1] === people[i][1]), 'tornar a executar prepara cons
 const code = Object.fromEntries(people.map((p) => [p[0], p[1]]));
 let err = ''; try { gs('entra("ZZZZZZ")'); } catch (e) { err = e.message; }
 ok(err === 'codi-incorrecte', 'un codi inventat no entra');
-const g1 = gs(`desa(${J(code.Gemma)}, {text: "=HYPERLINK(1)"})`);
-ok(g1.mine.text.startsWith("'="), 'no es poden colar fórmules al full');
-const g2 = gs(`desa(${J(code.Gemma)}, {text: "Plantes", hints: "balcó petit"})`);
-ok(g2.mine.text === 'Plantes' && sheets.Temes.data.filter((r) => r[1] === 'Gemma').length === 1, 'cada persona té un sol tema (desar-lo el canvia)');
+const g1 = gs(`desa(${J(code.Gemma)}, ["=HYPERLINK(1)", "b", "c"])`);
+ok(g1.mine.themes[0].startsWith("'="), 'no es poden colar fórmules al full');
+err = ''; try { gs(`desa(${J(code.Gemma)}, ["Plantes", "", "verd"])`); } catch (e) { err = e.message; }
+ok(/3 temes/.test(err), 'cal escriure els 3 temes');
+const g2 = gs(`desa(${J(code.Gemma)}, ["Plantes", "Balcó", "Verd"])`);
+ok(g2.mine.themes.join() === 'Plantes,Balcó,Verd' && sheets.Temes.data.filter((r) => r[1] === 'Gemma').length === 1, 'desar els temes els canvia (una fila per persona)');
 const own = gs(`tria(${J(code.Gemma)}, ${J(g2.mine.id)})`);
-ok(/propi/.test(own.error), 'no pots triar el teu propi tema');
+ok(/a tu/.test(own.error), 'no et pots triar a tu');
 
 // ---------- Navegador ----------
 console.log('Navegador');
@@ -102,11 +104,14 @@ const card = (page, name) => page.locator('#othersList .tag', { hasText: name })
 // L'Anna entra amb l'enllaç i proposa el seu tema.
 const anna = await open('Anna');
 ok((await anna.textContent('#hello')) === 'Hola, Anna', 'l\'enllaç personal entra directament');
-await anna.fill('#tText', 'Alguna cosa per a la cuina');
-await anna.fill('#tHints', 'M\'agrada el menjar japonès');
+await anna.fill('#t1', 'Cuina');
+await anna.fill('#t2', 'Japó');
 await anna.click('#saveBtn');
-await anna.waitForFunction(() => document.querySelector('#mineView').textContent.includes('cuina'));
-ok(await anna.locator('#themeForm').isHidden(), 'un cop desat, el formulari s\'amaga i surt el tema');
+ok(!(await anna.evaluate(() => document.getElementById('t3').checkValidity())) && !gs(`entra(${J(code.Anna)})`).mine, 'si falta un tema, no es desa');
+await anna.fill('#t3', 'Alguna cosa petita');
+await anna.click('#saveBtn');
+await anna.waitForFunction(() => document.querySelectorAll('#mineView .themes li').length === 3);
+ok(await anna.locator('#themeForm').isHidden(), 'un cop desats, el formulari s\'amaga i surten els 3 temes');
 
 // En Bernat entra escrivint el codi i tria el tema de l'Anna.
 const bernat = await open('Bernat', { viaLink: false });
@@ -115,59 +120,60 @@ await bernat.click('#loginBtn');
 await bernat.waitForSelector('#app:not([hidden])');
 ok(true, 'en Bernat entra escrivint el codi en minúscules');
 await bernat.click('#tabOthers');
-ok((await card(bernat, 'Anna').locator('.hints').textContent()).includes('japonès'), 'es veuen les pistes del tema');
-await card(bernat, 'Anna').getByRole('button', { name: 'El trio' }).click();
+ok((await card(bernat, 'Anna').locator('.themes li').allTextContents()).join() === 'Cuina,Japó,Alguna cosa petita', 'en Bernat veu els 3 temes de l\'Anna');
+await card(bernat, 'Anna').getByRole('button', { name: 'La trio' }).click();
 await card(bernat, 'Anna').locator('.chip.mine').waitFor();
-ok((await bernat.textContent('#pickBox')).includes('Anna'), 'en Bernat veu «Regales a Anna»');
+ok((await bernat.textContent('#pickBox')).includes('Anna') && (await bernat.locator('#pickBox li').count()) === 3, 'en Bernat veu «Regales a Anna» amb els 3 temes');
 
 // La Carla el veu triat i no el pot triar.
 const carla = await open('Carla', { viewport: { width: 390, height: 844 } });
 await carla.click('#tabOthers');
-ok(await card(carla, 'Anna').locator('.chip.taken').isVisible(), 'la Carla el veu «Ja està triat»');
-ok((await card(carla, 'Anna').getByRole('button').count()) === 0, 'la Carla no el pot triar');
+ok(await card(carla, 'Anna').locator('.chip.taken').isVisible(), 'la Carla la veu «Ja està triada»');
+ok((await card(carla, 'Anna').getByRole('button').count()) === 0, 'la Carla no la pot triar');
 const annaId = gs(`entra(${J(code.Anna)})`).mine.id;
-ok(/avançat/.test(gs(`tria(${J(code.Carla)}, ${J(annaId)})`).error), 'el servidor tampoc deixa triar-lo dues vegades');
+ok(/avançat/.test(gs(`tria(${J(code.Carla)}, ${J(annaId)})`).error), 'el servidor tampoc deixa triar-la dues vegades');
 ok(await carla.evaluate(() => document.documentElement.scrollWidth) <= 390, 'al mòbil no hi ha desplaçament lateral');
 
 // L'Anna no en sap res; els altres no saben qui.
 const annaView = gs(`entra(${J(code.Anna)})`);
-ok(!('status' in annaView.mine), 'el servidor no diu a l\'Anna si han triat el seu tema');
+ok(!('status' in annaView.mine), 'el servidor no diu a l\'Anna si l\'han triada');
 await anna.reload(); await anna.waitForSelector('#app:not([hidden])');
 await anna.click('#tabMine');
-ok(!/triat|regales/i.test(await anna.textContent('#paneMine')), 'la pàgina de l\'Anna no mostra si l\'han triat');
+ok(!/triat|regales/i.test(await anna.textContent('#paneMine')), 'la pàgina de l\'Anna no mostra si l\'han triada');
 const keys = new Set(gs(`entra(${J(code.Carla)})`).others.flatMap((o) => (o.theme ? Object.keys(o.theme) : [])));
-ok([...keys].sort().join() === 'hints,id,status,text', 'als altres només els arriba «triat», mai qui');
+ok([...keys].sort().join() === 'id,status,themes', 'als altres només els arriba «triada», mai qui');
 
 // Cadascú tria només una persona: canviar allibera l'anterior.
-await card(bernat, 'Gemma').getByRole('button', { name: 'Canvia a aquest' }).click();
+await card(bernat, 'Gemma').getByRole('button', { name: 'Canvia a aquesta' }).click();
 await card(bernat, 'Gemma').locator('.chip.mine').waitFor();
 ok(await card(bernat, 'Anna').locator('.chip.free').isVisible(), 'en Bernat canvia a la Gemma i l\'Anna torna a estar lliure');
 await card(bernat, 'Gemma').getByRole('button', { name: 'Desfés' }).click();
 await card(bernat, 'Gemma').locator('.chip.free').waitFor();
 ok(!(await bernat.textContent('#pickBox')).includes('Regales a'), 'en Bernat desfà la tria');
 
-// L'Anna canvia el seu tema.
-await anna.getByRole('button', { name: 'Canvia-ho' }).click();
-await anna.fill('#tText', 'Alguna cosa per a la cuina japonesa');
+// L'Anna canvia els seus temes.
+await anna.getByRole('button', { name: 'Canvia\'ls' }).click();
+ok((await anna.inputValue('#t2')) === 'Japó', 'en editar, el formulari surt omplert');
+await anna.fill('#t2', 'Menjar japonès');
 await anna.click('#saveBtn');
-await anna.waitForFunction(() => document.querySelector('#mineView').textContent.includes('japonesa'));
-ok(true, 'l\'Anna canvia el seu tema');
+await anna.waitForFunction(() => document.querySelector('#mineView').textContent.includes('Menjar japonès'));
+ok(true, 'l\'Anna canvia un dels temes');
 
 // Que l'últim no es quedi amb el seu propi tema.
 const all = ['Anna', 'Bernat', 'Carla', 'David', 'Elena', 'Ferran', 'Gemma', 'Oriol'];
-for (const n of all) gs(`desa(${J(code[n])}, {text: "Tema de ${n}"})`);
+for (const n of all) gs(`desa(${J(code[n])}, ["A de ${n}", "B de ${n}", "C de ${n}"])`);
 const id = (n) => gs(`entra(${J(code[n])})`).mine.id;
 // Anna→Bernat→…→Ferran→Gemma: queden en Gemma i l'Oriol sense triar, i lliures els temes de l'Anna i l'Oriol.
 for (let i = 0; i < 6; i++) ok(!gs(`tria(${J(code[all[i]])}, ${J(id(all[i + 1]))})`).error, `${all[i]} tria ${all[i + 1]}`);
 const bad = gs(`tria(${J(code.Gemma)}, ${J(id('Anna'))})`);
-ok(/l'última persona/.test(bad.error), 'la Gemma no pot deixar l\'Oriol només amb el seu tema');
+ok(/l'última es quedaria/.test(bad.error), 'la Gemma no pot deixar l\'Oriol sense ningú a qui regalar');
 ok(!gs(`tria(${J(code.Gemma)}, ${J(id('Oriol'))})`).error && !gs(`tria(${J(code.Oriol)}, ${J(id('Anna'))})`).error, 'la Gemma tria l\'Oriol i l\'Oriol l\'Anna: tothom té a qui regalar');
 
 if (shots) {
   fs.mkdirSync(shots, { recursive: true });
   gs(`desfes(${J(code.Carla)})`); gs(`desfes(${J(code.Elena)})`); gs(`desfes(${J(code.Oriol)})`);
-  const demo = { Bernat: ['Llibres de misteri', 'Ja tinc tots els de l\'Agatha Christie'], Carla: ['Jocs de taula', 'Millor cooperatius'], David: ['Música', 'Vinils de jazz'], Elena: ['Plantes', 'Tinc un balcó petit'], Ferran: ['Esport', 'Corro i vaig en bici'], Gemma: ['Alguna cosa per relaxar-se', ''], Oriol: ['Tecnologia', 'Gadgets petits per a la feina'], Anna: ['Alguna cosa per a la cuina', 'M\'agrada el menjar japonès'] };
-  for (const [n, [t, h]] of Object.entries(demo)) gs(`desa(${J(code[n])}, {text: ${J(t)}, hints: ${J(h)}})`);
+  const demo = { Anna: ['Cuina', 'Japó', 'Alguna cosa petita'], Bernat: ['Misteri', 'Llibres', 'Tardor'], Carla: ['Jocs', 'Amics', 'Riure'], David: ['Música', 'Jazz', 'Vinil'], Elena: ['Plantes', 'Balcó', 'Verd'], Ferran: ['Esport', 'Muntanya', 'Bicicleta'], Gemma: ['Relax', 'Aromes', 'Diumenge'], Oriol: ['Tecnologia', 'Feina', 'Petit i útil'] };
+  for (const [n, t] of Object.entries(demo)) gs(`desa(${J(code[n])}, ${J(t)})`);
   gs(`tria(${J(code.Carla)}, ${J(id('David'))})`);
   const hide = async (p) => { await p.evaluate(() => { document.getElementById('toast').hidden = true; }); };
   const m = await open('Carla', { viewport: { width: 390, height: 844 } });

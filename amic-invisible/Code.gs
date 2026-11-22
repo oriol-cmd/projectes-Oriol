@@ -1,9 +1,9 @@
 /**
  * Amic invisible: tauler de temes de regal.
  *
- * Cada persona proposa un tema de regal (p. ex. «alguna cosa per a la cuina»).
- * Els altres veuen el tema de cadascú i en trien un: serà la persona a qui regalen.
- * Ningú sap qui ha triat el seu tema, i cada tema només el pot triar una persona.
+ * Cada persona escriu 3 temes de regal, els que vulgui. Els altres els llegeixen i trien
+ * una persona: serà a qui regalen, i el regal l'interpreten com creguin.
+ * Ningú sap qui l'ha triat, i cada persona només la pot triar algú.
  *
  * Com instal·lar-lo (un sol cop, uns 5 minuts):
  * 1. Crea un full de càlcul nou a Google Sheets (p. ex. «Amic invisible»).
@@ -46,7 +46,7 @@ function doGet() {
 function prepara() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ps = sheet_(ss, SHEET_PARTICIPANTS, ['Nom', 'Codi', 'Enllaç personal']);
-  sheet_(ss, SHEET_THEMES, ['id', 'Nom', 'Tema', 'Pistes', 'Actualitzat']);
+  sheet_(ss, SHEET_THEMES, ['id', 'Nom', 'Tema 1', 'Tema 2', 'Tema 3', 'Actualitzat']);
   sheet_(ss, SHEET_PICKS, ['id del tema', 'Triat per (codi xifrat)', 'Data']).hideSheet();
 
   const names = PARTICIPANTS.map((n) => String(n).trim()).filter(Boolean);
@@ -78,33 +78,33 @@ function entra(code) {
   return state_(who_(code));
 }
 
-// Desa el tema de la persona (el crea o el canvia: cadascú en té un).
+// Desa els 3 temes de la persona (els crea o els canvia).
 function desa(code, theme) {
   return withLock_(() => {
     const me = who_(code);
     const t = cleanTheme_(theme);
     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_THEMES);
     const i = rows_(sh).findIndex((r) => r[1] === me.name);
-    if (i >= 0) sh.getRange(i + 2, 3, 1, 3).setValues([[t.text, t.hints, new Date()]]);
-    else sh.appendRow(['t' + Utilities.getUuid().slice(0, 8), me.name, t.text, t.hints, new Date()]);
+    if (i >= 0) sh.getRange(i + 2, 3, 1, 4).setValues([t.concat([new Date()])]);
+    else sh.appendRow(['t' + Utilities.getUuid().slice(0, 8), me.name].concat(t, [new Date()]));
     return state_(me);
   });
 }
 
-// Tria el tema d'una altra persona. Si ja n'havies triat un altre, el canvia.
+// Tria una altra persona (pel seu id de temes). Si ja n'havies triat una altra, la canvia.
 function tria(code, id) {
   return withLock_(() => {
     const me = who_(code);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const themes = rows_(ss.getSheetByName(SHEET_THEMES)).filter((r) => r[0]);
     const theme = themes.find((r) => r[0] === id);
-    if (!theme) return state_(me, 'Aquest tema ja no existeix.');
-    if (theme[1] === me.name) return state_(me, 'No pots triar el teu propi tema.');
+    if (!theme) return state_(me, 'Aquesta persona encara no ha posat els temes.');
+    if (theme[1] === me.name) return state_(me, 'No et pots triar a tu.');
     const ps = ss.getSheetByName(SHEET_PICKS);
     const picks = rows_(ps).filter((r) => r[0]);
     const holder = picks.find((r) => r[0] === id);
     if (holder && holder[1] === me.hash) return state_(me);
-    if (holder) return state_(me, 'Algú se t\'ha avançat: aquest tema ja està triat.');
+    if (holder) return state_(me, 'Algú se t\'ha avançat: aquesta persona ja està triada.');
 
     // Que l'última persona no es quedi només amb el seu propi tema.
     const names = participants_().map((p) => p.name);
@@ -116,7 +116,7 @@ function tria(code, id) {
     const free = themes.filter((r) => !takenIds.has(r[0])).map((r) => r[1])
       .concat(names.filter((n) => !withTheme.has(n)));
     if (left.length === 1 && free.length === 1 && left[0] === free[0]) {
-      return state_(me, 'Tria\'n un altre: si no, l\'última persona es quedaria només amb el seu propi tema.');
+      return state_(me, 'Tria una altra persona: si no, l\'última es quedaria sense ningú a qui regalar.');
     }
 
     deleteRows_(ps, (r) => r[1] === me.hash);
@@ -141,7 +141,7 @@ function state_(me, error) {
   const picks = {};
   rows_(ss.getSheetByName(SHEET_PICKS)).forEach((r) => { if (r[0]) picks[r[0]] = r[1]; });
   const names = participants_().map((p) => p.name);
-  const plain = (r) => (r ? { id: r[0], text: String(r[2]), hints: String(r[3] || '') } : null);
+  const plain = (r) => (r ? { id: r[0], themes: [r[2], r[3], r[4]].map((x) => String(x || '')) } : null);
   const byName = (n) => themes.find((r) => r[1] === n);
 
   let myPick = null;
@@ -149,7 +149,7 @@ function state_(me, error) {
     const t = plain(byName(n));
     if (t) {
       t.status = !picks[t.id] ? 'free' : picks[t.id] === me.hash ? 'mine' : 'taken';
-      if (t.status === 'mine') myPick = { name: n, text: t.text };
+      if (t.status === 'mine') myPick = { name: n, themes: t.themes };
     }
     return { name: n, theme: t };
   });
@@ -179,14 +179,12 @@ function who_(code) {
   return p;
 }
 
-function cleanTheme_(t) {
-  t = t || {};
-  const text = String(t.text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
-  if (!text) throw new Error('Escriu el teu tema de regal.');
-  const hints = String(t.hints || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+function cleanTheme_(list) {
   // Evita que Sheets ho interpreti com una fórmula.
   const safe = (s) => (/^[=+\-@]/.test(s) ? "'" + s : s);
-  return { text: safe(text), hints: safe(hints) };
+  const t = [0, 1, 2].map((i) => safe(String((list || [])[i] || '').replace(/\s+/g, ' ').trim().slice(0, 120)));
+  if (t.some((x) => !x)) throw new Error('Escriu els 3 temes.');
+  return t;
 }
 
 function deleteRows_(sh, test) {

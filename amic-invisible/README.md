@@ -1,11 +1,11 @@
 # Amic invisible: tauler de temes de regal
 
-Un tauler on cada persona del grup proposa **un tema de regal** (p. ex. «alguna cosa per a la cuina», amb pistes opcionals com «m'agrada el menjar japonès»). Els altres veuen el tema de cadascú i en trien un: **serà la persona a qui regalen**. Ningú sap qui ha triat el seu tema.
+Un tauler on cada persona del grup escriu **3 temes de regal**, els que vulgui (p. ex. «Cuina», «Japó», «Alguna cosa petita»). Els altres llegeixen els temes de cadascú i **trien una persona: serà a qui regalen**. Com interpreta els 3 temes, ho decideix qui regala. Ningú sap qui l'ha triat.
 
-- **Tu no saps si algú ha triat el teu tema, ni qui.** El servidor ni tan sols envia aquesta informació al teu mòbil.
-- Els altres només veuen «Ja està triat», mai qui l'ha triat. Cada tema només el pot triar una persona.
-- **Cadascú tria una sola persona.** Qui tria veu «Regales a …» i pot desfer-ho o canviar-ho mentre quedin temes lliures.
-- El tauler evita que l'última persona es quedi només amb el seu propi tema: si una tria ho provocaria, demana que se'n triï un altre.
+- **Tu no saps si algú t'ha triat, ni qui.** El servidor ni tan sols envia aquesta informació al teu mòbil.
+- Els altres només veuen «Ja està triada», mai qui l'ha triada. Cada persona només la pot triar algú.
+- **Cadascú tria una sola persona.** Qui tria veu «Regales a …» amb els 3 temes, i pot desfer-ho o canviar-ho mentre quedin persones lliures.
+- El tauler evita que l'última persona es quedi sense ningú a qui regalar: si una tria ho provocaria, demana que se'n triï una altra.
 
 ## Accés: un enllaç per persona
 
@@ -36,7 +36,7 @@ Tot funciona amb un full de Google Sheets i Apps Script, amb el teu compte de Go
 
 Tu tens accés al full, però pots jugar igual sense fer trampes sense voler:
 
-- Qui ha triat cada tema es desa a la pestanya **Tries**, que està **amagada**. No la mostris.
+- Qui ha triat cada persona es desa a la pestanya **Tries**, que està **amagada**. No la mostris.
 - Fins i tot allà, qui ha triat es desa xifrat (no hi surt cap nom), i els temes s'identifiquen amb un codi, no amb el text.
 
 ### Canvis més endavant
@@ -51,4 +51,4 @@ Tu tens accés al full, però pots jugar igual sense fer trampes sense voler:
 node tests/amic-invisible.mjs
 ```
 
-Executa el `Code.gs` real amb un Google Sheets simulat i obre la pàgina a Chromium amb tres persones: entrar amb l'enllaç o amb el codi, proposar i canviar el tema, triar, que el propietari no en sàpiga res, que no es pugui triar dues vegades, canviar i desfer la tria, i que l'última persona no es quedi amb el seu propi tema.
+Executa el `Code.gs` real amb un Google Sheets simulat i obre la pàgina a Chromium amb tres persones: entrar amb l'enllaç o amb el codi, escriure i canviar els 3 temes, triar, que la persona triada no en sàpiga res, que no es pugui triar dues vegades, canviar i desfer la tria, i que l'última persona no es quedi sense ningú a qui regalar.
