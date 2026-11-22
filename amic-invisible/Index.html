@@ -169,18 +169,15 @@ input:focus { border-color: var(--pine); outline: none; }
 
       <div id="paneMine" style="display:grid;gap:16px">
         <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Escriu 3 temes per al regal que t'agradaria rebre. Qui te'l faci els llegirà i hi pensarà el que cregui. No sabràs qui és fins al dia de l'intercanvi.</p>
+          Escriu 2 temes per al regal que t'agradaria rebre. Qui te'l faci els llegirà i hi pensarà el que cregui. No sabràs qui és fins al dia de l'intercanvi.</p>
         <div class="tags" id="mineView"></div>
         <form class="add" id="themeForm">
-          <h3 id="formTitle">Quins 3 temes proposes?</h3>
+          <h3 id="formTitle">Quins 2 temes proposes?</h3>
           <label for="t1">Tema 1
             <input id="t1" type="text" maxlength="120" required placeholder="P. ex. cuina">
           </label>
           <label for="t2">Tema 2
             <input id="t2" type="text" maxlength="120" required placeholder="P. ex. Japó">
-          </label>
-          <label for="t3">Tema 3
-            <input id="t3" type="text" maxlength="120" required placeholder="P. ex. alguna cosa petita">
           </label>
           <div class="actions">
             <button class="btn" type="submit" id="saveBtn">Desa els temes</button>
@@ -347,7 +344,7 @@ input:focus { border-color: var(--pine); outline: none; }
 
   function startEdit() {
     editing = true;
-    ['t1', 't2', 't3'].forEach((k, i) => { $(k).value = state.mine.themes[i] || ''; });
+    ['t1', 't2'].forEach((k, i) => { $(k).value = state.mine.themes[i] || ''; });
     $('formTitle').textContent = 'Canvia els teus temes';
     $('cancelEdit').hidden = false;
     render();
@@ -356,7 +353,7 @@ input:focus { border-color: var(--pine); outline: none; }
   function stopEdit() {
     editing = false;
     $('themeForm').reset();
-    $('formTitle').textContent = 'Quins 3 temes proposes?';
+    $('formTitle').textContent = 'Quins 2 temes proposes?';
     $('cancelEdit').hidden = true;
     if (state) render();
   }
@@ -364,8 +361,8 @@ input:focus { border-color: var(--pine); outline: none; }
 
   $('themeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const theme = ['t1', 't2', 't3'].map((k) => $(k).value);
-    if (theme.some((x) => !x.trim())) { toast('Escriu els 3 temes.'); return; }
+    const theme = ['t1', 't2'].map((k) => $(k).value);
+    if (theme.some((x) => !x.trim())) { toast('Escriu els 2 temes.'); return; }
     const wasNew = !state.mine;
     $('saveBtn').disabled = true;
     const s = await call('desa', theme);
