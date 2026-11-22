@@ -5,6 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Amic invisible</title>
+<link rel="apple-touch-icon" href="icona-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icona-192.png">
+<meta name="apple-mobile-web-app-title" content="Amic invisible">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
 <style>
@@ -208,6 +211,10 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
 .sheet .btn { width: 100%; padding-block: 13px; font-size: 16px; }
 @media (min-width: 600px) { .sheet-bg { align-items: center; } .sheet { border-radius: 22px; } }
 @media (prefers-reduced-motion: no-preference) { .sheet { animation: up .25s ease-out; } @keyframes up { from { transform: translateY(24px); } } }
+.home { border: 1px dashed var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45; }
+.home h3 { font-size: 16px; }
+.home p { margin: 0; }
+.home .ico { display: inline-block; vertical-align: -3px; width: 16px; height: 16px; }
 .help-link { margin: 22px auto 0; width: max-content; display: flex; align-items: center; gap: 8px; background: transparent; border: 0; color: var(--primary); font-weight: 600; font-size: 14.5px; padding: 8px 12px; border-radius: 999px; }
 .help-link svg { width: 38px; height: auto; }
 .help-link:hover { background: var(--primary-soft); }
@@ -402,6 +409,14 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     <ol class="steps" id="helpSteps"></ol>
     <div class="g-date" id="helpDate"></div>
     <p class="g-avis" id="helpAvis"></p>
+    <div class="home" id="helpHome">
+      <h3>Tingues-lo a mà</h3>
+      <p>Posa'l a la pantalla d'inici i l'obriràs com una app, amb el cargol, sense haver de buscar l'enllaç.</p>
+      <p id="homeIos"><b>iPhone:</b> obre'l amb el Safari, prem el botó de compartir
+        <svg class="ico" viewBox="0 0 16 16" aria-label="compartir"><path d="M8 1.5v8.5M5 4.5l3-3 3 3M4 7H3v7.5h10V7h-1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        i tria <b>«Afegeix a la pantalla d'inici»</b>. Si s'ha obert dins del WhatsApp, primer prem <b>«Obre al Safari»</b>.</p>
+      <p id="homeAndroid"><b>Android:</b> obre'l amb el Chrome, prem el menú <b>⋮</b> de dalt a la dreta i tria <b>«Afegeix a la pantalla d'inici»</b> (o <b>«Instal·la l'aplicació»</b>). Si s'ha obert dins del WhatsApp, primer prem <b>⋮ &gt; «Obre a Chrome»</b>.</p>
+    </div>
     <button class="btn" id="helpOk" type="button">Entesos, som-hi!</button>
   </div>
 </div>
@@ -588,6 +603,15 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     $('helpDate').hidden = !date;
     $('helpAvis').textContent = CFG.avis;
     $('helpAvis').hidden = !CFG.avis;
+    // A la pantalla d'inici: iPhone, Android o tots dos si no se sap; res si ja s'ha obert des de la icona.
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua);
+    let standalone = navigator.standalone === true;
+    try { standalone = standalone || matchMedia('(display-mode: standalone)').matches; } catch (e) {}
+    $('helpHome').hidden = standalone;
+    $('homeIos').hidden = android;
+    $('homeAndroid').hidden = ios;
     $('help').hidden = false;
     $('helpOk').focus();
   }

@@ -3,7 +3,7 @@ name: Publica les apps a GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'amic-invisible/Index.html', 'amic-invisible/app-id.txt', '.github/workflows/pages.yml']
+    paths: ['app/**', 'amic-invisible/Index.html', 'amic-invisible/app-id.txt', 'amic-invisible/icona-*.png', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -34,6 +34,7 @@ jobs:
           for dir in amic-invisible amic-invisible-bove-palau; do
             mkdir -p "_site/$dir"
             sed "s/__APP_ID__/$ID/" amic-invisible/Index.html > "_site/$dir/index.html"
+            cp amic-invisible/icona-*.png "_site/$dir/"
           done
       - uses: actions/upload-pages-artifact@v3
         with:

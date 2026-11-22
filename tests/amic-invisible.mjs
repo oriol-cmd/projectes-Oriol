@@ -151,6 +151,7 @@ ok((await anna.textContent('#mono')) === 'BP', 'surt el monograma BP de la famí
   ok(await first.locator('#help').isVisible(), 'el primer cop que algú entra, surt el full «Com funciona»');
   const helpText = await first.textContent('#help');
   ok((await first.locator('#help .snail').count()) === 1 && helpText.includes('Amic invisible Bové Palau') && helpText.includes('dilluns 7 de desembre a les 22:00') && helpText.includes('Escriu 2 temes'), 'amb el cargol, la família, la data límit i els passos');
+  ok(await first.locator('#homeIos').isVisible() && await first.locator('#homeAndroid').isVisible(), 'explica com posar-lo a la pantalla d\'inici (iPhone i Android, si no sap quin mòbil és)');
   await first.keyboard.press('Escape');
   await first.mouse.click(195, 30);
   ok(await first.locator('#help').isVisible(), 'el primer cop no es pot tancar tocant fora ni amb Esc: s\'ha d\'acceptar');
@@ -316,6 +317,31 @@ ok(sheets.Temes.data.length === 1 && sheets.Tries.data.length === 1, 'el tauler 
 ok(sheets.Participants.data.slice(1).map((r) => r[1]).join() === codesBefore, 'la família i els enllaços són els mateixos');
 ok(sheets['Configuració'].data.find((r) => r[0] === 'Data límit')[1] === '07/12/2027 22:00', 'amb la data límit nova: 07/12/2027 22:00');
 setCfg('Data límit', '07/12/2026 22:00'); setCfg('Estil', 'avet'); setCfg('Avís', 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.');
+
+{
+  for (const [ua, name, show, hide] of [
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', 'iPhone', '#homeIos', '#homeAndroid'],
+    ['Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36', 'Android', '#homeAndroid', '#homeIos'],
+  ]) {
+    const ctxUa = await browser.newContext({ userAgent: ua, viewport: { width: 390, height: 844 } });
+    const pg = await ctxUa.newPage();
+    await pg.exposeFunction('__gas', (fn, args) => { try { return { ok: ctx[fn](...args) }; } catch (e) { return { err: e.message }; } });
+    await pg.addInitScript(({ c }) => {
+      const runner = (succ, fail) => new Proxy({}, { get(_, k) {
+        if (k === 'withSuccessHandler') return (f) => runner(f, fail);
+        if (k === 'withFailureHandler') return (f) => runner(succ, f);
+        return (...args) => window.__gas(k, JSON.parse(JSON.stringify(args))).then((r) => (r.err ? fail && fail(new Error(r.err)) : succ && succ(r.ok)));
+      } });
+      window.google = { script: { run: runner(), url: { getLocation: (cb) => setTimeout(() => cb({ parameter: { codi: c } }), 0) } } };
+    }, { c: code.Anna });
+    await pg.route('https://amic.test/', (r) => r.fulfill({ contentType: 'text/html', body: html.replace('<?!= config ?>', JSON.stringify(gs('publicConfig_(config_())'))) }));
+    await pg.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
+    await pg.goto('https://amic.test/');
+    await pg.waitForSelector('#help:not([hidden])');
+    ok(await pg.locator(show).isVisible() && await pg.locator(hide).isHidden(), `en un ${name}, el full només explica com fer-ho a l'${name}`);
+    await ctxUa.close();
+  }
+}
 
 console.log('Des de GitHub Pages (sense comptes de Google)');
 async function openHosted(query, viewport = { width: 390, height: 844 }, path0 = 'https://pages.test/amic-invisible/', body = html) {
