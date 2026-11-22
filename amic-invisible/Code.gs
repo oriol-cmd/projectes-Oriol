@@ -1,9 +1,9 @@
 /**
- * Amic invisible: tauler de desitjos per a un grup.
+ * Amic invisible: tauler de temes de regal.
  *
- * Cada persona escriu què li agradaria rebre. Els altres veuen aquestes llistes i
- * poden marcar un desig («el regalo jo») sense que ningú sàpiga qui l'ha marcat.
- * Tu no veus mai si algú ha marcat res de la teva llista.
+ * Cada persona proposa un tema de regal (p. ex. «alguna cosa per a la cuina»).
+ * Els altres veuen el tema de cadascú i en trien un: serà la persona a qui regalen.
+ * Ningú sap qui ha triat el seu tema, i cada tema només el pot triar una persona.
  *
  * Com instal·lar-lo (un sol cop, uns 5 minuts):
  * 1. Crea un full de càlcul nou a Google Sheets (p. ex. «Amic invisible»).
@@ -19,8 +19,8 @@
  *
  * Si canvies els noms, torna a executar «prepara»: qui ja hi era conserva el seu codi.
  *
- * Si tu també hi participes: no obris la pestanya «Marques» (està amagada), que és on
- * es desa què s'ha marcat.
+ * Si tu també hi participes: no obris la pestanya «Tries» (està amagada), que és on
+ * es desa quins temes s'han triat.
  */
 
 const PARTICIPANTS = ['Anna', 'Bernat', 'Carla', 'David', 'Elena', 'Ferran', 'Gemma', 'Oriol'];
@@ -29,9 +29,8 @@ const PARTICIPANTS = ['Anna', 'Bernat', 'Carla', 'David', 'Elena', 'Ferran', 'Ge
 const AVIS = 'Pressupost: uns 20 €. Intercanvi el dissabte 20 de desembre.';
 
 const SHEET_PARTICIPANTS = 'Participants';
-const SHEET_WISHES = 'Desitjos';
-const SHEET_MARKS = 'Marques';
-const MAX_WISHES = 15;
+const SHEET_THEMES = 'Temes';
+const SHEET_PICKS = 'Tries';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sense 0/O ni 1/I, que es confonen
 
 // ---------- Pàgina ----------
@@ -47,9 +46,8 @@ function doGet() {
 function prepara() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ps = sheet_(ss, SHEET_PARTICIPANTS, ['Nom', 'Codi', 'Enllaç personal']);
-  sheet_(ss, SHEET_WISHES, ['id', 'Propietari', 'Desig', 'Enllaç', 'Preu aprox.', 'Creat']);
-  const ms = sheet_(ss, SHEET_MARKS, ['id del desig', 'Marcat per (codi xifrat)', 'Data']);
-  ms.hideSheet();
+  sheet_(ss, SHEET_THEMES, ['id', 'Nom', 'Tema', 'Pistes', 'Actualitzat']);
+  sheet_(ss, SHEET_PICKS, ['id del tema', 'Triat per (codi xifrat)', 'Data']).hideSheet();
 
   const names = PARTICIPANTS.map((n) => String(n).trim()).filter(Boolean);
   if (new Set(names.map((n) => n.toLowerCase())).size !== names.length) throw new Error('Hi ha noms repetits a PARTICIPANTS');
@@ -77,64 +75,60 @@ function prepara() {
 // ---------- Funcions que crida la pàgina ----------
 
 function entra(code) {
-  const me = who_(code);
-  return state_(me);
+  return state_(who_(code));
 }
 
-function afegeix(code, wish) {
+// Desa el tema de la persona (el crea o el canvia: cadascú en té un).
+function desa(code, theme) {
   return withLock_(() => {
     const me = who_(code);
-    const w = cleanWish_(wish);
-    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_WISHES);
-    const mine = rows_(sh).filter((r) => r[1] === me.name).length;
-    if (mine >= MAX_WISHES) return state_(me, 'Ja tens ' + MAX_WISHES + ' desitjos. Esborra\'n algun per afegir-ne un altre.');
-    sh.appendRow(['d' + Utilities.getUuid().slice(0, 8), me.name, w.text, w.link, w.price, new Date()]);
+    const t = cleanTheme_(theme);
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_THEMES);
+    const i = rows_(sh).findIndex((r) => r[1] === me.name);
+    if (i >= 0) sh.getRange(i + 2, 3, 1, 3).setValues([[t.text, t.hints, new Date()]]);
+    else sh.appendRow(['t' + Utilities.getUuid().slice(0, 8), me.name, t.text, t.hints, new Date()]);
     return state_(me);
   });
 }
 
-function edita(code, id, wish) {
-  return withLock_(() => {
-    const me = who_(code);
-    const w = cleanWish_(wish);
-    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_WISHES);
-    const i = rows_(sh).findIndex((r) => r[0] === id && r[1] === me.name);
-    if (i < 0) return state_(me, 'Aquest desig ja no existeix.');
-    sh.getRange(i + 2, 3, 1, 3).setValues([[w.text, w.link, w.price]]);
-    return state_(me);
-  });
-}
-
-function esborra(code, id) {
+// Tria el tema d'una altra persona. Si ja n'havies triat un altre, el canvia.
+function tria(code, id) {
   return withLock_(() => {
     const me = who_(code);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sh = ss.getSheetByName(SHEET_WISHES);
-    const i = rows_(sh).findIndex((r) => r[0] === id && r[1] === me.name);
-    if (i >= 0) sh.deleteRow(i + 2);
-    deleteMarks_(ss.getSheetByName(SHEET_MARKS), (r) => r[0] === id);
+    const themes = rows_(ss.getSheetByName(SHEET_THEMES)).filter((r) => r[0]);
+    const theme = themes.find((r) => r[0] === id);
+    if (!theme) return state_(me, 'Aquest tema ja no existeix.');
+    if (theme[1] === me.name) return state_(me, 'No pots triar el teu propi tema.');
+    const ps = ss.getSheetByName(SHEET_PICKS);
+    const picks = rows_(ps).filter((r) => r[0]);
+    const holder = picks.find((r) => r[0] === id);
+    if (holder && holder[1] === me.hash) return state_(me);
+    if (holder) return state_(me, 'Algú se t\'ha avançat: aquest tema ja està triat.');
+
+    // Que l'última persona no es quedi només amb el seu propi tema.
+    const names = participants_().map((p) => p.name);
+    const others = picks.filter((r) => r[1] !== me.hash);
+    const pickers = new Set(others.map((r) => r[1]));
+    const takenIds = new Set(others.map((r) => r[0]).concat([id]));
+    const withTheme = new Set(themes.map((r) => r[1]));
+    const left = participants_().filter((p) => p.name !== me.name && !pickers.has(p.hash)).map((p) => p.name);
+    const free = themes.filter((r) => !takenIds.has(r[0])).map((r) => r[1])
+      .concat(names.filter((n) => !withTheme.has(n)));
+    if (left.length === 1 && free.length === 1 && left[0] === free[0]) {
+      return state_(me, 'Tria\'n un altre: si no, l\'última persona es quedaria només amb el seu propi tema.');
+    }
+
+    deleteRows_(ps, (r) => r[1] === me.hash);
+    ps.appendRow([id, me.hash, new Date()]);
     return state_(me);
   });
 }
 
-function marca(code, id) {
+function desfes(code) {
   return withLock_(() => {
     const me = who_(code);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const wish = rows_(ss.getSheetByName(SHEET_WISHES)).find((r) => r[0] === id);
-    if (!wish) return state_(me, 'Aquest desig s\'ha esborrat.');
-    if (wish[1] === me.name) return state_(me, 'No pots marcar els teus propis desitjos.');
-    const ms = ss.getSheetByName(SHEET_MARKS);
-    if (rows_(ms).some((r) => r[0] === id)) return state_(me, 'Algú se t\'ha avançat: aquest desig ja està agafat.');
-    ms.appendRow([id, me.hash, new Date()]);
-    return state_(me);
-  });
-}
-
-function desmarca(code, id) {
-  return withLock_(() => {
-    const me = who_(code);
-    deleteMarks_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MARKS), (r) => r[0] === id && r[1] === me.hash);
+    deleteRows_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PICKS), (r) => r[1] === me.hash);
     return state_(me);
   });
 }
@@ -143,52 +137,61 @@ function desmarca(code, id) {
 
 function state_(me, error) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const wishes = rows_(ss.getSheetByName(SHEET_WISHES)).filter((r) => r[0]);
-  const marks = {};
-  rows_(ss.getSheetByName(SHEET_MARKS)).forEach((r) => { if (r[0]) marks[r[0]] = r[1]; });
-  const names = rows_(ss.getSheetByName(SHEET_PARTICIPANTS)).map((r) => String(r[0]).trim()).filter(Boolean);
-  const plain = (r) => ({ id: r[0], text: String(r[2]), link: String(r[3] || ''), price: String(r[4] || '') });
+  const themes = rows_(ss.getSheetByName(SHEET_THEMES)).filter((r) => r[0]);
+  const picks = {};
+  rows_(ss.getSheetByName(SHEET_PICKS)).forEach((r) => { if (r[0]) picks[r[0]] = r[1]; });
+  const names = participants_().map((p) => p.name);
+  const plain = (r) => (r ? { id: r[0], text: String(r[2]), hints: String(r[3] || '') } : null);
+  const byName = (n) => themes.find((r) => r[1] === n);
+
+  let myPick = null;
+  const others = names.filter((n) => n !== me.name).map((n) => {
+    const t = plain(byName(n));
+    if (t) {
+      t.status = !picks[t.id] ? 'free' : picks[t.id] === me.hash ? 'mine' : 'taken';
+      if (t.status === 'mine') myPick = { name: n, text: t.text };
+    }
+    return { name: n, theme: t };
+  });
 
   return {
     name: me.name,
     notice: AVIS,
     error: error || '',
-    // Els teus desitjos: sense cap informació de marques.
-    mine: wishes.filter((r) => r[1] === me.name).map(plain),
-    others: names.filter((n) => n !== me.name).map((n) => ({
-      name: n,
-      wishes: wishes.filter((r) => r[1] === n).map((r) => {
-        const w = plain(r);
-        w.status = !marks[r[0]] ? 'free' : marks[r[0]] === me.hash ? 'mine' : 'taken';
-        return w;
-      }),
-    })),
+    mine: plain(byName(me.name)), // sense cap informació de si l'han triat
+    myPick: myPick,
+    others: others,
   };
+}
+
+function participants_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PARTICIPANTS);
+  return rows_(sh).filter((r) => r[0] && r[1]).map((r) => {
+    const code = String(r[1]).toUpperCase();
+    return { name: String(r[0]).trim(), code: code, hash: hash_(code) };
+  });
 }
 
 function who_(code) {
   const c = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PARTICIPANTS);
-  const row = c && sh ? rows_(sh).find((r) => String(r[1]).toUpperCase() === c && r[0]) : null;
-  if (!row) throw new Error('codi-incorrecte');
-  return { name: String(row[0]).trim(), hash: hash_(c) };
+  const p = c ? participants_().find((x) => x.code === c) : null;
+  if (!p) throw new Error('codi-incorrecte');
+  return p;
 }
 
-function cleanWish_(w) {
-  w = w || {};
-  const text = String(w.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-  if (!text) throw new Error('Escriu què t\'agradaria.');
-  let link = String(w.link || '').trim().slice(0, 500);
-  if (link && !/^https?:\/\//i.test(link)) link = /^[\w-]+(\.[\w-]+)+/.test(link) ? 'https://' + link : '';
-  const price = String(w.price || '').trim().slice(0, 30);
+function cleanTheme_(t) {
+  t = t || {};
+  const text = String(t.text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (!text) throw new Error('Escriu el teu tema de regal.');
+  const hints = String(t.hints || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   // Evita que Sheets ho interpreti com una fórmula.
   const safe = (s) => (/^[=+\-@]/.test(s) ? "'" + s : s);
-  return { text: safe(text), link: link, price: safe(price) };
+  return { text: safe(text), hints: safe(hints) };
 }
 
-function deleteMarks_(ms, test) {
-  const rows = rows_(ms);
-  for (let i = rows.length - 1; i >= 0; i--) if (test(rows[i])) ms.deleteRow(i + 2);
+function deleteRows_(sh, test) {
+  const rows = rows_(sh);
+  for (let i = rows.length - 1; i >= 0; i--) if (test(rows[i])) sh.deleteRow(i + 2);
 }
 
 function rows_(sh) {

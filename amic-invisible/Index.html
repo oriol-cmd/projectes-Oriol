@@ -73,7 +73,6 @@ main { padding-block: 20px 60px; display: grid; gap: 20px; }
 /* Formulari */
 form.add { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
 form.add h3 { font-size: 17px; }
-.row { display: grid; grid-template-columns: 1fr 140px; gap: 10px; }
 label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); min-width: 0; }
 input[type="text"], input[type="url"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); }
 input:focus { border-color: var(--pine); outline: none; }
@@ -90,6 +89,17 @@ input:focus { border-color: var(--pine); outline: none; }
 .tag .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); align-items: center; }
 .tag .meta a { color: var(--pine); overflow-wrap: anywhere; }
 .tag .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.tag .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tag .hints { font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
+.tag.is-empty { border-style: dashed; background: transparent; }
+.tag.is-empty .text { color: var(--muted); font-weight: 500; }
+.tag.is-mine .who { color: var(--berry); }
+.pick { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 4px; }
+.pick .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--berry); }
+.pick-name { font: 700 22px/1.2 var(--font-display); }
+.pick-theme { color: var(--muted); overflow-wrap: anywhere; }
+.pick .hint { margin-top: 2px; }
+.pick.chosen { border-color: var(--berry); background: var(--berry-soft); }
 .tag.is-mine { border-color: var(--berry); background: var(--berry-soft); }
 .tag.is-mine::before { border-color: var(--berry); }
 .tag.is-taken .text { color: var(--taken); text-decoration: line-through; text-decoration-thickness: 1px; }
@@ -102,16 +112,11 @@ input:focus { border-color: var(--pine); outline: none; }
 .small.mark { border-color: var(--pine); color: var(--pine); }
 .small.danger { border-color: var(--berry); color: var(--berry); }
 
-.person { display: grid; gap: 10px; }
-.person h2 { font-size: 19px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-.person h2 span { font: 500 13px var(--font-body); color: var(--muted); }
-.empty { color: var(--muted); font-size: 14px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 14px; margin: 0; }
 
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.2); z-index: 5; }
 .loading { color: var(--muted); text-align: center; padding: 40px 0; }
 
 @media (max-width: 520px) {
-  .row { grid-template-columns: 1fr; }
   .brand h1 { font-size: 20px; }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -130,7 +135,7 @@ input:focus { border-color: var(--pine); outline: none; }
         <path d="M17 9v22" stroke="currentColor" stroke-width="2"/>
         <path d="M17 9c-2-5-8-6-8-2s6 2 8 2c2 0 8 2 8-2s-6-3-8 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
       </svg>
-      <div><h1>Amic invisible</h1><small id="hello">Llistes de desitjos</small></div>
+      <div><h1>Amic invisible</h1><small id="hello">Temes de regal</small></div>
     </div>
     <button class="ghost" id="logout" type="button" hidden>No sóc jo</button>
   </div>
@@ -152,38 +157,32 @@ input:focus { border-color: var(--pine); outline: none; }
   <section id="app" hidden>
     <div style="display:grid;gap:20px">
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" id="tabMine" aria-selected="true">La meva llista</button>
-        <button type="button" role="tab" id="tabOthers" aria-selected="false">Els altres</button>
+        <button type="button" role="tab" id="tabMine" aria-selected="true">El meu tema</button>
+        <button type="button" role="tab" id="tabOthers" aria-selected="false">A qui regalo</button>
       </div>
 
       <div id="paneMine" style="display:grid;gap:16px">
         <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Els altres veuen aquesta llista i en poden triar alguna cosa. Tu no sabràs mai si n'han marcat res, ni qui.</p>
-        <form class="add" id="wishForm">
-          <h3 id="formTitle">Què t'agradaria?</h3>
-          <label for="wText">Desig
-            <input id="wText" type="text" maxlength="200" required placeholder="P. ex. un llibre de cuina japonesa">
+          Proposa un tema per al regal que t'agradaria rebre. Algú el triarà, però tu no sabràs qui fins al dia de l'intercanvi.</p>
+        <div class="tags" id="mineView"></div>
+        <form class="add" id="themeForm">
+          <h3 id="formTitle">Quin tema proposes?</h3>
+          <label for="tText">Tema
+            <input id="tText" type="text" maxlength="120" required placeholder="P. ex. alguna cosa per a la cuina">
           </label>
-          <div class="row">
-            <label for="wLink">Enllaç (opcional)
-              <input id="wLink" type="url" inputmode="url" maxlength="500" placeholder="https://…">
-            </label>
-            <label for="wPrice">Preu aprox. (opcional)
-              <input id="wPrice" type="text" maxlength="30" placeholder="15 €">
-            </label>
-          </div>
+          <label for="tHints">Pistes (opcional)
+            <input id="tHints" type="text" maxlength="300" placeholder="P. ex. m'agrada el menjar japonès, no tinc wok">
+          </label>
           <div class="actions">
-            <button class="btn" type="submit" id="saveBtn">Afegeix a la llista</button>
+            <button class="btn" type="submit" id="saveBtn">Desa el tema</button>
             <button class="btn secondary" type="button" id="cancelEdit" hidden>Cancel·la</button>
           </div>
         </form>
-        <div class="tags" id="mineList"></div>
       </div>
 
-      <div id="paneOthers" style="display:grid;gap:26px" hidden>
-        <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Marca el que regalaràs. Els altres veuran que ja està agafat, però ningú sabrà que has estat tu.</p>
-        <div id="othersList" style="display:grid;gap:26px"></div>
+      <div id="paneOthers" style="display:grid;gap:16px" hidden>
+        <div class="pick" id="pickBox"></div>
+        <div class="tags" id="othersList"></div>
       </div>
     </div>
   </section>
@@ -197,8 +196,7 @@ input:focus { border-color: var(--pine); outline: none; }
   const KEY = 'amic-invisible-codi';
   let code = '';
   let state = null;
-  let editing = null;   // id del desig que s'està editant
-  let confirmDel = null; // id del desig pendent de confirmar
+  let editing = false;
   let busy = false;
 
   const store = {
@@ -217,7 +215,7 @@ input:focus { border-color: var(--pine); outline: none; }
     const t = $('toast');
     t.textContent = msg; t.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.hidden = true; }, 3800);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 4200);
   }
 
   function show(view) {
@@ -246,12 +244,14 @@ input:focus { border-color: var(--pine); outline: none; }
   }
 
   function apply(s) {
+    const first = !state;
     state = s;
     if (s.error) toast(s.error);
     $('hello').textContent = 'Hola, ' + s.name;
     $('noticeText').textContent = s.notice || '';
     $('notice').hidden = !s.notice;
     show('app');
+    if (first && s.mine) tab('others'); // si ja has posat el teu tema, el que toca és triar
     render();
   }
 
@@ -264,114 +264,100 @@ input:focus { border-color: var(--pine); outline: none; }
     return e;
   }
 
-  function meta(w) {
-    const m = el('div', 'meta');
-    if (w.price) m.appendChild(el('span', null, w.price));
-    if (/^https?:\/\//i.test(w.link)) {
-      const a = el('a', null, 'Veure l\'enllaç');
-      a.href = w.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      m.appendChild(a);
-    }
-    return m;
-  }
-
   function render() {
-    // La meva llista
-    const mine = $('mineList');
-    mine.replaceChildren();
-    if (!state.mine.length) {
-      mine.appendChild(el('p', 'empty', 'Encara no has afegit res. Escriu el primer desig aquí dalt.'));
-    }
-    state.mine.forEach((w) => {
+    // El meu tema
+    const mv = $('mineView');
+    mv.replaceChildren();
+    const form = $('themeForm');
+    if (state.mine && !editing) {
       const t = el('article', 'tag');
-      t.appendChild(el('div', 'text', w.text));
-      if (w.price || w.link) t.appendChild(meta(w));
+      t.appendChild(el('div', 'who', 'El teu tema'));
+      t.appendChild(el('div', 'text', state.mine.text));
+      if (state.mine.hints) t.appendChild(el('div', 'hints', state.mine.hints));
       const bar = el('div', 'bar');
-      const left = el('div', 'actions');
-      const ed = el('button', 'small', 'Edita'); ed.type = 'button';
-      ed.onclick = () => startEdit(w);
-      const del = el('button', 'small danger', confirmDel === w.id ? 'Segur? Esborra' : 'Esborra'); del.type = 'button';
-      del.onclick = () => {
-        if (confirmDel !== w.id) { confirmDel = w.id; render(); return; }
-        confirmDel = null;
-        if (editing === w.id) stopEdit();
-        call('esborra', w.id).then((s) => s && toast('Desig esborrat.'));
-      };
-      left.append(ed, del);
-      bar.appendChild(left);
+      const ed = el('button', 'small', 'Canvia-ho'); ed.type = 'button';
+      ed.onclick = startEdit;
+      bar.appendChild(ed);
       t.appendChild(bar);
-      mine.appendChild(t);
-    });
+      mv.appendChild(t);
+      form.hidden = true;
+    } else {
+      form.hidden = false;
+    }
 
-    // Els altres
-    const others = $('othersList');
-    others.replaceChildren();
+    // A qui regalo
+    const pb = $('pickBox');
+    pb.replaceChildren();
+    if (state.myPick) {
+      pb.className = 'pick chosen';
+      pb.appendChild(el('div', 'who', 'Regales a'));
+      pb.appendChild(el('div', 'pick-name', state.myPick.name));
+      pb.appendChild(el('div', 'pick-theme', 'Tema: ' + state.myPick.text));
+    } else {
+      pb.className = 'pick';
+      pb.appendChild(el('div', 'pick-name', 'Tria a qui regales'));
+      pb.appendChild(el('p', 'hint', 'Tria el tema d\'una persona. Els altres veuran que ja està triat, però ningú sabrà que has estat tu.'));
+    }
+
+    const list = $('othersList');
+    list.replaceChildren();
     state.others.forEach((p) => {
-      const sec = el('section', 'person');
-      const h = el('h2', null, p.name);
-      const free = p.wishes.filter((w) => w.status === 'free').length;
-      if (p.wishes.length) {
-        const n = p.wishes.length + (p.wishes.length === 1 ? ' desig' : ' desitjos');
-        h.appendChild(el('span', null, n + ' · ' + (free === 0 ? (p.wishes.length === 1 ? 'agafat' : 'tots agafats') : free + (free === 1 ? ' lliure' : ' lliures'))));
+      const th = p.theme;
+      if (!th) {
+        const t = el('article', 'tag is-empty');
+        t.appendChild(el('div', 'who', p.name));
+        t.appendChild(el('div', 'text', 'Encara no ha posat el tema'));
+        list.appendChild(t);
+        return;
       }
-      sec.appendChild(h);
-      if (!p.wishes.length) {
-        sec.appendChild(el('p', 'empty', p.name + ' encara no ha posat cap desig. Torna-hi més tard.'));
-      } else {
-        const grid = el('div', 'tags');
-        p.wishes.forEach((w) => {
-          const t = el('article', 'tag' + (w.status === 'mine' ? ' is-mine' : w.status === 'taken' ? ' is-taken' : ''));
-          t.appendChild(el('div', 'text', w.text));
-          if (w.price || w.link) t.appendChild(meta(w));
-          const bar = el('div', 'bar');
-          const chip = el('span', 'chip ' + w.status, w.status === 'free' ? 'Lliure' : w.status === 'mine' ? 'El regales tu' : 'Ja està agafat');
-          bar.appendChild(chip);
-          if (w.status === 'free') {
-            const b = el('button', 'small mark', 'El regalo jo'); b.type = 'button';
-            b.onclick = () => call('marca', w.id).then((s) => s && !s.error && toast('Marcat. Ningú sabrà que has estat tu.'));
-            bar.appendChild(b);
-          } else if (w.status === 'mine') {
-            const b = el('button', 'small', 'Desmarca'); b.type = 'button';
-            b.onclick = () => call('desmarca', w.id).then((s) => s && toast('Desmarcat. Torna a estar lliure.'));
-            bar.appendChild(b);
-          }
-          t.appendChild(bar);
-          grid.appendChild(t);
-        });
-        sec.appendChild(grid);
+      const t = el('article', 'tag' + (th.status === 'mine' ? ' is-mine' : th.status === 'taken' ? ' is-taken' : ''));
+      t.appendChild(el('div', 'who', p.name));
+      t.appendChild(el('div', 'text', th.text));
+      if (th.hints) t.appendChild(el('div', 'hints', th.hints));
+      const bar = el('div', 'bar');
+      bar.appendChild(el('span', 'chip ' + th.status, th.status === 'free' ? 'Lliure' : th.status === 'mine' ? 'El regales tu' : 'Ja està triat'));
+      if (th.status === 'free') {
+        const b = el('button', 'small mark', state.myPick ? 'Canvia a aquest' : 'El trio'); b.type = 'button';
+        b.onclick = () => call('tria', th.id).then((s) => s && !s.error && toast('Regales a ' + p.name + '. Ningú sabrà que has estat tu.'));
+        bar.appendChild(b);
+      } else if (th.status === 'mine') {
+        const b = el('button', 'small', 'Desfés'); b.type = 'button';
+        b.onclick = () => call('desfes').then((s) => s && toast('Desfet. El tema torna a estar lliure.'));
+        bar.appendChild(b);
       }
-      others.appendChild(sec);
+      t.appendChild(bar);
+      list.appendChild(t);
     });
   }
 
   // ---------- Formulari ----------
 
-  function startEdit(w) {
-    editing = w.id;
-    $('wText').value = w.text; $('wLink').value = w.link; $('wPrice').value = w.price;
-    $('formTitle').textContent = 'Edita el desig';
-    $('saveBtn').textContent = 'Desa els canvis';
+  function startEdit() {
+    editing = true;
+    $('tText').value = state.mine.text; $('tHints').value = state.mine.hints;
+    $('formTitle').textContent = 'Canvia el teu tema';
     $('cancelEdit').hidden = false;
-    $('wishForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    $('wText').focus();
+    render();
+    $('tText').focus();
   }
   function stopEdit() {
-    editing = null;
-    $('wishForm').reset();
-    $('formTitle').textContent = 'Què t\'agradaria?';
-    $('saveBtn').textContent = 'Afegeix a la llista';
+    editing = false;
+    $('themeForm').reset();
+    $('formTitle').textContent = 'Quin tema proposes?';
     $('cancelEdit').hidden = true;
+    if (state) render();
   }
   $('cancelEdit').onclick = stopEdit;
 
-  $('wishForm').addEventListener('submit', async (e) => {
+  $('themeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const wish = { text: $('wText').value, link: $('wLink').value, price: $('wPrice').value };
-    if (!wish.text.trim()) return;
+    const theme = { text: $('tText').value, hints: $('tHints').value };
+    if (!theme.text.trim()) return;
+    const wasNew = !state.mine;
     $('saveBtn').disabled = true;
-    const s = editing ? await call('edita', editing, wish) : await call('afegeix', wish);
+    const s = await call('desa', theme);
     $('saveBtn').disabled = false;
-    if (s && !s.error) { toast(editing ? 'Canvis desats.' : 'Afegit a la teva llista.'); stopEdit(); }
+    if (s && !s.error) { toast(wasNew ? 'Tema desat. Ara tria a qui regales.' : 'Tema canviat.'); stopEdit(); }
   });
 
   // ---------- Pestanyes ----------
@@ -397,22 +383,19 @@ input:focus { border-color: var(--pine); outline: none; }
   }
 
   $('login').addEventListener('submit', (e) => { e.preventDefault(); login($('code').value); });
-  $('logout').onclick = () => { store.set(''); code = ''; state = null; stopEdit(); $('code').value = ''; show('login'); };
+  $('logout').onclick = () => { store.set(''); code = ''; state = null; editing = false; $('themeForm').reset(); $('code').value = ''; tab('mine'); show('login'); };
 
   function refresh() { if (code && state && !busy && !editing) call('entra'); }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 60000);
 
   // Codi de l'enllaç personal (?codi=XXXXXX) o el que es va desar l'última vegada.
-  const start = () => {
-    try {
-      google.script.url.getLocation((loc) => {
-        const fromLink = loc && loc.parameter && loc.parameter.codi;
-        login(fromLink || store.get());
-      });
-    } catch (e) { login(store.get()); }
-  };
-  start();
+  try {
+    google.script.url.getLocation((loc) => {
+      const fromLink = loc && loc.parameter && loc.parameter.codi;
+      login(fromLink || store.get());
+    });
+  } catch (e) { login(store.get()); }
 })();
 </script>
 </body>

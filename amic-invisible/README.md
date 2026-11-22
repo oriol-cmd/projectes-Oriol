@@ -1,11 +1,11 @@
-# Amic invisible: tauler de desitjos
+# Amic invisible: tauler de temes de regal
 
-Un tauler perquè cada persona del grup escrigui què li agradaria rebre. Els altres veuen aquestes llistes i poden marcar un desig («El regalo jo») **sense que ningú sàpiga qui l'ha marcat**.
+Un tauler on cada persona del grup proposa **un tema de regal** (p. ex. «alguna cosa per a la cuina», amb pistes opcionals com «m'agrada el menjar japonès»). Els altres veuen el tema de cadascú i en trien un: **serà la persona a qui regalen**. Ningú sap qui ha triat el seu tema.
 
-- **Tu no veus mai si algú ha marcat res de la teva llista.** El servidor ni tan sols envia aquesta informació al teu mòbil.
-- Els altres només veuen «Ja està agafat», mai qui l'ha agafat. Així no es regala dues vegades el mateix.
-- Qui l'ha marcat veu «El regales tu» i el pot desmarcar.
-- Cada desig pot tenir un enllaç i un preu aproximat. Es poden editar i esborrar.
+- **Tu no saps si algú ha triat el teu tema, ni qui.** El servidor ni tan sols envia aquesta informació al teu mòbil.
+- Els altres només veuen «Ja està triat», mai qui l'ha triat. Cada tema només el pot triar una persona.
+- **Cadascú tria una sola persona.** Qui tria veu «Regales a …» i pot desfer-ho o canviar-ho mentre quedin temes lliures.
+- El tauler evita que l'última persona es quedi només amb el seu propi tema: si una tria ho provocaria, demana que se'n triï un altre.
 
 ## Accés: un enllaç per persona
 
@@ -13,7 +13,7 @@ No cal crear cap compte ni instal·lar res. Cada persona rep **el seu enllaç pe
 
 L'enllaç porta un codi de 6 lletres (`…/exec?codi=K7MPQ2`). Si algú el perd, pot obrir l'enllaç general i escriure-hi el codi.
 
-> Cadascú ha de rebre només el seu enllaç: qui tingui l'enllaç d'una altra persona podria veure què li han marcat.
+> Cadascú ha de rebre només el seu enllaç: qui tingui l'enllaç d'una altra persona podria veure a qui regala.
 
 ## Cost: 0 €
 
@@ -36,8 +36,8 @@ Tot funciona amb un full de Google Sheets i Apps Script, amb el teu compte de Go
 
 Tu tens accés al full, però pots jugar igual sense fer trampes sense voler:
 
-- Què ha marcat cadascú es desa a la pestanya **Marques**, que està **amagada**. No la mostris.
-- Fins i tot allà, qui ha marcat es desa xifrat (no hi surt cap nom), i els desitjos s'identifiquen amb un codi, no amb el text.
+- Qui ha triat cada tema es desa a la pestanya **Tries**, que està **amagada**. No la mostris.
+- Fins i tot allà, qui ha triat es desa xifrat (no hi surt cap nom), i els temes s'identifiquen amb un codi, no amb el text.
 
 ### Canvis més endavant
 
@@ -51,4 +51,4 @@ Tu tens accés al full, però pots jugar igual sense fer trampes sense voler:
 node tests/amic-invisible.mjs
 ```
 
-Executa el `Code.gs` real amb un Google Sheets simulat i obre la pàgina a Chromium amb tres persones: entrar amb l'enllaç o amb el codi, afegir, marcar, que el propietari no en vegi res, que no es pugui marcar dues vegades, desmarcar, editar i esborrar.
+Executa el `Code.gs` real amb un Google Sheets simulat i obre la pàgina a Chromium amb tres persones: entrar amb l'enllaç o amb el codi, proposar i canviar el tema, triar, que el propietari no en sàpiga res, que no es pugui triar dues vegades, canviar i desfer la tria, i que l'última persona no es quedi amb el seu propi tema.
