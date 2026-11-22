@@ -8,29 +8,50 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
 <style>
-/* Disseny: etiquetes de regal (amb el foradet del cordill) sobre paper de pi fosc; vermell nabiu per al que és teu. */
+/* Disseny: etiquetes de regal (amb el foradet del cordill). Quatre estils de color, triats a la pestanya Configuració. */
 :root {
-  --bg: #eef2ef;
-  --paper: #ffffff;
-  --ink: #17231f;
-  --muted: #5b6b65;
-  --line: #d5ddd9;
-  --pine: #1f5a4a;
-  --pine-soft: #e1ece7;
-  --berry: #b3263e;
-  --berry-soft: #f8e3e7;
-  --taken: #8a958f;
-  --head: #173f35;
-  --head-ink: #f3f7f5;
+  --bg: #eef2ef; --paper: #ffffff; --ink: #17231f; --muted: #5b6b65; --line: #d5ddd9;
+  --primary: #1f5a4a; --primary-soft: #e1ece7; --accent: #b3263e; --accent-soft: #f8e3e7;
+  --taken: #8a958f; --head: #173f35; --head-ink: #f3f7f5;
   --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
+:root[data-estil="nit"] {
+  --bg: #eef0f6; --paper: #ffffff; --ink: #161b2e; --muted: #5a6178; --line: #d6dae6;
+  --primary: #24408e; --primary-soft: #e3e8f6; --accent: #a5660a; --accent-soft: #f8ecd6;
+  --taken: #8a90a2; --head: #18213f; --head-ink: #f3f4fa;
+}
+:root[data-estil="gerd"] {
+  --bg: #f5eff1; --paper: #ffffff; --ink: #2a1520; --muted: #6e5862; --line: #e5d6dc;
+  --primary: #8a2456; --primary-soft: #f5e2eb; --accent: #c2410c; --accent-soft: #fde8dc;
+  --taken: #9a8a91; --head: #4a1330; --head-ink: #fbf1f5;
+}
+:root[data-estil="neu"] {
+  --bg: #f1f4f7; --paper: #ffffff; --ink: #1a222b; --muted: #5b6774; --line: #d8dfe6;
+  --primary: #2c6488; --primary-soft: #e1edf5; --accent: #c0392b; --accent-soft: #f9e2df;
+  --taken: #8b96a1; --head: #2e3d4c; --head-ink: #f4f7fa;
+}
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #101816; --paper: #18231f; --ink: #e6eeea; --muted: #9aaba4; --line: #2b3a35;
-    --pine: #6cc2a5; --pine-soft: #1c3029; --berry: #f0758a; --berry-soft: #3a1f26; --taken: #6f7d77;
-    --head: #0b1311; --head-ink: #e6eeea; color-scheme: dark;
+    --primary: #6cc2a5; --primary-soft: #1c3029; --accent: #f0758a; --accent-soft: #3a1f26;
+    --taken: #6f7d77; --head: #0b1311; --head-ink: #e6eeea; color-scheme: dark;
+  }
+  :root[data-estil="nit"] {
+    --bg: #0e1120; --paper: #171b2e; --ink: #e7e9f3; --muted: #9ca2bb; --line: #2a3048;
+    --primary: #93aef5; --primary-soft: #1c2440; --accent: #f1c26b; --accent-soft: #3a2f17;
+    --taken: #6f7590; --head: #0a0d1a; --head-ink: #e7e9f3;
+  }
+  :root[data-estil="gerd"] {
+    --bg: #170e12; --paper: #22151b; --ink: #f2e6eb; --muted: #b49ca7; --line: #3d2630;
+    --primary: #f08cbb; --primary-soft: #3a1a2a; --accent: #fb9a63; --accent-soft: #3d2216;
+    --taken: #7d6871; --head: #12080d; --head-ink: #f2e6eb;
+  }
+  :root[data-estil="neu"] {
+    --bg: #0f1419; --paper: #182029; --ink: #e6ecf1; --muted: #9eabb8; --line: #2b3743;
+    --primary: #85c1e6; --primary-soft: #1b2b38; --accent: #f2857a; --accent-soft: #3b1f1d;
+    --taken: #6d7a87; --head: #0a0e12; --head-ink: #e6ecf1;
   }
 }
 * { box-sizing: border-box; }
@@ -39,7 +60,7 @@ body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body)
 h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--pine); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 [hidden] { display: none !important; }
 
 .wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
@@ -49,10 +70,11 @@ header.top .wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wra
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .brand svg { flex: none; }
 .brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.mono { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font: 700 15px/1 var(--font-display); letter-spacing: 0.02em; }
 .brand small { display: block; font: 500 13px var(--font-body); opacity: 0.75; }
 .ghost { background: transparent; border: 1px solid color-mix(in srgb, var(--head-ink) 35%, transparent); color: var(--head-ink); border-radius: 999px; padding: 6px 14px; font-size: 13px; }
 
-.notice { background: var(--pine-soft); color: var(--ink); border-bottom: 1px solid var(--line); padding-block: 10px; font-size: 14px; }
+.notice { background: var(--primary-soft); color: var(--ink); border-bottom: 1px solid var(--line); padding-block: 10px; font-size: 14px; }
 
 main { padding-block: 20px 60px; display: grid; gap: 20px; }
 
@@ -75,9 +97,9 @@ form.add { background: var(--paper); border: 1px solid var(--line); border-radiu
 form.add h3 { font-size: 17px; }
 label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); min-width: 0; }
 input[type="text"], input[type="url"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); }
-input:focus { border-color: var(--pine); outline: none; }
+input:focus { border-color: var(--primary); outline: none; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn { border: 0; border-radius: 9px; padding: 10px 16px; font-weight: 600; background: var(--pine); color: var(--paper); }
+.btn { border: 0; border-radius: 9px; padding: 10px 16px; font-weight: 600; background: var(--primary); color: var(--paper); }
 .btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 .btn:disabled { opacity: 0.55; cursor: default; }
 
@@ -86,37 +108,33 @@ input:focus { border-color: var(--pine); outline: none; }
 .tag { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 6px 14px 14px 6px; padding: 14px 14px 14px 34px; display: grid; gap: 8px; min-width: 0; }
 .tag::before { content: ""; position: absolute; left: 12px; top: 18px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 1.5px solid var(--line); }
 .tag .text { font-weight: 600; overflow-wrap: anywhere; }
-.tag .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); align-items: center; }
-.tag .meta a { color: var(--pine); overflow-wrap: anywhere; }
 .tag .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 .tag .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .themes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .themes li { font-weight: 600; overflow-wrap: anywhere; padding-left: 14px; position: relative; }
-.themes li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; border-radius: 50%; background: var(--pine); }
-.tag.is-mine .themes li::before, .pick .themes li::before { background: var(--berry); }
+.themes li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+.tag.is-mine .themes li::before, .pick .themes li::before { background: var(--accent); }
 .tag.is-taken .themes li { color: var(--taken); text-decoration: line-through; text-decoration-thickness: 1px; }
 .tag.is-taken .themes li::before { background: var(--line); }
 .pick .themes li { font-weight: 500; }
 .tag.is-empty { border-style: dashed; background: transparent; }
 .tag.is-empty .text { color: var(--muted); font-weight: 500; }
-.tag.is-mine .who { color: var(--berry); }
+.tag.is-mine .who { color: var(--accent); }
 .pick { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 4px; }
-.pick .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--berry); }
+.pick .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
 .pick-name { font: 700 22px/1.2 var(--font-display); }
 .pick .themes { margin-top: 6px; }
 .pick .hint { margin-top: 2px; }
-.pick.chosen { border-color: var(--berry); background: var(--berry-soft); }
-.tag.is-mine { border-color: var(--berry); background: var(--berry-soft); }
-.tag.is-mine::before { border-color: var(--berry); }
-.tag.is-taken .text { color: var(--taken); text-decoration: line-through; text-decoration-thickness: 1px; }
+.pick.chosen { border-color: var(--accent); background: var(--accent-soft); }
+.tag.is-mine { border-color: var(--accent); background: var(--accent-soft); }
+.tag.is-mine::before { border-color: var(--accent); }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 3px 10px; letter-spacing: 0.01em; }
-.chip.free { color: var(--pine); background: var(--pine-soft); }
-.chip.mine { color: var(--paper); background: var(--berry); }
+.chip.free { color: var(--primary); background: var(--primary-soft); }
+.chip.mine { color: var(--paper); background: var(--accent); }
 .chip.taken { color: var(--taken); border: 1px solid var(--line); }
 .small { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 5px 11px; font-size: 13px; font-weight: 600; }
-.small.mark { border-color: var(--pine); color: var(--pine); }
-.small.danger { border-color: var(--berry); color: var(--berry); }
+.small.mark { border-color: var(--primary); color: var(--primary); }
 
 
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.2); z-index: 5; }
@@ -129,19 +147,24 @@ input:focus { border-color: var(--pine); outline: none; }
   .tag { transition: border-color .15s, background-color .15s; }
 }
 </style>
+<script>window.CONFIG = <?!= config ?>;</script>
+<script>
+  try { document.documentElement.setAttribute('data-estil', (window.CONFIG && window.CONFIG.estil) || 'avet'); } catch (e) {}
+</script>
 </head>
 <body>
 
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+      <span class="mono" id="mono" aria-hidden="true"></span>
+      <svg id="giftIcon" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true" hidden>
         <rect x="4" y="13" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
         <rect x="2" y="9" width="30" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
         <path d="M17 9v22" stroke="currentColor" stroke-width="2"/>
         <path d="M17 9c-2-5-8-6-8-2s6 2 8 2c2 0 8 2 8-2s-6-3-8 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
       </svg>
-      <div><h1>Amic invisible</h1><small id="hello">Temes de regal</small></div>
+      <div><h1 id="title">Amic invisible</h1><small id="hello"></small></div>
     </div>
     <button class="ghost" id="logout" type="button" hidden>No sóc jo</button>
   </div>
@@ -163,24 +186,19 @@ input:focus { border-color: var(--pine); outline: none; }
   <section id="app" hidden>
     <div style="display:grid;gap:20px">
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" id="tabMine" aria-selected="true">Els meus temes</button>
+        <button type="button" role="tab" id="tabMine" aria-selected="true"></button>
         <button type="button" role="tab" id="tabOthers" aria-selected="false">A qui regalo</button>
       </div>
 
       <div id="paneMine" style="display:grid;gap:16px">
         <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Escriu 2 temes per al regal que t'agradaria rebre. Qui te'l faci els llegirà i hi pensarà el que cregui. No sabràs qui és fins al dia de l'intercanvi.</p>
+          <span id="mineHint"></span></p>
         <div class="tags" id="mineView"></div>
         <form class="add" id="themeForm">
-          <h3 id="formTitle">Quins 2 temes proposes?</h3>
-          <label for="t1">Tema 1
-            <input id="t1" type="text" maxlength="120" required placeholder="P. ex. cuina">
-          </label>
-          <label for="t2">Tema 2
-            <input id="t2" type="text" maxlength="120" required placeholder="P. ex. Japó">
-          </label>
+          <h3 id="formTitle"></h3>
+          <div id="fields" style="display:grid;gap:10px"></div>
           <div class="actions">
-            <button class="btn" type="submit" id="saveBtn">Desa els temes</button>
+            <button class="btn" type="submit" id="saveBtn">Desa</button>
             <button class="btn secondary" type="button" id="cancelEdit" hidden>Cancel·la</button>
           </div>
         </form>
@@ -204,6 +222,50 @@ input:focus { border-color: var(--pine); outline: none; }
   let state = null;
   let editing = false;
   let busy = false;
+
+  // ---------- Personalització (pestanya Configuració del full) ----------
+  const CFG = Object.assign({ titol: 'Amic invisible', familia: '', avis: '', numTemes: 2, estil: 'avet', exemples: [] }, window.CONFIG || {});
+  const N = CFG.numTemes;
+  const T = {
+    temes: N === 1 ? 'el tema' : 'els temes',
+    teus: N === 1 ? 'El teu tema' : 'Els teus temes',
+    meus: N === 1 ? 'El meu tema' : 'Els meus temes',
+    titol: N === 1 ? 'Quin tema proposes?' : 'Quins ' + N + ' temes proposes?',
+    canvia: N === 1 ? 'Canvia el teu tema' : 'Canvia els teus temes',
+    falta: N === 1 ? 'Escriu el tema.' : 'Escriu els ' + N + ' temes.',
+  };
+  const familyLine = CFG.familia ? 'Família ' + CFG.familia : '';
+
+  function personalize() {
+    document.documentElement.setAttribute('data-estil', CFG.estil);
+    $('title').textContent = CFG.titol;
+    $('hello').textContent = familyLine;
+    $('hello').hidden = !familyLine;
+    const initials = CFG.familia.split(/[\s-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase();
+    $('mono').textContent = initials;
+    $('mono').hidden = !initials;
+    $('giftIcon').hidden = !!initials;
+    $('noticeText').textContent = CFG.avis;
+    $('notice').hidden = !CFG.avis;
+    $('tabMine').textContent = T.meus;
+    $('mineHint').textContent = (N === 1 ? 'Escriu un tema' : 'Escriu ' + N + ' temes') +
+      ' per al regal que t\'agradaria rebre. Qui te\'l faci ' + (N === 1 ? 'el llegirà' : 'els llegirà') +
+      ' i hi pensarà el que cregui. No sabràs qui és fins al dia de l\'intercanvi.';
+    $('formTitle').textContent = T.titol;
+    $('saveBtn').textContent = N === 1 ? 'Desa el tema' : 'Desa els temes';
+    const f = $('fields');
+    f.replaceChildren();
+    for (let i = 1; i <= N; i++) {
+      const l = el('label', null, N === 1 ? 'Tema' : 'Tema ' + i);
+      l.htmlFor = 't' + i;
+      const inp = el('input');
+      inp.id = 't' + i; inp.type = 'text'; inp.maxLength = 120; inp.required = true;
+      if (CFG.exemples[i - 1]) inp.placeholder = 'P. ex. ' + CFG.exemples[i - 1];
+      l.appendChild(inp);
+      f.appendChild(l);
+    }
+  }
+  const fieldIds = () => Array.from({ length: N }, (_, i) => 't' + (i + 1));
 
   const store = {
     get() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } },
@@ -253,9 +315,8 @@ input:focus { border-color: var(--pine); outline: none; }
     const first = !state;
     state = s;
     if (s.error) toast(s.error);
-    $('hello').textContent = 'Hola, ' + s.name;
-    $('noticeText').textContent = s.notice || '';
-    $('notice').hidden = !s.notice;
+    $('hello').textContent = (familyLine ? familyLine + ' · ' : '') + 'Hola, ' + s.name;
+    $('hello').hidden = false;
     show('app');
     if (first && s.mine) tab('others'); // si ja has posat el teu tema, el que toca és triar
     render();
@@ -283,10 +344,10 @@ input:focus { border-color: var(--pine); outline: none; }
     const form = $('themeForm');
     if (state.mine && !editing) {
       const t = el('article', 'tag');
-      t.appendChild(el('div', 'who', 'Els teus temes'));
+      t.appendChild(el('div', 'who', T.teus));
       t.appendChild(themeList(state.mine.themes));
       const bar = el('div', 'bar');
-      const ed = el('button', 'small', 'Canvia\'ls'); ed.type = 'button';
+      const ed = el('button', 'small', N === 1 ? 'Canvia-ho' : 'Canvia\'ls'); ed.type = 'button';
       ed.onclick = startEdit;
       bar.appendChild(ed);
       t.appendChild(bar);
@@ -317,7 +378,7 @@ input:focus { border-color: var(--pine); outline: none; }
       if (!th) {
         const t = el('article', 'tag is-empty');
         t.appendChild(el('div', 'who', p.name));
-        t.appendChild(el('div', 'text', 'Encara no ha posat els temes'));
+        t.appendChild(el('div', 'text', 'Encara no ha posat ' + T.temes));
         list.appendChild(t);
         return;
       }
@@ -344,8 +405,8 @@ input:focus { border-color: var(--pine); outline: none; }
 
   function startEdit() {
     editing = true;
-    ['t1', 't2'].forEach((k, i) => { $(k).value = state.mine.themes[i] || ''; });
-    $('formTitle').textContent = 'Canvia els teus temes';
+    fieldIds().forEach((k, i) => { $(k).value = state.mine.themes[i] || ''; });
+    $('formTitle').textContent = T.canvia;
     $('cancelEdit').hidden = false;
     render();
     $('t1').focus();
@@ -353,7 +414,7 @@ input:focus { border-color: var(--pine); outline: none; }
   function stopEdit() {
     editing = false;
     $('themeForm').reset();
-    $('formTitle').textContent = 'Quins 2 temes proposes?';
+    $('formTitle').textContent = T.titol;
     $('cancelEdit').hidden = true;
     if (state) render();
   }
@@ -361,13 +422,13 @@ input:focus { border-color: var(--pine); outline: none; }
 
   $('themeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const theme = ['t1', 't2'].map((k) => $(k).value);
-    if (theme.some((x) => !x.trim())) { toast('Escriu els 2 temes.'); return; }
+    const theme = fieldIds().map((k) => $(k).value);
+    if (theme.some((x) => !x.trim())) { toast(T.falta); return; }
     const wasNew = !state.mine;
     $('saveBtn').disabled = true;
     const s = await call('desa', theme);
     $('saveBtn').disabled = false;
-    if (s && !s.error) { toast(wasNew ? 'Temes desats. Ara tria a qui regales.' : 'Temes canviats.'); stopEdit(); }
+    if (s && !s.error) { toast((N === 1 ? (wasNew ? 'Tema desat' : 'Tema canviat') : (wasNew ? 'Temes desats' : 'Temes canviats')) + (wasNew ? '. Ara tria a qui regales.' : '.')); stopEdit(); }
   });
 
   // ---------- Pestanyes ----------
@@ -393,11 +454,13 @@ input:focus { border-color: var(--pine); outline: none; }
   }
 
   $('login').addEventListener('submit', (e) => { e.preventDefault(); login($('code').value); });
-  $('logout').onclick = () => { store.set(''); code = ''; state = null; editing = false; $('themeForm').reset(); $('code').value = ''; tab('mine'); show('login'); };
+  $('logout').onclick = () => { store.set(''); code = ''; state = null; editing = false; $('themeForm').reset(); $('code').value = ''; $('hello').textContent = familyLine; $('hello').hidden = !familyLine; tab('mine'); show('login'); };
 
   function refresh() { if (code && state && !busy && !editing) call('entra'); }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 60000);
+
+  personalize();
 
   // Codi de l'enllaç personal (?codi=XXXXXX) o el que es va desar l'última vegada.
   try {

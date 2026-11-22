@@ -1,67 +1,108 @@
 /**
  * Amic invisible: tauler de temes de regal.
  *
- * Cada persona escriu 2 temes de regal, els que vulgui. Els altres els llegeixen i trien
- * una persona: serà a qui regalen, i el regal l'interpreten com creguin.
+ * Cada persona escriu uns quants temes de regal, els que vulgui. Els altres els llegeixen i
+ * trien una persona: serà a qui regalen, i el regal l'interpreten com creguin.
  * Ningú sap qui l'ha triat, i cada persona només la pot triar algú.
  *
  * Com instal·lar-lo (un sol cop, uns 5 minuts):
  * 1. Crea un full de càlcul nou a Google Sheets (p. ex. «Amic invisible»).
  * 2. Extensions > Apps Script. Esborra el que hi hagi a Code.gs i enganxa-hi aquest codi.
- * 3. Fitxer «+» > HTML, posa-li de nom «Index» i enganxa-hi el contingut d'Index.html.
- * 4. Escriu els noms a PARTICIPANTS (aquí sota) i, si vols, un AVIS. Desa.
- * 5. Implementa > Nova implementació > ⚙️ Aplicació web
+ * 3. Fitxer «+» > HTML, posa-li de nom «Index» i enganxa-hi el contingut d'Index.html. Desa.
+ * 4. Implementa > Nova implementació > ⚙️ Aplicació web
  *      Executa com a: Jo
  *      Qui hi té accés: Qualsevol
  *    Accepta els permisos.
- * 6. Tria la funció «prepara» i prem Executa. Al full apareix la pestanya «Participants»
- *    amb l'enllaç personal de cadascú. Envia a cada persona el seu (i només el seu).
+ * 5. Tria la funció «prepara» i prem Executa. Al full hi apareixen les pestanyes:
+ *      Configuració: títol, família, avís, temes per persona, colors i exemples.
+ *      Participants: escriu-hi els noms a la columna A.
+ * 6. Torna al full i, al menú «Amic invisible», prem «Genera codis i enllaços».
+ *    A la pestanya Participants surt l'enllaç personal de cadascú. Envia a cada persona el seu.
  *
- * Si canvies els noms, torna a executar «prepara»: qui ja hi era conserva el seu codi.
+ * Tot el que hi ha a la pestanya Configuració es pot canviar quan vulguis: la pàgina ho
+ * agafa al moment, sense tornar a implementar res.
  *
  * Si tu també hi participes: no obris la pestanya «Tries» (està amagada), que és on
- * es desa quins temes s'han triat.
+ * es desa qui ha triat qui.
  */
 
-const PARTICIPANTS = ['Anna', 'Bernat', 'Carla', 'David', 'Elena', 'Ferran', 'Gemma', 'Oriol'];
+// Valors inicials. Només s'usen la primera vegada, per omplir les pestanyes del full.
+const INICIAL = {
+  titol: 'Amic invisible',
+  familia: 'Bové Palau',
+  avis: 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.',
+  numTemes: 2,
+  estil: 'avet',
+  exemples: 'Cuina, Japó, Alguna cosa petita',
+  participants: ['Anna', 'Bernat', 'Carla', 'David', 'Elena', 'Ferran', 'Gemma', 'Oriol'],
+};
 
-// Text que surt a dalt de tot per a tothom. Pots deixar-lo buit: ''.
-const AVIS = 'Pressupost: uns 20 €. Intercanvi el dissabte 20 de desembre.';
-
+const ESTILS = ['avet', 'nit', 'gerd', 'neu'];
+const SHEET_CONFIG = 'Configuració';
 const SHEET_PARTICIPANTS = 'Participants';
 const SHEET_THEMES = 'Temes';
 const SHEET_PICKS = 'Tries';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sense 0/O ni 1/I, que es confonen
 
+// Files de la pestanya Configuració: [etiqueta, clau, explicació].
+const CONFIG_ROWS = [
+  ['Títol', 'titol', 'Surt a dalt de tot.'],
+  ['Família', 'familia', 'Surt sota el títol, amb les inicials. Deixa-ho buit si no en vols.'],
+  ['Avís', 'avis', 'Text per a tothom: pressupost, data, lloc… Si és buit, no surt.'],
+  ['Temes per persona', 'numTemes', '1, 2 o 3.'],
+  ['Estil', 'estil', 'avet (verd i vermell), nit (blau i daurat), gerd (granat i taronja) o neu (blau gris i vermell).'],
+  ['Exemples', 'exemples', 'Exemples que surten dins dels requadres buits, separats per comes.'],
+];
+
 // ---------- Pàgina ----------
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Amic invisible')
+  const cfg = config_();
+  const t = HtmlService.createTemplateFromFile('Index');
+  t.config = JSON.stringify(cfg).replace(/</g, '\\u003c');
+  return t.evaluate()
+    .setTitle(cfg.titol + (cfg.familia ? ' · ' + cfg.familia : ''))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-// ---------- Preparació (l'executes tu des de l'editor) ----------
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Amic invisible')
+    .addItem('Genera codis i enllaços', 'prepara')
+    .addToUi();
+}
 
+// ---------- Preparació ----------
+
+// Crea les pestanyes que faltin i dona un codi i un enllaç a cada participant.
+// Es pot tornar a executar sempre que vulguis: qui ja tenia codi el conserva.
 function prepara() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const cs = ss.getSheetByName(SHEET_CONFIG);
+  if (!cs) {
+    const c = sheet_(ss, SHEET_CONFIG, ['Opció', 'Valor', 'Explicació']);
+    c.getRange(2, 1, CONFIG_ROWS.length, 3).setValues(CONFIG_ROWS.map((r) => [r[0], INICIAL[r[1]], r[2]]));
+  }
   const ps = sheet_(ss, SHEET_PARTICIPANTS, ['Nom', 'Codi', 'Enllaç personal']);
-  sheet_(ss, SHEET_THEMES, ['id', 'Nom', 'Tema 1', 'Tema 2', 'Actualitzat']);
-  sheet_(ss, SHEET_PICKS, ['id del tema', 'Triat per (codi xifrat)', 'Data']).hideSheet();
+  sheet_(ss, SHEET_THEMES, ['id', 'Nom', 'Tema 1', 'Tema 2', 'Tema 3', 'Actualitzat']);
+  sheet_(ss, SHEET_PICKS, ['id dels temes', 'Triat per (codi xifrat)', 'Data']).hideSheet();
 
-  const names = PARTICIPANTS.map((n) => String(n).trim()).filter(Boolean);
-  if (new Set(names.map((n) => n.toLowerCase())).size !== names.length) throw new Error('Hi ha noms repetits a PARTICIPANTS');
+  const rows = rows_(ps).filter((r) => String(r[0]).trim());
+  const source = rows.length ? rows : INICIAL.participants.map((n) => [n, '']);
+  const names = source.map((r) => String(r[0]).trim());
+  const seen = new Set();
+  names.forEach((n) => {
+    if (seen.has(n.toLowerCase())) throw new Error('El nom «' + n + '» surt dues vegades a Participants.');
+    seen.add(n.toLowerCase());
+  });
 
-  const old = {};
-  rows_(ps).forEach((r) => { if (r[0] && r[1]) old[String(r[0]).trim().toLowerCase()] = String(r[1]); });
-  const used = new Set(Object.values(old));
+  const used = new Set(source.map((r) => String(r[1] || '')).filter(Boolean));
   let url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { url = ''; }
 
-  const out = names.map((name) => {
-    let code = old[name.toLowerCase()];
+  const out = source.map((r, i) => {
+    let code = String(r[1] || '').trim().toUpperCase();
     if (!code) { do { code = newCode_(); } while (used.has(code)); used.add(code); }
-    return [name, code, url ? url + '?codi=' + code : '(primer implementa l\'aplicació web i torna a executar «prepara»)'];
+    return [names[i], code, url ? url + '?codi=' + code : '(primer implementa l\'aplicació web i torna-ho a executar)'];
   });
 
   const last = ps.getLastRow();
@@ -72,20 +113,41 @@ function prepara() {
   return out;
 }
 
+// Configuració actual, llegida de la pestanya Configuració (o els valors inicials).
+function config_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIG);
+  const raw = {};
+  rows_(sh).forEach((r) => {
+    const row = CONFIG_ROWS.find((c) => c[0].toLowerCase() === String(r[0]).trim().toLowerCase());
+    if (row) raw[row[1]] = r[1];
+  });
+  const get = (k) => (raw[k] === undefined ? INICIAL[k] : raw[k]);
+  const n = parseInt(get('numTemes'), 10);
+  const estil = String(get('estil') || '').trim().toLowerCase();
+  return {
+    titol: String(get('titol') || '').trim() || 'Amic invisible',
+    familia: String(get('familia') || '').trim(),
+    avis: String(get('avis') || '').trim(),
+    numTemes: n >= 1 && n <= 3 ? n : 2,
+    estil: ESTILS.indexOf(estil) >= 0 ? estil : 'avet',
+    exemples: String(get('exemples') || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 3),
+  };
+}
+
 // ---------- Funcions que crida la pàgina ----------
 
 function entra(code) {
   return state_(who_(code));
 }
 
-// Desa els 2 temes de la persona (els crea o els canvia).
+// Desa els temes de la persona (els crea o els canvia).
 function desa(code, theme) {
   return withLock_(() => {
     const me = who_(code);
-    const t = cleanTheme_(theme);
+    const t = cleanTheme_(theme, config_().numTemes);
     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_THEMES);
     const i = rows_(sh).findIndex((r) => r[1] === me.name);
-    if (i >= 0) sh.getRange(i + 2, 3, 1, 3).setValues([t.concat([new Date()])]);
+    if (i >= 0) sh.getRange(i + 2, 3, 1, 4).setValues([t.concat([new Date()])]);
     else sh.appendRow(['t' + Utilities.getUuid().slice(0, 8), me.name].concat(t, [new Date()]));
     return state_(me);
   });
@@ -141,7 +203,8 @@ function state_(me, error) {
   const picks = {};
   rows_(ss.getSheetByName(SHEET_PICKS)).forEach((r) => { if (r[0]) picks[r[0]] = r[1]; });
   const names = participants_().map((p) => p.name);
-  const plain = (r) => (r ? { id: r[0], themes: [r[2], r[3]].map((x) => String(x || '')) } : null);
+  const n = config_().numTemes;
+  const plain = (r) => (r ? { id: r[0], themes: [r[2], r[3], r[4]].slice(0, n).map((x) => String(x || '')).filter(Boolean) } : null);
   const byName = (n) => themes.find((r) => r[1] === n);
 
   let myPick = null;
@@ -156,7 +219,6 @@ function state_(me, error) {
 
   return {
     name: me.name,
-    notice: AVIS,
     error: error || '',
     mine: plain(byName(me.name)), // sense cap informació de si l'han triat
     myPick: myPick,
@@ -179,11 +241,11 @@ function who_(code) {
   return p;
 }
 
-function cleanTheme_(list) {
+function cleanTheme_(list, n) {
   // Evita que Sheets ho interpreti com una fórmula.
   const safe = (s) => (/^[=+\-@]/.test(s) ? "'" + s : s);
-  const t = [0, 1].map((i) => safe(String((list || [])[i] || '').replace(/\s+/g, ' ').trim().slice(0, 120)));
-  if (t.some((x) => !x)) throw new Error('Escriu els 2 temes.');
+  const t = [0, 1, 2].map((i) => (i < n ? safe(String((list || [])[i] || '').replace(/\s+/g, ' ').trim().slice(0, 120)) : ''));
+  if (t.slice(0, n).some((x) => !x)) throw new Error(n === 1 ? 'Escriu el tema.' : 'Escriu els ' + n + ' temes.');
   return t;
 }
 

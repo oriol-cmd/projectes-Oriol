@@ -58,6 +58,11 @@ const people = gs('prepara()');
 ok(people.length === 8 && people.every((p) => /^[A-Z][A-Z2-9]{5}$/.test(p[1])), 'prepara crea 8 codis de 6 caràcters');
 ok(people[0][2].endsWith('?codi=' + people[0][1]), 'enllaç personal amb el codi');
 ok(sheets.Tries.hidden, 'la pestanya Tries queda amagada');
+ok(sheets['Configuració'].data.some((r) => r[0] === 'Família' && r[1] === 'Bové Palau'), 'la pestanya Configuració porta la família Bové Palau');
+const setCfg = (label, value) => { sheets['Configuració'].data.find((r) => r[0] === label)[1] = value; };
+setCfg('Temes per persona', '7'); setCfg('Estil', 'Groc');
+ok(gs('config_()').numTemes === 2 && gs('config_()').estil === 'avet', 'valors de configuració estranys tornen als normals');
+setCfg('Temes per persona', 2); setCfg('Estil', 'avet');
 const again = gs('prepara()');
 ok(again.every((p, i) => p[1] === people[i][1]), 'tornar a executar prepara conserva els codis');
 const code = Object.fromEntries(people.map((p) => [p[0], p[1]]));
@@ -77,8 +82,8 @@ console.log('Navegador');
 const browser = await chromium.launch();
 const html = fs.readFileSync(path.join(dir, 'Index.html'), 'utf8');
 
-async function open(name, { viaLink = true, viewport = { width: 1100, height: 900 }, scheme = 'light' } = {}) {
-  const page = await browser.newPage({ viewport, colorScheme: scheme });
+async function open(name, { viaLink = true, viewport = { width: 1100, height: 900 }, scheme = 'light', scale = 1 } = {}) {
+  const page = await browser.newPage({ viewport, colorScheme: scheme, deviceScaleFactor: scale });
   page.on('pageerror', (e) => { console.log('  ✗ error a la pàgina: ' + e.message); fails++; });
   await page.exposeFunction('__gas', (fn, args) => {
     try { return { ok: ctx[fn](...args) }; } catch (e) { return { err: e.message }; }
@@ -93,7 +98,7 @@ async function open(name, { viaLink = true, viewport = { width: 1100, height: 90
     });
     window.google = { script: { run: runner(), url: { getLocation: (cb) => setTimeout(() => cb({ parameter: c ? { codi: c } : {} }), 0) } } };
   }, { c: viaLink ? code[name] : '' });
-  await page.route('https://amic.test/', (r) => r.fulfill({ contentType: 'text/html', body: html }));
+  await page.route('https://amic.test/', (r) => r.fulfill({ contentType: 'text/html', body: html.replace('<?!= config ?>', JSON.stringify(gs('config_()')).replace(/</g, '\\u003c')) }));
   await page.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
   await page.goto('https://amic.test/');
   await page.waitForSelector('#app:not([hidden]), #login:not([hidden])');
@@ -103,7 +108,8 @@ const card = (page, name) => page.locator('#othersList .tag', { hasText: name })
 
 // L'Anna entra amb l'enllaç i proposa el seu tema.
 const anna = await open('Anna');
-ok((await anna.textContent('#hello')) === 'Hola, Anna', 'l\'enllaç personal entra directament');
+ok((await anna.textContent('#hello')) === 'Família Bové Palau · Hola, Anna', 'l\'enllaç personal entra directament');
+ok((await anna.textContent('#mono')) === 'BP', 'surt el monograma BP de la família');
 await anna.fill('#t1', 'Cuina');
 await anna.click('#saveBtn');
 ok(!(await anna.evaluate(() => document.getElementById('t2').checkValidity())) && !gs(`entra(${J(code.Anna)})`).mine, 'si falta un tema, no es desa');
@@ -168,19 +174,53 @@ const bad = gs(`tria(${J(code.Gemma)}, ${J(id('Anna'))})`);
 ok(/l'última es quedaria/.test(bad.error), 'la Gemma no pot deixar l\'Oriol sense ningú a qui regalar');
 ok(!gs(`tria(${J(code.Gemma)}, ${J(id('Oriol'))})`).error && !gs(`tria(${J(code.Oriol)}, ${J(id('Anna'))})`).error, 'la Gemma tria l\'Oriol i l\'Oriol l\'Anna: tothom té a qui regalar');
 
+// La configuració es canvia al full i la pàgina ho agafa en tornar-la a obrir.
+setCfg('Temes per persona', 3); setCfg('Estil', 'nit'); setCfg('Títol', 'Amic invisible 2026');
+const cfgPage = await open('Elena');
+await cfgPage.click('#tabMine');
+ok((await cfgPage.locator('#fields input').count()) === 3, 'amb «Temes per persona» = 3 surten 3 requadres');
+ok((await cfgPage.getAttribute('html', 'data-estil')) === 'nit' && (await cfgPage.textContent('#title')) === 'Amic invisible 2026', 'l\'estil i el títol canvien sense tornar a implementar');
+setCfg('Temes per persona', 2); setCfg('Estil', 'avet'); setCfg('Títol', 'Amic invisible');
+
 if (shots) {
   fs.mkdirSync(shots, { recursive: true });
-  gs(`desfes(${J(code.Carla)})`); gs(`desfes(${J(code.Elena)})`); gs(`desfes(${J(code.Oriol)})`);
-  const demo = { Anna: ['Cuina', 'Japó'], Bernat: ['Misteri', 'Llibres'], Carla: ['Jocs', 'Riure'], David: ['Música', 'Jazz'], Elena: ['Plantes', 'Verd'], Ferran: ['Esport', 'Muntanya'], Gemma: ['Relax', 'Aromes'], Oriol: ['Tecnologia', 'Petit i útil'] };
+  // Dades de mostra noves.
+  sheets.Temes.data.splice(1); sheets.Tries.data.splice(1);
+  const demo = { Anna: ['Cuina', 'Japó'], Bernat: ['Misteri', 'Llibres'], David: ['Música', 'Jazz'], Elena: ['Plantes', 'Balcó'], Ferran: ['Esport', 'Muntanya'], Gemma: ['Relax', 'Aromes'], Oriol: ['Tecnologia', 'Petit i útil'] };
   for (const [n, t] of Object.entries(demo)) gs(`desa(${J(code[n])}, ${J(t)})`);
-  gs(`tria(${J(code.Carla)}, ${J(id('David'))})`);
-  const hide = async (p) => { await p.evaluate(() => { document.getElementById('toast').hidden = true; }); };
-  const m = await open('Carla', { viewport: { width: 390, height: 844 } });
-  await m.click('#tabOthers'); await hide(m);
-  await m.screenshot({ path: path.join(shots, 'temes-mobil.png'), fullPage: true });
-  const d = await open('Elena', { scheme: 'dark' });
-  await d.click('#tabOthers'); await hide(d);
-  await d.screenshot({ path: path.join(shots, 'temes-ordinador-fosc.png'), fullPage: true });
+  gs(`tria(${J(code.Anna)}, ${J(id('Bernat'))})`); gs(`tria(${J(code.Elena)}, ${J(id('Gemma'))})`); gs(`tria(${J(code.Oriol)}, ${J(id('Elena'))})`);
+
+  const phone = { width: 390, height: 844 };
+  const snap = async (page, file, full = false) => {
+    await page.evaluate(() => { document.getElementById('toast').hidden = true; });
+    await page.screenshot({ path: path.join(shots, file), fullPage: full });
+  };
+
+  let pg = await open('Carla', { viaLink: false, viewport: phone, scale: 2 });
+  await snap(pg, '01-entrada.png');
+  pg = await open('Carla', { viewport: phone, scale: 2 });
+  await snap(pg, '02-escriu-els-temes.png');
+  await pg.fill('#t1', 'Jocs de taula'); await pg.fill('#t2', 'Riure');
+  await pg.click('#saveBtn');
+  await pg.waitForFunction(() => document.querySelectorAll('#mineView .themes li').length === 2);
+  await snap(pg, '03-temes-desats.png');
+  await pg.click('#tabOthers');
+  await snap(pg, '04-tria-a-qui-regales.png');
+  await card(pg, 'David').getByRole('button', { name: 'La trio' }).click();
+  await card(pg, 'David').locator('.chip.mine').waitFor();
+  await snap(pg, '05-regales-a.png');
+  for (const estil of ['avet', 'nit', 'gerd', 'neu']) {
+    setCfg('Estil', estil);
+    for (const scheme of ['light', 'dark']) {
+      const e = await open('Carla', { viewport: phone, scale: 2, scheme });
+      await e.click('#tabOthers');
+      await snap(e, `estil-${estil}${scheme === 'dark' ? '-fosc' : ''}.png`);
+    }
+  }
+  setCfg('Estil', 'avet');
+  const desk = await open('Carla', { viewport: { width: 1200, height: 860 }, scale: 2 });
+  await desk.click('#tabOthers');
+  await snap(desk, '06-ordinador.png');
 }
 
 await browser.close();
