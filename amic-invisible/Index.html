@@ -210,8 +210,10 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
   .tag { transition: border-color .15s, background-color .15s; }
 }
 </style>
-<script>window.CONFIG = <?!= config ?>;</script>
+<!-- Des de Google, aquí hi va la configuració. Des de GitHub Pages es demana en obrir la pàgina. -->
+<script type="application/json" id="cfgJson"><?!= config ?></script>
 <script>
+  try { window.CONFIG = JSON.parse(document.getElementById('cfgJson').textContent); } catch (e) { window.CONFIG = null; }
   try { document.documentElement.setAttribute('data-estil', (window.CONFIG && window.CONFIG.estil) || 'avet'); } catch (e) {}
 </script>
 </head>
@@ -386,6 +388,12 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
 (function () {
   const $ = (id) => document.getElementById(id);
   const KEY = 'amic-invisible-codi';
+  const KEY_S = 'amic-invisible-s';
+  // Des de Google (HtmlService) hi ha google.script.run; des de GitHub Pages es parla amb
+  // l'aplicació de Google per fetch, sense cap compte (així no hi ha errors de comptes).
+  const viaGoogle = !!(window.google && google.script && google.script.run);
+  const query = new URLSearchParams(location.search);
+  let API = '';
   let code = '';
   let state = null;
   let editing = false;
@@ -393,7 +401,7 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
   let deadlineTimer;
 
   // ---------- Personalització (pestanya Configuració del full) ----------
-  const CFG = Object.assign({ titol: 'Amic invisible', familia: '', avis: '', numTemes: 2, estil: 'avet', exemples: [], appUrl: '' }, window.CONFIG || {});
+  const CFG = Object.assign({ titol: 'Amic invisible', familia: '', avis: '', numTemes: 2, estil: 'avet', exemples: [], guideUrl: '' }, window.CONFIG || {});
   let N, T, familyLine, builtN = 0;
   function derive() {
     N = CFG.numTemes;
@@ -420,6 +428,7 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
   function personalize() {
     document.documentElement.setAttribute('data-estil', CFG.estil);
     $('title').textContent = CFG.titol;
+    document.title = CFG.titol + (CFG.familia ? ' · ' + CFG.familia : '');
     $('hello').textContent = familyLine;
     $('hello').hidden = !familyLine;
     const initials = CFG.familia.split(/[\s-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase();
@@ -456,9 +465,20 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
   };
 
   function api(fn, ...args) {
-    return new Promise((resolve, reject) => {
-      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
-    });
+    if (viaGoogle) {
+      return new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+      });
+    }
+    return fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ fn, args }),
+      credentials: 'omit',
+      redirect: 'follow',
+    })
+      .then((r) => { if (!r.ok) throw new Error('No hi ha connexió amb el tauler. Torna-ho a provar d\'aquí a una estona.'); return r.json(); })
+      .then((j) => (j.ok ? j.result : Promise.reject(new Error(j.error))));
   }
 
   let toastTimer;
@@ -531,8 +551,8 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
       document.querySelectorAll('#cEstil input').forEach((r) => { r.checked = r.value === a.estil; });
     }
     $('noUrl').hidden = a.hasUrl;
-    $('guideBox').hidden = !CFG.appUrl;
-    if (CFG.appUrl) $('guideLink').href = CFG.appUrl + '?instruccions';
+    $('guideBox').hidden = !CFG.guideUrl;
+    if (CFG.guideUrl) $('guideLink').href = CFG.guideUrl;
     $('nBtn').textContent = confirmEdition ? 'Segur? Es buidarà el tauler' : 'Comença l\'edició nova';
 
     const list = $('peopleList');
@@ -835,13 +855,29 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
   }
 
   // Codi de l'enllaç personal (?codi=XXXXXX) o el que es va desar l'última vegada.
-  try {
-    google.script.url.getLocation((loc) => {
-      const params = (loc && loc.parameter) || {};
-      if ('instruccions' in params) return guide();
-      login(params.codi || store.get());
-    });
-  } catch (e) { login(store.get()); }
+  function start(params) {
+    if ('instruccions' in params) return guide();
+    login(params.codi || store.get());
+  }
+
+  if (viaGoogle) {
+    try { google.script.url.getLocation((loc) => start((loc && loc.parameter) || {})); }
+    catch (e) { login(store.get()); }
+  } else {
+    // ?s= és l'identificador de l'aplicació de Google; es recorda per a la propera vegada.
+    let sid = (query.get('s') || '').replace(/[^\w-]/g, '');
+    try { if (sid) localStorage.setItem(KEY_S, sid); else sid = localStorage.getItem(KEY_S) || ''; } catch (e) {}
+    const params = Object.fromEntries(query.entries());
+    if (!sid) {
+      show('loading');
+      $('loading').textContent = 'Obre l\'enllaç que t\'han enviat per WhatsApp: aquesta adreça està incompleta.';
+    } else {
+      API = 'https://script.google.com/macros/s/' + sid + '/exec';
+      api('config')
+        .then((c) => { applyConfig(c); start(params); })
+        .catch(() => { show('loading'); $('loading').textContent = 'No hi ha connexió amb el tauler. Torna-ho a provar d\'aquí a una estona.'; });
+    }
+  }
 })();
 </script>
 </body>

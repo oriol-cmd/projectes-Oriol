@@ -52,6 +52,7 @@ const ctx = {
     },
   },
   HtmlService: {},
+  ContentService: { createTextOutput: (t) => ({ t, setMimeType() { return this; }, getContent() { return this.t; } }), MimeType: { JSON: 'json' } },
   console,
 };
 vm.createContext(ctx);
@@ -72,7 +73,7 @@ ok(first[0][2].startsWith('(enganxa'), 'si Google només dona l\'enllaç /dev (q
 sheets['Configuració'].data.find((r) => r[0] === "Enllaç de l'aplicació")[1] = 'https://script.google.com/macros/s/PROVA/exec';
 const people = gs('prepara()');
 ok(people.length === 8 && people.every((p) => /^[A-Z][A-Z2-9]{5}$/.test(p[1])), 'prepara crea 8 codis de 6 caràcters');
-ok(people[0][2].endsWith('?codi=' + people[0][1]), 'enllaç personal amb el codi');
+ok(people[0][2] === 'https://oriol-cmd.github.io/projectes-Oriol/amic-invisible/?s=PROVA&codi=' + people[0][1], 'l\'enllaç personal va a la pàgina de GitHub, amb l\'aplicació i el codi');
 ok(sheets.Tries.hidden, 'la pestanya Tries queda amagada');
 ok(sheets['Configuració'].data.some((r) => r[0] === 'Família' && r[1] === 'Bové Palau'), 'la pestanya Configuració porta la família Bové Palau');
 const setCfg = (label, value) => { sheets['Configuració'].data.find((r) => r[0] === label)[1] = value; };
@@ -260,7 +261,7 @@ await oriol.fill('#pName', 'Iu'); await oriol.fill('#pPhone', '611 22 33 44');
 await oriol.click('#addPerson button[type="submit"]');
 await oriol.locator('.person-row', { hasText: 'Iu' }).waitFor();
 const iu = sheets.Participants.data.find((r) => r[0] === 'Iu');
-ok(iu && /^[A-Z][A-Z2-9]{5}$/.test(iu[1]) && iu[2].endsWith('?codi=' + iu[1]), 'en Iu té codi i enllaç propis');
+ok(iu && /^[A-Z][A-Z2-9]{5}$/.test(iu[1]) && iu[2].endsWith('codi=' + iu[1]), 'en Iu té codi i enllaç propis');
 ok((await oriol.locator('.person-row', { hasText: 'Iu' }).locator('a.wa').getAttribute('href')).startsWith('https://wa.me/34611223344?text='), 'i un botó de WhatsApp directe al seu mòbil');
 ok(/Ja hi ha algú/.test(gs(`afegeixPersona(${J(code.Oriol)}, "anna", "")`).error), 'no es pot afegir un nom repetit');
 await oriol.locator('.person-row', { hasText: 'Anna' }).locator('input[type="checkbox"]').check();
@@ -292,6 +293,45 @@ ok(sheets.Temes.data.length === 1 && sheets.Tries.data.length === 1, 'el tauler 
 ok(sheets.Participants.data.slice(1).map((r) => r[1]).join() === codesBefore, 'la família i els enllaços són els mateixos');
 ok(sheets['Configuració'].data.find((r) => r[0] === 'Data límit')[1] === '07/12/2027 22:00', 'amb la data límit nova: 07/12/2027 22:00');
 setCfg('Data límit', '07/12/2026 22:00'); setCfg('Estil', 'avet'); setCfg('Avís', 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.');
+
+console.log('Des de GitHub Pages (sense comptes de Google)');
+async function openHosted(query, viewport = { width: 390, height: 844 }) {
+  const page = await browser.newPage({ viewport });
+  page.on('pageerror', (e) => { console.log('  ✗ error a la pàgina: ' + e.message); fails++; });
+  const calls = [];
+  await page.route('https://pages.test/amic-invisible/**', (r) => r.fulfill({ contentType: 'text/html', body: html }));
+  await page.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
+  await page.route('https://script.google.com/macros/s/PROVA/exec', (r) => {
+    const req = r.request();
+    calls.push({ method: req.method(), cookie: req.headers().cookie || '' });
+    const out = ctx.doPost({ postData: { contents: req.postData() } }).getContent();
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: out });
+  });
+  await page.goto('https://pages.test/amic-invisible/' + query);
+  return { page, calls };
+}
+{
+  const { page, calls } = await openHosted('?s=PROVA&codi=' + code.Elena);
+  await page.waitForSelector('#app:not([hidden])');
+  ok((await page.textContent('#hello')).includes('Hola, Elena') && (await page.textContent('#mono')) === 'BP', 'des de GitHub Pages, l\'Elena entra amb el seu enllaç');
+  ok(calls.length >= 2 && calls.every((c) => c.method === 'POST' && !c.cookie), 'parla amb el full sense enviar cap compte de Google');
+  ok((await page.title()) === 'Amic invisible · Bové Palau', 'el títol de la pestanya és el de la família');
+  await page.fill('#t1', 'Plantes'); await page.fill('#t2', 'Balcó');
+  await page.click('#saveBtn');
+  await page.waitForFunction(() => document.querySelectorAll('#mineView .themes li').length === 2);
+  ok(gs(`entra(${J(code.Elena)})`).mine.join() === 'Plantes,Balcó', 'i els temes es desen al full');
+  await page.goto('https://pages.test/amic-invisible/');
+  await page.waitForSelector('#app:not([hidden])');
+  ok((await page.textContent('#hello')).includes('Hola, Elena'), 'l\'endemà, amb l\'adreça curta, el mòbil se\'n recorda');
+  const bad = await openHosted('');
+  await bad.page.waitForFunction(() => document.getElementById('loading').textContent.includes('incompleta'));
+  ok(true, 'sense l\'enllaç sencer, explica que cal obrir el que han enviat');
+  const g = await openHosted('?s=PROVA&instruccions');
+  await g.page.waitForSelector('#guide:not([hidden])');
+  ok((await g.page.textContent('#guideCard')).includes('Família Bové Palau'), 'la targeta d\'instruccions també funciona des de GitHub');
+  ok(/No conec/.test(JSON.parse(ctx.doPost({ postData: { contents: '{"fn":"prepara","args":[]}' } }).getContent()).error), 'des de fora només es poden fer les accions de la pàgina');
+  ok(gs(`entra(${J(code.Oriol)})`).config.guideUrl === 'https://oriol-cmd.github.io/projectes-Oriol/amic-invisible/?s=PROVA&instruccions', 'el botó d\'instruccions dels ajustos porta a GitHub');
+}
 
 if (shots) {
   fs.mkdirSync(shots, { recursive: true });

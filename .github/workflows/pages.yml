@@ -1,9 +1,9 @@
-name: Publica l'app a GitHub Pages
+name: Publica les apps a GitHub Pages
 
 on:
   push:
     branches: [main]
-    paths: ['app/**', '.github/workflows/pages.yml']
+    paths: ['app/**', 'amic-invisible/Index.html', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -24,8 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Xiu-xiu a l'arrel i l'amic invisible a /amic-invisible/
+      - name: Prepara el lloc
+        run: |
+          mkdir -p _site/amic-invisible
+          cp -r app/. _site/
+          cp amic-invisible/Index.html _site/amic-invisible/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: app
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

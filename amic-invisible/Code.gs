@@ -31,6 +31,7 @@
 // Valors inicials. Només s'usen la primera vegada, per omplir les pestanyes del full.
 const INICIAL = {
   url: '',
+  pagina: 'https://oriol-cmd.github.io/projectes-Oriol/amic-invisible/',
   titol: 'Amic invisible',
   familia: 'Bové Palau',
   avis: 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.',
@@ -51,6 +52,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sense 0/O ni 1/I, que 
 // Files de la pestanya Configuració: [etiqueta, clau, explicació].
 const CONFIG_ROWS = [
   ['Enllaç de l\'aplicació', 'url', 'L\'adreça que acaba en /exec (Implementa > Gestiona les implementacions). Amb ella es fan els enllaços personals.'],
+  ['Adreça de la pàgina', 'pagina', 'On s\'obre la pàgina per a la família (GitHub Pages): així funciona en qualsevol mòbil, encara que hi hagi diversos comptes de Google. Si és buit, s\'obre des de Google.'],
   ['Títol', 'titol', 'Surt a dalt de tot.'],
   ['Família', 'familia', 'Surt sota el títol, amb les inicials. Deixa-ho buit si no en vols.'],
   ['Avís', 'avis', 'Text per a tothom: pressupost, data de l\'intercanvi, lloc… Si és buit, no surt.'],
@@ -69,6 +71,26 @@ function doGet() {
   return t.evaluate()
     .setTitle(cfg.titol + (cfg.familia ? ' · ' + cfg.familia : ''))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// La pàgina publicada a GitHub Pages parla amb el full per aquí, sense cap compte de Google:
+// així no falla als mòbils amb més d'un compte de Google obert.
+function doPost(e) {
+  const api = {
+    config: () => publicConfig_(config_()),
+    entra: entra, desa: desa, tria: tria, desfes: desfes,
+    desaAjustos: desaAjustos, afegeixPersona: afegeixPersona, canviaTelefon: canviaTelefon,
+    treuPersona: treuPersona, canviaAcces: canviaAcces, novaEdicio: novaEdicio,
+  };
+  let out;
+  try {
+    const q = JSON.parse(e.postData.contents);
+    if (!Object.prototype.hasOwnProperty.call(api, q.fn)) throw new Error('No conec aquesta acció.');
+    out = { ok: true, result: api[q.fn].apply(null, Array.isArray(q.args) ? q.args : []) };
+  } catch (err) {
+    out = { ok: false, error: String((err && err.message) || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function onOpen() {
@@ -125,7 +147,7 @@ function refreshPeople_(edit) {
   const out = source.map((r, i) => {
     let code = String(r[1] || '').trim().toUpperCase();
     if (!code) { do { code = newCode_(); } while (used.has(code)); used.add(code); }
-    const link = url ? url + '?codi=' + code : '';
+    const link = personalLink_(cfg, url, code);
     const phone = String(r[3] || '').trim();
     const wa = link ? '=HYPERLINK("' + waUrl_(names[i], phone, link, cfg) + '", "Envia-li ➜")' : '';
     const admin = isYes_(r[5]) ? 'Sí' : '';
@@ -139,6 +161,22 @@ function refreshPeople_(edit) {
   ps.getRange(2, 4, 60, 1).setNumberFormat('@');
   if (out.length) ps.getRange(2, 1, out.length, 6).setValues(out);
   return out;
+}
+
+// Enllaç personal: a la pàgina de GitHub (amb l'identificador de l'aplicació) o, si no n'hi
+// ha, directament a Google.
+function personalLink_(cfg, url, code) {
+  if (!url) return '';
+  const id = (url.match(/\/s\/([^/]+)\/exec$/) || [])[1];
+  if (cfg.pagina && id) return cfg.pagina + '?s=' + id + '&codi=' + code;
+  return url + '?codi=' + code;
+}
+
+function guideLink_(cfg) {
+  const url = appUrl_(cfg);
+  if (!url) return '';
+  const id = (url.match(/\/s\/([^/]+)\/exec$/) || [])[1];
+  return cfg.pagina && id ? cfg.pagina + '?s=' + id + '&instruccions' : url + '?instruccions';
 }
 
 function appUrl_(cfg) {
@@ -180,8 +218,11 @@ function config_() {
   const estil = String(get('estil') || '').trim().toLowerCase();
   const limit = parseDate_(get('dataLimit'));
   const url = String(get('url') || '').trim().replace(/[?#].*$/, '');
+  let pagina = String(get('pagina') || '').trim().replace(/[?#].*$/, '');
+  if (pagina && !/\/$/.test(pagina) && !/\.html$/.test(pagina)) pagina += '/';
   return {
     url: /^https:\/\/script\.google\.com\/.+\/exec$/.test(url) ? url : '',
+    pagina: /^https:\/\/[^\s"<>]+$/.test(pagina) ? pagina : '',
     titol: String(get('titol') || '').trim() || 'Amic invisible',
     familia: String(get('familia') || '').trim(),
     avis: String(get('avis') || '').trim(),
@@ -197,7 +238,8 @@ function config_() {
 function publicConfig_(cfg) {
   const c = Object.assign({}, cfg);
   delete c.url;
-  c.appUrl = appUrl_(cfg);
+  delete c.pagina;
+  c.guideUrl = guideLink_(cfg);
   return c;
 }
 
@@ -419,8 +461,8 @@ function adminData_(cfg, themes) {
       admin: p.admin,
       phone: p.phone,
       written: written.has(p.name),
-      link: url ? url + '?codi=' + p.code : '',
-      wa: url ? waUrl_(p.name, p.phone, url + '?codi=' + p.code, cfg) : '',
+      link: personalLink_(cfg, url, p.code),
+      wa: url ? waUrl_(p.name, p.phone, personalLink_(cfg, url, p.code), cfg) : '',
     })),
   };
 }
