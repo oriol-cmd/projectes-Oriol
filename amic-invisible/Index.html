@@ -200,6 +200,18 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
 .zone { border-color: var(--accent); }
 @media (max-width: 420px) { .tabs button { font-size: 14px; padding-inline: 4px; } .swatches { grid-template-columns: repeat(2, 1fr); } }
 
+/* Full d'instruccions (surt el primer cop i amb «Com funciona?») */
+.sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgb(0 0 0 / 0.45); display: grid; align-items: end; justify-items: center; }
+.sheet { width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; background: var(--paper); color: var(--ink); border-radius: 22px 22px 0 0; padding: 22px 22px calc(22px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; box-shadow: 0 -10px 40px rgb(0 0 0 / 0.25); }
+.sheet h2 { text-align: center; font-size: 26px; }
+.sheet .snail { width: 190px; margin: 0 auto; }
+.sheet .btn { width: 100%; padding-block: 13px; font-size: 16px; }
+@media (min-width: 600px) { .sheet-bg { align-items: center; } .sheet { border-radius: 22px; } }
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: up .25s ease-out; } @keyframes up { from { transform: translateY(24px); } } }
+.help-link { margin: 22px auto 0; width: max-content; display: flex; align-items: center; gap: 8px; background: transparent; border: 0; color: var(--primary); font-weight: 600; font-size: 14.5px; padding: 8px 12px; border-radius: 999px; }
+.help-link svg { width: 38px; height: auto; }
+.help-link:hover { background: var(--primary-soft); }
+
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.2); z-index: 5; }
 .loading { color: var(--muted); text-align: center; padding: 40px 0; }
 
@@ -379,8 +391,20 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
         </form>
       </div>
     </div>
+    <button class="help-link" id="helpOpen" type="button"><svg viewBox="0 0 220 150" aria-hidden="true"><use href="#snail"/></svg>Com funciona?</button>
   </section>
 </main>
+
+<div class="sheet-bg" id="help" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <svg class="snail" viewBox="0 0 220 150" aria-hidden="true"><use href="#snail"/></svg>
+    <h2 id="helpTitle">Com funciona</h2>
+    <ol class="steps" id="helpSteps"></ol>
+    <div class="g-date" id="helpDate"></div>
+    <p class="g-avis" id="helpAvis"></p>
+    <button class="btn" id="helpOk" type="button">Entesos, som-hi!</button>
+  </div>
+</div>
 
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -393,6 +417,9 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
   // l'aplicació de Google per fetch, sense cap compte (així no hi ha errors de comptes).
   const viaGoogle = !!(window.google && google.script && google.script.run);
   const query = new URLSearchParams(location.search);
+  // Identificador de l'aplicació de Google. En publicar a GitHub Pages s'hi posa el de
+  // amic-invisible/app-id.txt, i així els enllaços personals poden ser curts.
+  const APP_ID = '__APP_ID__';
   let API = '';
   let code = '';
   let state = null;
@@ -526,6 +553,7 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     $('tabAdmin').hidden = !s.admin;
     $('tabAdmin').parentElement.classList.toggle('three', !!s.admin);
     if (first) tab(s.phase === 'tria' ? 'others' : 'mine');
+    if (first && !seenHelp()) openHelp(true);
     if (!s.admin && !$('paneAdmin').hidden) tab('mine');
     if (s.phase === 'temes' && s.msLeft < 86400000) {
       clearTimeout(deadlineTimer);
@@ -534,6 +562,44 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     render();
     if (s.admin) renderAdmin();
   }
+
+  // ---------- Full d'instruccions ----------
+
+  const helpKey = () => 'amic-invisible-vist-' + code;
+  function seenHelp() { try { return localStorage.getItem(helpKey()) === '1'; } catch (e) { return false; } }
+
+  // El primer cop s'ha d'acceptar amb el botó; després es pot consultar i tancar com es vulgui.
+  let mustAccept = false;
+  function openHelp(first) {
+    mustAccept = first === true;
+    const temes = N === 1 ? 'un tema' : N + ' temes';
+    const date = state && state.dataLimitText ? state.dataLimitText : CFG.dataLimitText;
+    const steps = [
+      ['Escriu ' + temes + ' ', 'per al regal que t\'agradaria rebre. Els pots canviar fins a la data límit, i ningú els veurà fins llavors.'],
+      [date ? 'Quan s\'acabi el termini, tria a qui regales. ' : 'Després, tria a qui regales. ', 'Llegeix els temes de tothom i tria una persona. Qui arribi primer, tria primer, i ningú sabrà que has estat tu.'],
+      ['Prepara el regal ', 'a partir dels seus temes, tal com tu ho entenguis. I el dia de l\'intercanvi, sorpresa!'],
+    ];
+    const ol = $('helpSteps');
+    ol.replaceChildren();
+    steps.forEach(([b, t]) => { const li = el('li'); const d = el('div'); d.append(el('b', null, b), t); li.appendChild(d); ol.appendChild(li); });
+    $('helpTitle').textContent = CFG.familia ? 'Amic invisible ' + CFG.familia : 'Com funciona';
+    $('helpDate').replaceChildren();
+    if (date) $('helpDate').append('Data límit per posar els temes', el('strong', null, date));
+    $('helpDate').hidden = !date;
+    $('helpAvis').textContent = CFG.avis;
+    $('helpAvis').hidden = !CFG.avis;
+    $('help').hidden = false;
+    $('helpOk').focus();
+  }
+  function closeHelp() {
+    mustAccept = false;
+    $('help').hidden = true;
+    try { localStorage.setItem(helpKey(), '1'); } catch (e) {}
+  }
+  $('helpOk').onclick = closeHelp;
+  $('help').addEventListener('click', (e) => { if (e.target === $('help') && !mustAccept) closeHelp(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('help').hidden && !mustAccept) closeHelp(); });
+  $('helpOpen').onclick = () => openHelp(false);
 
   // ---------- Ajustos ----------
 
@@ -865,7 +931,7 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     catch (e) { login(store.get()); }
   } else {
     // ?s= és l'identificador de l'aplicació de Google; es recorda per a la propera vegada.
-    let sid = (query.get('s') || '').replace(/[^\w-]/g, '');
+    let sid = (query.get('s') || (/^__/.test(APP_ID) ? '' : APP_ID)).replace(/[^\w-]/g, '');
     try { if (sid) localStorage.setItem(KEY_S, sid); else sid = localStorage.getItem(KEY_S) || ''; } catch (e) {}
     const params = Object.fromEntries(query.entries());
     if (!sid) {

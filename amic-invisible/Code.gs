@@ -31,7 +31,7 @@
 // Valors inicials. Només s'usen la primera vegada, per omplir les pestanyes del full.
 const INICIAL = {
   url: '',
-  pagina: 'https://oriol-cmd.github.io/projectes-Oriol/amic-invisible/',
+  pagina: 'https://oriol-cmd.github.io/projectes-Oriol/amic-invisible-bove-palau/',
   titol: 'Amic invisible',
   familia: 'Bové Palau',
   avis: 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.',
@@ -147,7 +147,7 @@ function refreshPeople_(edit) {
   const out = source.map((r, i) => {
     let code = String(r[1] || '').trim().toUpperCase();
     if (!code) { do { code = newCode_(); } while (used.has(code)); used.add(code); }
-    const link = personalLink_(cfg, url, code);
+    const link = url ? personalLink_(cfg, url, code) : '';
     const phone = String(r[3] || '').trim();
     const wa = link ? '=HYPERLINK("' + waUrl_(names[i], phone, link, cfg) + '", "Envia-li ➜")' : '';
     const admin = isYes_(r[5]) ? 'Sí' : '';
@@ -163,20 +163,17 @@ function refreshPeople_(edit) {
   return out;
 }
 
-// Enllaç personal: a la pàgina de GitHub (amb l'identificador de l'aplicació) o, si no n'hi
-// ha, directament a Google.
+// Enllaç personal, curt: a la pàgina de GitHub (que ja porta l'identificador de l'aplicació,
+// vegeu amic-invisible/app-id.txt) o, si no n'hi ha, directament a Google.
 function personalLink_(cfg, url, code) {
-  if (!url) return '';
-  const id = (url.match(/\/s\/([^/]+)\/exec$/) || [])[1];
-  if (cfg.pagina && id) return cfg.pagina + '?s=' + id + '&codi=' + code;
-  return url + '?codi=' + code;
+  if (cfg.pagina) return cfg.pagina + '?codi=' + code;
+  return url ? url + '?codi=' + code : '';
 }
 
 function guideLink_(cfg) {
+  if (cfg.pagina) return cfg.pagina + '?instruccions';
   const url = appUrl_(cfg);
-  if (!url) return '';
-  const id = (url.match(/\/s\/([^/]+)\/exec$/) || [])[1];
-  return cfg.pagina && id ? cfg.pagina + '?s=' + id + '&instruccions' : url + '?instruccions';
+  return url ? url + '?instruccions' : '';
 }
 
 function appUrl_(cfg) {
@@ -461,7 +458,7 @@ function adminData_(cfg, themes) {
       admin: p.admin,
       phone: p.phone,
       written: written.has(p.name),
-      link: personalLink_(cfg, url, p.code),
+      link: url ? personalLink_(cfg, url, p.code) : '',
       wa: url ? waUrl_(p.name, p.phone, personalLink_(cfg, url, p.code), cfg) : '',
     })),
   };
