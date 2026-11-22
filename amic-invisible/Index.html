@@ -87,6 +87,7 @@ main { padding-block: 20px 60px; display: grid; gap: 20px; }
 .code-input { text-transform: uppercase; letter-spacing: 0.25em; font-size: 22px; text-align: center; font-variant-numeric: tabular-nums; }
 
 /* Pestanyes */
+.tabs.three { grid-template-columns: 1fr 1fr 0.8fr; }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
 .tabs button { border: 0; background: transparent; border-radius: 9px; padding: 10px 8px; font-weight: 600; color: var(--muted); }
 .tabs button[aria-selected="true"] { background: var(--head); color: var(--head-ink); }
@@ -95,8 +96,8 @@ main { padding-block: 20px 60px; display: grid; gap: 20px; }
 .hint svg { flex: none; margin-top: 2px; }
 
 /* Formulari */
-form.add { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
-form.add h3 { font-size: 17px; }
+.add { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+.add h3 { font-size: 17px; }
 label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); min-width: 0; }
 input[type="text"], input[type="url"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); }
 input:focus { border-color: var(--primary); outline: none; }
@@ -170,6 +171,34 @@ input:focus { border-color: var(--primary); outline: none; }
 .guide-tools { width: 100%; max-width: 440px; display: grid; gap: 10px; }
 .guide-tools h3 { font-size: 17px; }
 .guide-tools textarea { width: 100%; min-height: 230px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); color: var(--ink); font: 13.5px/1.5 var(--font-body); resize: vertical; }
+
+/* Ajustos */
+.add h3 + .hint { margin-top: -4px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+select, textarea, input[type="date"], input[type="time"], input[type="tel"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); font: inherit; }
+textarea { resize: vertical; }
+.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.swatches { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.swatches legend { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 4px; padding: 0; }
+.swatch { position: relative; display: grid; gap: 6px; justify-items: center; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 4px 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink); }
+.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch .dots { display: flex; }
+.swatch .dots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--paper); margin-left: -5px; }
+.swatch:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+.swatch:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.people { display: grid; gap: 8px; }
+.person-row { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.person-row .pname { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.person-row .pname small { font-weight: 500; color: var(--muted); }
+.person-row .pactions { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.person-row input[type="tel"] { width: 150px; padding: 6px 10px; font-size: 13px; }
+a.small { text-decoration: none; color: inherit; display: inline-block; }
+.small.wa { border-color: var(--primary); color: var(--primary); }
+.small.danger { border-color: var(--accent); color: var(--accent); }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.check input { width: 16px; height: 16px; accent-color: var(--primary); }
+.zone { border-color: var(--accent); }
+@media (max-width: 420px) { .tabs button { font-size: 14px; padding-inline: 4px; } .swatches { grid-template-columns: repeat(2, 1fr); } }
 
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.2); z-index: 5; }
 .loading { color: var(--muted); text-align: center; padding: 40px 0; }
@@ -265,6 +294,7 @@ input:focus { border-color: var(--primary); outline: none; }
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="tabMine" aria-selected="true"></button>
         <button type="button" role="tab" id="tabOthers" aria-selected="false">A qui regalo</button>
+        <button type="button" role="tab" id="tabAdmin" aria-selected="false" hidden>Ajustos</button>
       </div>
 
       <div id="paneMine" style="display:grid;gap:16px">
@@ -285,6 +315,67 @@ input:focus { border-color: var(--primary); outline: none; }
         <div class="pick" id="pickBox"></div>
         <div class="tags" id="othersList"></div>
       </div>
+
+      <div id="paneAdmin" style="display:grid;gap:16px" hidden>
+        <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>Només ho veus tu i qui tingui accés als ajustos. Aquí no surt mai qui ha triat qui.</span></p>
+
+        <form class="add" id="cfgForm">
+          <h3>Data límit</h3>
+          <p class="hint">Fins aquest moment s'escriuen els temes. Després es tanquen i s'obre la tria per a tothom.</p>
+          <div class="row2">
+            <label for="cDate">Dia<input type="date" id="cDate"></label>
+            <label for="cTime">Hora<input type="time" id="cTime"></label>
+          </div>
+          <hr class="sep">
+          <h3>Textos</h3>
+          <label for="cTitol">Títol<input type="text" id="cTitol" maxlength="60"></label>
+          <label for="cFamilia">Família<input type="text" id="cFamilia" maxlength="60"></label>
+          <label for="cAvis">Avís per a tothom<textarea id="cAvis" maxlength="300" rows="2"></textarea></label>
+          <hr class="sep">
+          <h3>Joc</h3>
+          <label for="cNum">Temes per persona<select id="cNum"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          <fieldset class="swatches" id="cEstil">
+            <legend>Colors</legend>
+            <label class="swatch"><input type="radio" name="estil" value="avet"><span class="dots"><i style="background:#1f5a4a"></i><i style="background:#b3263e"></i></span>avet</label>
+            <label class="swatch"><input type="radio" name="estil" value="nit"><span class="dots"><i style="background:#24408e"></i><i style="background:#a5660a"></i></span>nit</label>
+            <label class="swatch"><input type="radio" name="estil" value="gerd"><span class="dots"><i style="background:#8a2456"></i><i style="background:#c2410c"></i></span>gerd</label>
+            <label class="swatch"><input type="radio" name="estil" value="neu"><span class="dots"><i style="background:#2c6488"></i><i style="background:#c0392b"></i></span>neu</label>
+          </fieldset>
+          <label for="cEx">Exemples dels requadres (separats per comes)<input type="text" id="cEx" maxlength="200"></label>
+          <div class="actions"><button class="btn" type="submit" id="cfgSave">Desa els ajustos</button></div>
+        </form>
+
+        <section class="add">
+          <h3>Família</h3>
+          <p class="hint">Envia a cadascú el seu enllaç. Qui tingui marcat «Ajustos» podrà entrar en aquesta pestanya.</p>
+          <p class="hint" id="noUrl" hidden>Falta l'enllaç de l'aplicació (el que acaba en /exec) a la pestanya Configuració del full.</p>
+          <div class="people" id="peopleList"></div>
+          <form id="addPerson" style="display:grid;gap:10px">
+            <div class="row2">
+              <label for="pName">Persona nova<input type="text" id="pName" maxlength="40" placeholder="Nom"></label>
+              <label for="pPhone">Mòbil (opcional)<input type="tel" id="pPhone" maxlength="20" placeholder="600 11 22 33"></label>
+            </div>
+            <div class="actions"><button class="btn secondary" type="submit">Afegeix</button></div>
+          </form>
+        </section>
+
+        <section class="add" id="guideBox">
+          <h3>Instruccions per al grup</h3>
+          <p class="hint">La targeta del cargol i el text per enviar al grup de WhatsApp.</p>
+          <div class="actions"><a class="btn secondary" id="guideLink" target="_blank" rel="noopener" style="text-decoration:none">Obre les instruccions</a></div>
+        </section>
+
+        <form class="add zone" id="newEdition">
+          <h3>Edició nova (l'any que ve)</h3>
+          <p class="hint">Guarda els temes d'aquest any en una pestanya «Arxiu» del full, esborra totes les tries i torna a començar amb una data límit nova. La família i els enllaços es mantenen.</p>
+          <div class="row2">
+            <label for="nDate">Nova data límit<input type="date" id="nDate"></label>
+            <label for="nTime">Hora<input type="time" id="nTime" value="22:00"></label>
+          </div>
+          <div class="actions"><button class="btn secondary" type="submit" id="nBtn">Comença l'edició nova</button></div>
+        </form>
+      </div>
     </div>
   </section>
 </main>
@@ -302,17 +393,29 @@ input:focus { border-color: var(--primary); outline: none; }
   let deadlineTimer;
 
   // ---------- Personalització (pestanya Configuració del full) ----------
-  const CFG = Object.assign({ titol: 'Amic invisible', familia: '', avis: '', numTemes: 2, estil: 'avet', exemples: [] }, window.CONFIG || {});
-  const N = CFG.numTemes;
-  const T = {
-    temes: N === 1 ? 'el tema' : 'els temes',
-    teus: N === 1 ? 'El teu tema' : 'Els teus temes',
-    meus: N === 1 ? 'El meu tema' : 'Els meus temes',
-    titol: N === 1 ? 'Quin tema proposes?' : 'Quins ' + N + ' temes proposes?',
-    canvia: N === 1 ? 'Canvia el teu tema' : 'Canvia els teus temes',
-    falta: N === 1 ? 'Escriu el tema.' : 'Escriu els ' + N + ' temes.',
-  };
-  const familyLine = CFG.familia ? 'Família ' + CFG.familia : '';
+  const CFG = Object.assign({ titol: 'Amic invisible', familia: '', avis: '', numTemes: 2, estil: 'avet', exemples: [], appUrl: '' }, window.CONFIG || {});
+  let N, T, familyLine, builtN = 0;
+  function derive() {
+    N = CFG.numTemes;
+    T = {
+      temes: N === 1 ? 'el tema' : 'els temes',
+      teus: N === 1 ? 'El teu tema' : 'Els teus temes',
+      meus: N === 1 ? 'El meu tema' : 'Els meus temes',
+      titol: N === 1 ? 'Quin tema proposes?' : 'Quins ' + N + ' temes proposes?',
+      canvia: N === 1 ? 'Canvia el teu tema' : 'Canvia els teus temes',
+      falta: N === 1 ? 'Escriu el tema.' : 'Escriu els ' + N + ' temes.',
+    };
+    familyLine = CFG.familia ? 'Família ' + CFG.familia : '';
+  }
+  derive();
+
+  // La configuració pot canviar mentre la pàgina és oberta (des dels ajustos).
+  function applyConfig(c) {
+    if (!c || JSON.stringify(c) === JSON.stringify(CFG)) return;
+    Object.assign(CFG, c);
+    derive();
+    personalize();
+  }
 
   function personalize() {
     document.documentElement.setAttribute('data-estil', CFG.estil);
@@ -329,8 +432,10 @@ input:focus { border-color: var(--primary); outline: none; }
     $('mineHint').textContent = (N === 1 ? 'Escriu un tema' : 'Escriu ' + N + ' temes') +
       ' per al regal que t\'agradaria rebre. Qui te\'l faci ' + (N === 1 ? 'el llegirà' : 'els llegirà') +
       ' i hi pensarà el que cregui. No sabràs qui és fins al dia de l\'intercanvi.';
-    $('formTitle').textContent = T.titol;
+    if (!editing) $('formTitle').textContent = T.titol;
     $('saveBtn').textContent = N === 1 ? 'Desa el tema' : 'Desa els temes';
+    if (builtN === N) return;
+    builtN = N;
     const f = $('fields');
     f.replaceChildren();
     for (let i = 1; i <= N; i++) {
@@ -394,16 +499,115 @@ input:focus { border-color: var(--primary); outline: none; }
     const first = !state;
     state = s;
     if (s.error) toast(s.error);
+    applyConfig(s.config);
     $('hello').textContent = (familyLine ? familyLine + ' · ' : '') + 'Hola, ' + s.name;
     $('hello').hidden = false;
     show('app');
+    $('tabAdmin').hidden = !s.admin;
+    $('tabAdmin').parentElement.classList.toggle('three', !!s.admin);
     if (first) tab(s.phase === 'tria' ? 'others' : 'mine');
+    if (!s.admin && !$('paneAdmin').hidden) tab('mine');
     if (s.phase === 'temes' && s.msLeft < 86400000) {
       clearTimeout(deadlineTimer);
       deadlineTimer = setTimeout(() => { editing = false; refresh(); }, s.msLeft + 2000);
     }
     render();
+    if (s.admin) renderAdmin();
   }
+
+  // ---------- Ajustos ----------
+
+  let cfgDirty = false;
+  let confirmRemove = null;
+  let confirmEdition = false;
+  $('cfgForm').addEventListener('input', () => { cfgDirty = true; });
+
+  function renderAdmin() {
+    const a = state.admin;
+    if (!cfgDirty) {
+      $('cDate').value = a.date; $('cTime').value = a.time;
+      $('cTitol').value = a.titol; $('cFamilia').value = a.familia; $('cAvis').value = a.avis;
+      $('cNum').value = String(a.numTemes); $('cEx').value = a.exemples;
+      document.querySelectorAll('#cEstil input').forEach((r) => { r.checked = r.value === a.estil; });
+    }
+    $('noUrl').hidden = a.hasUrl;
+    $('guideBox').hidden = !CFG.appUrl;
+    if (CFG.appUrl) $('guideLink').href = CFG.appUrl + '?instruccions';
+    $('nBtn').textContent = confirmEdition ? 'Segur? Es buidarà el tauler' : 'Comença l\'edició nova';
+
+    const list = $('peopleList');
+    list.replaceChildren();
+    a.people.forEach((p) => {
+      const row = el('div', 'person-row');
+      const nm = el('div', 'pname', p.name + ' ');
+      nm.appendChild(el('small', null, p.name === state.name ? '(tu) · ' : ''));
+      nm.lastChild.textContent += p.written ? 'ja té temes' : 'sense temes';
+      row.appendChild(nm);
+
+      const chk = el('label', 'check');
+      const box = el('input'); box.type = 'checkbox'; box.checked = p.admin; box.disabled = p.name === state.name;
+      box.onchange = () => call('canviaAcces', p.name, box.checked).then((s) => s && !s.error && toast(box.checked ? p.name + ' ja pot entrar als ajustos.' : p.name + ' ja no pot entrar als ajustos.'));
+      chk.append(box, 'Ajustos');
+      row.appendChild(chk);
+
+      const acts = el('div', 'pactions');
+      if (p.wa) {
+        const w = el('a', 'small wa', 'WhatsApp'); w.href = p.wa; w.target = '_blank'; w.rel = 'noopener';
+        acts.appendChild(w);
+        const c = el('button', 'small', 'Copia l\'enllaç'); c.type = 'button';
+        c.onclick = async () => {
+          try { await navigator.clipboard.writeText(p.link); toast('Enllaç de ' + p.name + ' copiat.'); }
+          catch (e) { toast(p.link); }
+        };
+        acts.appendChild(c);
+      }
+      const tel = el('input'); tel.type = 'tel'; tel.value = p.phone; tel.placeholder = 'Mòbil'; tel.maxLength = 20;
+      tel.setAttribute('aria-label', 'Mòbil de ' + p.name);
+      tel.onchange = () => call('canviaTelefon', p.name, tel.value).then((s) => s && !s.error && toast('Mòbil de ' + p.name + ' desat.'));
+      acts.appendChild(tel);
+      if (p.name !== state.name) {
+        const rm = el('button', 'small danger', confirmRemove === p.name ? 'Segur? Treu-la' : 'Treu'); rm.type = 'button';
+        rm.onclick = () => {
+          if (confirmRemove !== p.name) { confirmRemove = p.name; renderAdmin(); return; }
+          confirmRemove = null;
+          call('treuPersona', p.name).then((s) => s && !s.error && toast(p.name + ' ja no hi és.'));
+        };
+        acts.appendChild(rm);
+      }
+      row.appendChild(acts);
+      list.appendChild(row);
+    });
+  }
+
+  $('cfgForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const estil = (document.querySelector('#cEstil input:checked') || {}).value || 'avet';
+    const v = { date: $('cDate').value, time: $('cTime').value, titol: $('cTitol').value, familia: $('cFamilia').value, avis: $('cAvis').value, numTemes: $('cNum').value, estil, exemples: $('cEx').value };
+    $('cfgSave').disabled = true;
+    cfgDirty = false;
+    const s = await call('desaAjustos', v);
+    $('cfgSave').disabled = false;
+    if (s && !s.error) toast('Ajustos desats. Ja els veu tothom.');
+    else cfgDirty = true;
+  });
+
+  $('addPerson').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('pName').value.trim();
+    if (!name) { toast('Escriu el nom.'); return; }
+    const s = await call('afegeixPersona', name, $('pPhone').value);
+    if (s && !s.error) { $('addPerson').reset(); toast(name + ' ja hi és. Envia-li el seu enllaç.'); }
+  });
+
+  $('newEdition').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!$('nDate').value) { toast('Posa la data límit de la nova edició.'); return; }
+    if (!confirmEdition) { confirmEdition = true; renderAdmin(); return; }
+    confirmEdition = false;
+    const s = await call('novaEdicio', $('nDate').value, $('nTime').value);
+    if (s && !s.error) { cfgDirty = false; $('newEdition').reset(); renderAdmin(); toast('Edició nova començada. Ara envia les instruccions al grup.'); tab('mine'); }
+    else renderAdmin();
+  });
 
   // ---------- Pintar ----------
 
@@ -559,12 +763,12 @@ input:focus { border-color: var(--primary); outline: none; }
   // ---------- Pestanyes ----------
 
   function tab(which) {
-    const mine = which === 'mine';
-    $('tabMine').setAttribute('aria-selected', String(mine));
-    $('tabOthers').setAttribute('aria-selected', String(!mine));
-    $('paneMine').hidden = !mine;
-    $('paneOthers').hidden = mine;
+    [['mine', 'tabMine', 'paneMine'], ['others', 'tabOthers', 'paneOthers'], ['admin', 'tabAdmin', 'paneAdmin']].forEach(([k, t, p]) => {
+      $(t).setAttribute('aria-selected', String(k === which));
+      $(p).hidden = k !== which;
+    });
   }
+  $('tabAdmin').onclick = () => tab('admin');
   $('tabMine').onclick = () => tab('mine');
   $('tabOthers').onclick = () => { tab('others'); refresh(); };
 
@@ -581,7 +785,7 @@ input:focus { border-color: var(--primary); outline: none; }
   $('login').addEventListener('submit', (e) => { e.preventDefault(); login($('code').value); });
   $('logout').onclick = () => { store.set(''); code = ''; state = null; editing = false; $('themeForm').reset(); $('code').value = ''; $('hello').textContent = familyLine; $('hello').hidden = !familyLine; tab('mine'); show('login'); };
 
-  function refresh() { if (code && state && !busy && !editing) call('entra'); }
+  function refresh() { if (code && state && !busy && !editing && !cfgDirty) call('entra'); }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 60000);
 

@@ -82,6 +82,7 @@ Fes-ho des d'un ordinador. Millor amb un **compte de Google personal** (Gmail): 
 **6. Escriu la família** (pestanya **Participants**)
 - Columna A: els noms (n'hi ha uns de mostra: esborra'ls o canvia'ls). Cada nom ha de ser diferent.
 - Columna D (opcional): el mòbil de cadascú, p. ex. `600 11 22 33`.
+- Columna F, **Pot configurar**: escriu **Sí** a la teva fila. Així veuràs la pestanya **Ajustos** a l'aplicació. (Si encara no hi és, surt en prémer el pas 7.)
 
 **7. Genera els enllaços**
 1. Torna a carregar el full (F5). Al cap d'uns segons, a dalt surt el menú **Amic invisible**.
@@ -104,14 +105,36 @@ Fes-ho des d'un ordinador. Millor amb un **compte de Google personal** (Gmail): 
 - **No surt el menú «Amic invisible»:** torna a carregar el full i espera uns segons. També pots executar `prepara` des de l'editor: fa el mateix.
 - **Has canviat el codi:** **Implementa > Gestiona les implementacions > ✏️ > Versió: Versió nova > Implementa**. L'enllaç no canvia.
 
+## Ajustos: tot des del mòbil
+
+Qui tingui **Sí** a la columna «Pot configurar» de Participants veu una tercera pestanya, **Ajustos**, a l'aplicació. Des d'allà, sense obrir el full:
+
+- **Data límit:** dia i hora. Quan la canvies, els missatges de WhatsApp ja porten la data nova.
+- **Textos:** títol, família i avís (pressupost, dia de l'intercanvi…).
+- **Joc:** temes per persona, colors i exemples.
+- **Família:** per a cada persona, el botó **WhatsApp** (obre el xat amb el missatge i el seu enllaç), **Copia l'enllaç**, el **mòbil** (opcional, només perquè el WhatsApp s'obri directament al seu xat), **Treu** i la casella **Ajustos** per donar-li o treure-li l'accés. A sota, **Persona nova**: nom i, si vols, mòbil.
+- **Instruccions per al grup:** obre la targeta del cargol.
+- **Edició nova (l'any que ve):** vegeu més avall.
+
+Als Ajustos no hi surt mai qui ha triat qui. Però qui hi té accés pot veure els enllaços de tothom: dona'l només a qui organitzi.
+
+## L'any que ve
+
+1. Entra a **Ajustos > Edició nova**, posa la nova data límit i prem **Comença l'edició nova** (dues vegades, per confirmar).
+2. Els temes d'aquest any queden guardats en una pestanya **Arxiu 2026** del full, i el tauler queda net.
+3. La família i els enllaços són els mateixos: només cal tornar a enviar les instruccions al grup. Si arriba algú nou, afegeix-lo a **Família** i envia-li el seu enllaç.
+
 ## Personalitza-ho
 
 Tot es canvia a la pestanya **Configuració** del full, i la pàgina ho agafa al moment: no cal tocar el codi ni tornar a implementar res.
 
 ![Personalitza-ho](imatges/personalitza.png)
 
+Tot això també es pot canviar des de la pestanya **Ajustos** de l'aplicació.
+
 | Opció | Per defecte | Què fa |
 |---|---|---|
+| Enllaç de l'aplicació | (buit) | L'URL que acaba en `/exec`. Amb ella es fan els enllaços personals. |
 | Títol | Amic invisible | Surt a dalt de tot. |
 | Família | Bové Palau | Surt sota el títol, amb les inicials (BP) en un cercle. Si és buit, hi surt un paquet de regal. |
 | Avís | Pressupost: uns 20 €… | Text per a tothom: pressupost, data de l'intercanvi, lloc… Si és buit, no surt. |

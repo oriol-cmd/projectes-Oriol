@@ -44,10 +44,11 @@ const ctx = {
     DigestAlgorithm: { SHA_256: 'sha256' },
     computeDigest: (_a, s) => Array.from(crypto.createHash('sha256').update(s).digest()).map((b) => (b > 127 ? b - 256 : b)),
     getUuid: () => crypto.randomUUID(),
-    formatDate: (d, tz) => {
-      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    formatDate: (d, tz, fmt) => {
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', year: 'numeric', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
         .formatToParts(d).map((x) => [x.type, x.value]));
-      return `${weekdays[p.weekday]}|${p.day}|${p.month}|${p.hour}:${p.minute}`;
+      const t = { yyyy: p.year, MM: p.month.padStart(2, '0'), dd: p.day.padStart(2, '0'), HH: p.hour, mm: p.minute, u: String(weekdays[p.weekday]), d: String(Number(p.day)), M: String(Number(p.month)) };
+      return fmt.replace(/yyyy|MM|dd|HH|mm|u|d|M/g, (k) => t[k]);
     },
   },
   HtmlService: {},
@@ -127,7 +128,7 @@ async function open(name, { viaLink = true, viewport = { width: 1100, height: 90
     });
     window.google = { script: { run: runner(), url: { getLocation: (cb) => setTimeout(() => cb({ parameter }), 0) } } };
   }, { parameter });
-  await page.route('https://amic.test/', (r) => r.fulfill({ contentType: 'text/html', body: html.replace('<?!= config ?>', JSON.stringify(gs('config_()')).replace(/</g, '\\u003c')) }));
+  await page.route('https://amic.test/', (r) => r.fulfill({ contentType: 'text/html', body: html.replace('<?!= config ?>', JSON.stringify(gs('publicConfig_(config_())')).replace(/</g, '\\u003c')) }));
   await page.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
   await page.goto('https://amic.test/');
   await page.waitForSelector('#app:not([hidden]), #login:not([hidden]), #guide:not([hidden])');
@@ -224,6 +225,74 @@ ok((await cfgPage.locator('#fields input').count()) === 3, 'amb «Temes per pers
 ok((await cfgPage.getAttribute('html', 'data-estil')) === 'nit' && (await cfgPage.textContent('#title')) === 'Amic invisible 2026', 'l\'estil i el títol canvien sense tornar a implementar');
 setCfg('Temes per persona', 2); setCfg('Estil', 'avet'); setCfg('Títol', 'Amic invisible');
 
+console.log('Ajustos');
+setCfg('Data límit', '07/12/2026 22:00');
+const oriolRow = sheets.Participants.data.find((r) => r[0] === 'Oriol');
+oriolRow[5] = 'sí';
+gs('prepara()');
+ok(sheets.Participants.data.find((r) => r[0] === 'Oriol')[5] === 'Sí', 'a Participants, «sí» a «Pot configurar» queda com a «Sí»');
+ok(/No tens accés/.test(gs(`desaAjustos(${J(code.Anna)}, {date: "2026-12-01", time: "10:00", numTemes: 2, estil: "avet"})`).error), 'qui no té accés no pot canviar els ajustos');
+ok(gs(`entra(${J(code.Anna)})`).admin === null, 'a qui no té accés no li arriba res dels ajustos');
+const adm = gs(`entra(${J(code.Oriol)})`).admin;
+ok(adm && adm.date === '2026-12-07' && adm.time === '22:00' && adm.people.length === 8, 'l\'Oriol rep els ajustos (data límit i família)');
+ok(!JSON.stringify(adm).match(/status|triat|pick/i) && adm.people.every((p) => Object.keys(p).sort().join() === 'admin,link,name,phone,wa,written'), 'als ajustos no hi surt qui ha triat qui');
+
+const annaP = await open('Anna');
+ok(await annaP.locator('#tabAdmin').isHidden(), 'l\'Anna no veu la pestanya Ajustos');
+const oriol = await open('Oriol', { viewport: { width: 390, height: 844 } });
+ok(await oriol.locator('#tabAdmin').isVisible(), 'l\'Oriol veu la pestanya Ajustos');
+await oriol.click('#tabAdmin');
+ok((await oriol.inputValue('#cDate')) === '2026-12-07' && (await oriol.inputValue('#cTime')) === '22:00', 'el panell mostra la data límit actual');
+await oriol.fill('#cDate', '2026-12-10'); await oriol.fill('#cTime', '21:30');
+await oriol.fill('#cAvis', 'Pressupost: 25 €. Intercanvi a casa dels avis.');
+await oriol.click('label.swatch:has(input[value="gerd"])');
+await oriol.click('#cfgSave');
+await oriol.waitForFunction(() => document.documentElement.getAttribute('data-estil') === 'gerd');
+ok(gs('config_()').dataLimitText === 'dijous 10 de desembre a les 21:30', 'l\'Oriol canvia la data límit des del mòbil');
+ok(sheets['Configuració'].data.find((r) => r[0] === 'Data límit')[1] === '10/12/2026 21:30', 'i queda escrita al full com a «10/12/2026 21:30»');
+ok((await oriol.textContent('#phase')).includes('dijous 10 de desembre a les 21:30') && (await oriol.textContent('#notice')).includes('25 €'), 'la pàgina s\'actualitza amb la data, l\'avís i els colors nous');
+ok(decodeURIComponent(sheets.Participants.data[1][4]).includes('dijous 10 de desembre'), 'els missatges de WhatsApp ja porten la data nova');
+await annaP.reload(); await annaP.waitForSelector('#app:not([hidden])');
+ok((await annaP.textContent('#phase')).includes('dijous 10 de desembre a les 21:30'), 'l\'Anna també veu la data nova');
+
+// Família: afegir, donar accés i treure.
+await oriol.fill('#pName', 'Iu'); await oriol.fill('#pPhone', '611 22 33 44');
+await oriol.click('#addPerson button[type="submit"]');
+await oriol.locator('.person-row', { hasText: 'Iu' }).waitFor();
+const iu = sheets.Participants.data.find((r) => r[0] === 'Iu');
+ok(iu && /^[A-Z][A-Z2-9]{5}$/.test(iu[1]) && iu[2].endsWith('?codi=' + iu[1]), 'en Iu té codi i enllaç propis');
+ok((await oriol.locator('.person-row', { hasText: 'Iu' }).locator('a.wa').getAttribute('href')).startsWith('https://wa.me/34611223344?text='), 'i un botó de WhatsApp directe al seu mòbil');
+ok(/Ja hi ha algú/.test(gs(`afegeixPersona(${J(code.Oriol)}, "anna", "")`).error), 'no es pot afegir un nom repetit');
+await oriol.locator('.person-row', { hasText: 'Anna' }).locator('input[type="checkbox"]').check();
+await oriol.waitForFunction(() => !document.body.style.cursor);
+ok(sheets.Participants.data.find((r) => r[0] === 'Anna')[5] === 'Sí', 'l\'Oriol dona accés als ajustos a l\'Anna');
+await annaP.reload(); await annaP.waitForSelector('#app:not([hidden])');
+ok(await annaP.locator('#tabAdmin').isVisible(), 'i ara l\'Anna també veu la pestanya Ajustos');
+ok(/a tu mateix/.test(gs(`canviaAcces(${J(code.Oriol)}, "Oriol", false)`).error), 'ningú es pot treure l\'accés a si mateix');
+const rmBtn = oriol.locator('.person-row', { hasText: 'Iu' }).getByRole('button', { name: /Treu/ });
+await rmBtn.click();
+ok((await rmBtn.textContent()) === 'Segur? Treu-la', 'treure algú demana confirmació');
+await rmBtn.click();
+await oriol.locator('.person-row', { hasText: 'Iu' }).waitFor({ state: 'detached' });
+ok(!sheets.Participants.data.some((r) => r[0] === 'Iu'), 'en Iu ja no hi és');
+gs(`canviaAcces(${J(code.Oriol)}, "Anna", false)`);
+
+// Edició nova per a l'any que ve.
+gs(`desa(${J(code.Anna)}, ["Cuina", "Japó"])`);
+const codesBefore = sheets.Participants.data.slice(1).map((r) => r[1]).join();
+ok(/més endavant/.test(gs(`novaEdicio(${J(code.Oriol)}, "2026-01-01", "22:00")`).error), 'l\'edició nova necessita una data límit futura');
+await oriol.fill('#nDate', '2027-12-07');
+await oriol.click('#nBtn');
+ok((await oriol.textContent('#nBtn')) === 'Segur? Es buidarà el tauler', 'començar una edició nova demana confirmació');
+await oriol.click('#nBtn');
+await oriol.waitForFunction(() => document.getElementById('phase').textContent.includes('2027') || document.getElementById('phase').textContent.includes('7 de desembre'));
+const arch = Object.keys(sheets).find((n) => n.startsWith('Arxiu '));
+ok(arch && sheets[arch].data.some((r) => r[0] === 'Anna' && r[1] === 'Cuina'), 'els temes d\'aquest any queden guardats a «' + arch + '»');
+ok(sheets.Temes.data.length === 1 && sheets.Tries.data.length === 1, 'el tauler queda net (sense temes ni tries)');
+ok(sheets.Participants.data.slice(1).map((r) => r[1]).join() === codesBefore, 'la família i els enllaços són els mateixos');
+ok(sheets['Configuració'].data.find((r) => r[0] === 'Data límit')[1] === '07/12/2027 22:00', 'amb la data límit nova: 07/12/2027 22:00');
+setCfg('Data límit', '07/12/2026 22:00'); setCfg('Estil', 'avet'); setCfg('Avís', 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.');
+
 if (shots) {
   fs.mkdirSync(shots, { recursive: true });
   sheets.Temes.data.splice(1); sheets.Tries.data.splice(1);
@@ -263,6 +332,19 @@ if (shots) {
     }
   }
   setCfg('Estil', 'avet');
+
+  // Panell d'ajustos (l'Oriol hi té accés).
+  sheets.Participants.data.find((r) => r[0] === 'David')[3] = '622 33 44 55';
+  gs('prepara()');
+  setNow(BEFORE);
+  const adm = await open('Oriol', { viewport: phone, scale: 2 });
+  await adm.click('#tabAdmin');
+  await adm.evaluate(() => { document.getElementById('toast').hidden = true; window.scrollTo(0, 0); });
+  await adm.screenshot({ path: path.join(shots, 'ajustos.png'), fullPage: true });
+  await (await adm.$('#cfgForm')).screenshot({ path: path.join(shots, 'ajustos-1-data-i-textos.png') });
+  await (await adm.$('#peopleList')).evaluate((e) => e.closest('section').id = 'familyBox');
+  await (await adm.$('#familyBox')).screenshot({ path: path.join(shots, 'ajustos-2-familia.png') });
+  await (await adm.$('#newEdition')).screenshot({ path: path.join(shots, 'ajustos-3-edicio-nova.png') });
 
   // Targeta d'instruccions per a WhatsApp.
   setNow(BEFORE);

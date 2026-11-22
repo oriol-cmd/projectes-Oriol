@@ -65,7 +65,7 @@ const CONFIG_ROWS = [
 function doGet() {
   const cfg = config_();
   const t = HtmlService.createTemplateFromFile('Index');
-  t.config = JSON.stringify(cfg).replace(/</g, '\\u003c');
+  t.config = JSON.stringify(publicConfig_(cfg)).replace(/</g, '\\u003c');
   return t.evaluate()
     .setTitle(cfg.titol + (cfg.familia ? ' · ' + cfg.familia : ''))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -94,12 +94,23 @@ function prepara() {
     cs.getRange(start, 1, missing.length, 3).setValues(missing.map((r) => [r[0], INICIAL[r[1]], r[2]]));
   }
 
-  const ps = sheet_(ss, SHEET_PARTICIPANTS, ['Nom', 'Codi', 'Enllaç personal', 'Telèfon (opcional)', 'Envia-li per WhatsApp']);
   sheet_(ss, SHEET_THEMES, ['id', 'Nom', 'Tema 1', 'Tema 2', 'Tema 3', 'Actualitzat']);
   sheet_(ss, SHEET_PICKS, ['Per a (xifrat)', 'Triat per (xifrat)', 'Data']).hideSheet();
+  return refreshPeople_();
+}
+
+const PEOPLE_HEADER = ['Nom', 'Codi', 'Enllaç personal', 'Telèfon (opcional)', 'Envia-li per WhatsApp', 'Pot configurar (Sí/No)'];
+
+// Torna a escriure la pestanya Participants: codis nous per a qui no en té, enllaços i
+// botons de WhatsApp. Conserva codis, telèfons i permisos. `edit` permet canviar la llista.
+function refreshPeople_(edit) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ps = sheet_(ss, SHEET_PARTICIPANTS, PEOPLE_HEADER);
+  if (String(ps.getDataRange().getValues()[0][5] || '') === '') ps.getRange(1, 1, 1, 6).setValues([PEOPLE_HEADER]);
 
   const rows = rows_(ps).filter((r) => String(r[0]).trim());
-  const source = rows.length ? rows : INICIAL.participants.map((n) => [n, '', '', '']);
+  let source = rows.length ? rows : INICIAL.participants.map((n) => [n, '', '', '', '', '']);
+  if (edit) source = edit(source.map((r) => r.slice(0, 6)));
   const names = source.map((r) => String(r[0]).trim());
   const seen = new Set();
   names.forEach((n) => {
@@ -109,33 +120,41 @@ function prepara() {
 
   const used = new Set(source.map((r) => String(r[1] || '')).filter(Boolean));
   const cfg = config_();
-  // L'enllaç de Configuració; si és buit, el que doni Google (només si és el públic, el que acaba en /exec).
-  let url = cfg.url;
-  if (!url) {
-    try { const u = ScriptApp.getService().getUrl() || ''; if (/\/exec$/.test(u)) url = u; } catch (e) { url = ''; }
-  }
+  const url = appUrl_(cfg);
 
   const out = source.map((r, i) => {
     let code = String(r[1] || '').trim().toUpperCase();
     if (!code) { do { code = newCode_(); } while (used.has(code)); used.add(code); }
     const link = url ? url + '?codi=' + code : '';
     const phone = String(r[3] || '').trim();
-    let wa = '';
-    if (link) {
-      const digits = phone.replace(/\D/g, '');
-      const to = digits.length === 9 ? '34' + digits : digits; // mòbils d'aquí sense prefix
-      wa = '=HYPERLINK("https://wa.me/' + to + '?text=' + encodeURIComponent(message_(names[i], link, cfg)) + '", "Envia-li ➜")';
-    }
-    return [names[i], code, link || '(enganxa l\'enllaç de l\'aplicació a Configuració i torna a generar els enllaços)', phone, wa];
+    const wa = link ? '=HYPERLINK("' + waUrl_(names[i], phone, link, cfg) + '", "Envia-li ➜")' : '';
+    const admin = isYes_(r[5]) ? 'Sí' : '';
+    return [names[i], code, link || '(enganxa l\'enllaç de l\'aplicació a Configuració i torna a generar els enllaços)', phone, wa, admin];
   });
 
   const last = ps.getLastRow();
-  if (last > 1) ps.getRange(2, 1, last - 1, 5).setValues(Array.from({ length: last - 1 }, () => ['', '', '', '', '']));
+  if (last > 1) ps.getRange(2, 1, last - 1, 6).setValues(Array.from({ length: last - 1 }, () => ['', '', '', '', '', '']));
   // Text pla, perquè Sheets no converteixi cap codi ni cap telèfon en número o fórmula.
   ps.getRange(2, 2, 60, 1).setNumberFormat('@');
   ps.getRange(2, 4, 60, 1).setNumberFormat('@');
-  ps.getRange(2, 1, out.length, 5).setValues(out);
+  if (out.length) ps.getRange(2, 1, out.length, 6).setValues(out);
   return out;
+}
+
+function appUrl_(cfg) {
+  if (cfg.url) return cfg.url;
+  try { const u = ScriptApp.getService().getUrl() || ''; if (/\/exec$/.test(u)) return u; } catch (e) { /* sense enllaç */ }
+  return '';
+}
+
+function waUrl_(name, phone, link, cfg) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  const to = digits.length === 9 ? '34' + digits : digits; // mòbils d'aquí sense prefix
+  return 'https://wa.me/' + to + '?text=' + encodeURIComponent(message_(name, link, cfg));
+}
+
+function isYes_(v) {
+  return /^(s[ií]|x|yes|1|true|vertader)$/i.test(String(v || '').trim());
 }
 
 // Missatge personal de WhatsApp amb l'enllaç de cadascú.
@@ -172,6 +191,14 @@ function config_() {
     dataLimit: limit ? limit.getTime() : 0,
     dataLimitText: limit ? formatDate_(limit) : '',
   };
+}
+
+// El que pot veure tothom (sense l'enllaç de configuració).
+function publicConfig_(cfg) {
+  const c = Object.assign({}, cfg);
+  delete c.url;
+  c.appUrl = appUrl_(cfg);
+  return c;
 }
 
 // Accepta una data de Sheets o un text com «07/12/2026 22:00» (l'hora és opcional: 23:59).
@@ -263,6 +290,141 @@ function desfes(code) {
   });
 }
 
+// ---------- Ajustos (només per a qui té «Sí» a «Pot configurar») ----------
+
+function adminOnly_(code, fn) {
+  return withLock_(() => {
+    const me = who_(code);
+    if (!me.admin) return state_(me, 'No tens accés als ajustos. Demana-ho a qui organitza.');
+    const err = fn(me);
+    return state_(who_(code), err || '');
+  });
+}
+
+function desaAjustos(code, v) {
+  return adminOnly_(code, () => {
+    v = v || {};
+    const text = (x, max) => {
+      const t = String(x == null ? '' : x).replace(/\s+/g, ' ').trim().slice(0, max);
+      return /^[=+\-@]/.test(t) ? "'" + t : t;
+    };
+    const limit = v.date ? limitText_(v.date, v.time) : '';
+    if (limit === null) return 'La data límit no és vàlida.';
+    const n = parseInt(v.numTemes, 10);
+    if (!(n >= 1 && n <= 3)) return 'Els temes per persona han de ser 1, 2 o 3.';
+    if (ESTILS.indexOf(String(v.estil)) < 0) return 'Aquest estil no existeix.';
+    setConfig_({
+      titol: text(v.titol, 60) || 'Amic invisible',
+      familia: text(v.familia, 60),
+      avis: text(v.avis, 300),
+      dataLimit: limit,
+      numTemes: String(n),
+      estil: String(v.estil),
+      exemples: text(v.exemples, 200),
+    });
+    refreshPeople_(); // els missatges de WhatsApp porten la data nova
+  });
+}
+
+function afegeixPersona(code, name, phone) {
+  return adminOnly_(code, () => {
+    const n = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!n) return 'Escriu el nom.';
+    if (/^[=+\-@]/.test(n)) return 'El nom no pot començar amb aquest símbol.';
+    if (participants_().some((p) => p.name.toLowerCase() === n.toLowerCase())) return 'Ja hi ha algú que es diu ' + n + '. Afegeix-hi una inicial.';
+    refreshPeople_((rows) => rows.concat([[n, '', '', String(phone || '').trim().slice(0, 20), '', '']]));
+  });
+}
+
+function canviaTelefon(code, name, phone) {
+  return adminOnly_(code, () => {
+    refreshPeople_((rows) => rows.map((r) => (String(r[0]).trim() === name ? [r[0], r[1], r[2], String(phone || '').trim().slice(0, 20), r[4], r[5]] : r)));
+  });
+}
+
+function treuPersona(code, name) {
+  return adminOnly_(code, (me) => {
+    if (name === me.name) return 'No et pots treure a tu mateix.';
+    const p = participants_().find((x) => x.name === name);
+    if (!p) return '';
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    deleteRows_(ss.getSheetByName(SHEET_THEMES), (r) => r[1] === name);
+    deleteRows_(ss.getSheetByName(SHEET_PICKS), (r) => r[0] === p.key || r[1] === p.hash);
+    refreshPeople_((rows) => rows.filter((r) => String(r[0]).trim() !== name));
+  });
+}
+
+function canviaAcces(code, name, on) {
+  return adminOnly_(code, (me) => {
+    if (name === me.name && !on) return 'No et pots treure l\'accés a tu mateix: demana-ho a un altre administrador.';
+    refreshPeople_((rows) => rows.map((r) => (String(r[0]).trim() === name ? [r[0], r[1], r[2], r[3], r[4], on ? 'Sí' : ''] : r)));
+  });
+}
+
+// «2026-12-07» + «22:00» (dels camps de la pàgina) → «07/12/2026 22:00». null si no és vàlida.
+function limitText_(date, time) {
+  const d = String(date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const t = String(time || '23:59').match(/^(\d{2}):(\d{2})$/);
+  return d && t ? d[3] + '/' + d[2] + '/' + d[1] + ' ' + t[1] + ':' + t[2] : null;
+}
+
+// Per a l'any que ve: guarda els temes en una pestanya d'arxiu, deixa el tauler net i posa
+// la data límit nova. La família i els enllaços es mantenen.
+function novaEdicio(code, date, time) {
+  return adminOnly_(code, () => {
+    const limit = limitText_(date, time);
+    if (!limit || !(parseDate_(limit) > now_())) return 'Posa la data límit de la nova edició (ha de ser més endavant d\'avui).';
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ts = ss.getSheetByName(SHEET_THEMES);
+    const rows = rows_(ts).filter((r) => r[0]);
+    if (rows.length) {
+      const year = Utilities.formatDate(now_(), Session.getScriptTimeZone(), 'yyyy');
+      let name = 'Arxiu ' + year;
+      for (let i = 2; ss.getSheetByName(name); i++) name = 'Arxiu ' + year + ' (' + i + ')';
+      const arch = ss.insertSheet(name);
+      arch.appendRow(['Nom', 'Tema 1', 'Tema 2', 'Tema 3']);
+      arch.getRange(2, 1, rows.length, 4).setValues(rows.map((r) => [r[1], r[2], r[3], r[4]]));
+    }
+    deleteRows_(ts, () => true);
+    deleteRows_(ss.getSheetByName(SHEET_PICKS), () => true);
+    setConfig_({ dataLimit: limit });
+    refreshPeople_();
+  });
+}
+
+function setConfig_(values) {
+  const cs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIG);
+  const rows = rows_(cs);
+  Object.keys(values).forEach((key) => {
+    const def = CONFIG_ROWS.find((c) => c[1] === key);
+    const i = rows.findIndex((r) => String(r[0]).trim().toLowerCase() === def[0].toLowerCase());
+    if (i >= 0) cs.getRange(i + 2, 2, 1, 1).setValues([[values[key]]]);
+    else { cs.appendRow([def[0], values[key], def[2]]); rows.push([def[0], values[key]]); }
+  });
+}
+
+function adminData_(cfg, themes) {
+  const tz = Session.getScriptTimeZone();
+  const limit = cfg.dataLimit ? new Date(cfg.dataLimit) : null;
+  const url = appUrl_(cfg);
+  const written = new Set(themes.map((r) => r[1]));
+  return {
+    titol: cfg.titol, familia: cfg.familia, avis: cfg.avis, numTemes: cfg.numTemes, estil: cfg.estil,
+    exemples: cfg.exemples.join(', '),
+    date: limit ? Utilities.formatDate(limit, tz, 'yyyy-MM-dd') : '',
+    time: limit ? Utilities.formatDate(limit, tz, 'HH:mm') : '',
+    hasUrl: !!url,
+    people: participants_().map((p) => ({
+      name: p.name,
+      admin: p.admin,
+      phone: p.phone,
+      written: written.has(p.name),
+      link: url ? url + '?codi=' + p.code : '',
+      wa: url ? waUrl_(p.name, p.phone, url + '?codi=' + p.code, cfg) : '',
+    })),
+  };
+}
+
 // ---------- Intern ----------
 
 function state_(me, error) {
@@ -298,6 +460,8 @@ function state_(me, error) {
     mine: themesOf(me.name), // sense cap informació de si l'han triat
     myPick: myPick,
     others: others,
+    config: publicConfig_(cfg),
+    admin: me.admin ? adminData_(cfg, themes) : null,
   };
 }
 
@@ -306,7 +470,7 @@ function participants_() {
   return rows_(sh).filter((r) => r[0] && r[1]).map((r) => {
     const code = String(r[1]).toUpperCase();
     const name = String(r[0]).trim();
-    return { name: name, code: code, hash: hash_(code), key: hash_('persona:' + name.toLowerCase()) };
+    return { name: name, code: code, hash: hash_(code), key: hash_('persona:' + name.toLowerCase()), phone: String(r[3] || ''), admin: isYes_(r[5]) };
   });
 }
 
