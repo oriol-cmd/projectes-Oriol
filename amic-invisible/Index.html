@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amic invisible</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Disseny: etiquetes de regal (amb el foradet del cordill) sobre paper de pi fosc; vermell nabiu per al que és teu. */
+:root {
+  --bg: #eef2ef;
+  --paper: #ffffff;
+  --ink: #17231f;
+  --muted: #5b6b65;
+  --line: #d5ddd9;
+  --pine: #1f5a4a;
+  --pine-soft: #e1ece7;
+  --berry: #b3263e;
+  --berry-soft: #f8e3e7;
+  --taken: #8a958f;
+  --head: #173f35;
+  --head-ink: #f3f7f5;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101816; --paper: #18231f; --ink: #e6eeea; --muted: #9aaba4; --line: #2b3a35;
+    --pine: #6cc2a5; --pine-soft: #1c3029; --berry: #f0758a; --berry-soft: #3a1f26; --taken: #6f7d77;
+    --head: #0b1311; --head-ink: #e6eeea; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); -webkit-text-size-adjust: 100%; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--pine); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+
+header.top { background: var(--head); color: var(--head-ink); padding-block: 18px 20px; }
+header.top .wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.brand small { display: block; font: 500 13px var(--font-body); opacity: 0.75; }
+.ghost { background: transparent; border: 1px solid color-mix(in srgb, var(--head-ink) 35%, transparent); color: var(--head-ink); border-radius: 999px; padding: 6px 14px; font-size: 13px; }
+
+.notice { background: var(--pine-soft); color: var(--ink); border-bottom: 1px solid var(--line); padding-block: 10px; font-size: 14px; }
+
+main { padding-block: 20px 60px; display: grid; gap: 20px; }
+
+/* Entrada */
+.login { max-width: 420px; margin: 40px auto 0; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 24px; display: grid; gap: 14px; }
+.login h2 { font-size: 22px; }
+.login p { margin: 0; color: var(--muted); }
+.code-input { text-transform: uppercase; letter-spacing: 0.25em; font-size: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* Pestanyes */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.tabs button { border: 0; background: transparent; border-radius: 9px; padding: 10px 8px; font-weight: 600; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--head); color: var(--head-ink); }
+
+.hint { color: var(--muted); font-size: 13.5px; margin: 0; display: flex; gap: 8px; align-items: flex-start; }
+.hint svg { flex: none; margin-top: 2px; }
+
+/* Formulari */
+form.add { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+form.add h3 { font-size: 17px; }
+.row { display: grid; grid-template-columns: 1fr 140px; gap: 10px; }
+label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); min-width: 0; }
+input[type="text"], input[type="url"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); }
+input:focus { border-color: var(--pine); outline: none; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 0; border-radius: 9px; padding: 10px 16px; font-weight: 600; background: var(--pine); color: var(--paper); }
+.btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+/* Etiquetes de regal */
+.tags { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tag { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 6px 14px 14px 6px; padding: 14px 14px 14px 34px; display: grid; gap: 8px; min-width: 0; }
+.tag::before { content: ""; position: absolute; left: 12px; top: 18px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 1.5px solid var(--line); }
+.tag .text { font-weight: 600; overflow-wrap: anywhere; }
+.tag .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); align-items: center; }
+.tag .meta a { color: var(--pine); overflow-wrap: anywhere; }
+.tag .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.tag.is-mine { border-color: var(--berry); background: var(--berry-soft); }
+.tag.is-mine::before { border-color: var(--berry); }
+.tag.is-taken .text { color: var(--taken); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 3px 10px; letter-spacing: 0.01em; }
+.chip.free { color: var(--pine); background: var(--pine-soft); }
+.chip.mine { color: var(--paper); background: var(--berry); }
+.chip.taken { color: var(--taken); border: 1px solid var(--line); }
+.small { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 5px 11px; font-size: 13px; font-weight: 600; }
+.small.mark { border-color: var(--pine); color: var(--pine); }
+.small.danger { border-color: var(--berry); color: var(--berry); }
+
+.person { display: grid; gap: 10px; }
+.person h2 { font-size: 19px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.person h2 span { font: 500 13px var(--font-body); color: var(--muted); }
+.empty { color: var(--muted); font-size: 14px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 14px; margin: 0; }
+
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.2); z-index: 5; }
+.loading { color: var(--muted); text-align: center; padding: 40px 0; }
+
+@media (max-width: 520px) {
+  .row { grid-template-columns: 1fr; }
+  .brand h1 { font-size: 20px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tag { transition: border-color .15s, background-color .15s; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <rect x="4" y="13" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="2" y="9" width="30" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M17 9v22" stroke="currentColor" stroke-width="2"/>
+        <path d="M17 9c-2-5-8-6-8-2s6 2 8 2c2 0 8 2 8-2s-6-3-8 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+      <div><h1>Amic invisible</h1><small id="hello">Llistes de desitjos</small></div>
+    </div>
+    <button class="ghost" id="logout" type="button" hidden>No sóc jo</button>
+  </div>
+</header>
+<div class="notice" id="notice" hidden><div class="wrap" id="noticeText"></div></div>
+
+<main class="wrap">
+  <p class="loading" id="loading">Carregant…</p>
+
+  <form class="login" id="login" hidden>
+    <h2>Entra al tauler</h2>
+    <p>Escriu el codi de 6 lletres que t'han enviat. Si has obert el teu enllaç personal, entraràs sol.</p>
+    <label for="code">El teu codi
+      <input class="code-input" id="code" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234">
+    </label>
+    <button class="btn" type="submit" id="loginBtn">Entra</button>
+  </form>
+
+  <section id="app" hidden>
+    <div style="display:grid;gap:20px">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tabMine" aria-selected="true">La meva llista</button>
+        <button type="button" role="tab" id="tabOthers" aria-selected="false">Els altres</button>
+      </div>
+
+      <div id="paneMine" style="display:grid;gap:16px">
+        <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Els altres veuen aquesta llista i en poden triar alguna cosa. Tu no sabràs mai si n'han marcat res, ni qui.</p>
+        <form class="add" id="wishForm">
+          <h3 id="formTitle">Què t'agradaria?</h3>
+          <label for="wText">Desig
+            <input id="wText" type="text" maxlength="200" required placeholder="P. ex. un llibre de cuina japonesa">
+          </label>
+          <div class="row">
+            <label for="wLink">Enllaç (opcional)
+              <input id="wLink" type="url" inputmode="url" maxlength="500" placeholder="https://…">
+            </label>
+            <label for="wPrice">Preu aprox. (opcional)
+              <input id="wPrice" type="text" maxlength="30" placeholder="15 €">
+            </label>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit" id="saveBtn">Afegeix a la llista</button>
+            <button class="btn secondary" type="button" id="cancelEdit" hidden>Cancel·la</button>
+          </div>
+        </form>
+        <div class="tags" id="mineList"></div>
+      </div>
+
+      <div id="paneOthers" style="display:grid;gap:26px" hidden>
+        <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Marca el que regalaràs. Els altres veuran que ja està agafat, però ningú sabrà que has estat tu.</p>
+        <div id="othersList" style="display:grid;gap:26px"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const KEY = 'amic-invisible-codi';
+  let code = '';
+  let state = null;
+  let editing = null;   // id del desig que s'està editant
+  let confirmDel = null; // id del desig pendent de confirmar
+  let busy = false;
+
+  const store = {
+    get() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } },
+    set(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} },
+  };
+
+  function api(fn, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+    });
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 3800);
+  }
+
+  function show(view) {
+    $('loading').hidden = view !== 'loading';
+    $('login').hidden = view !== 'login';
+    $('app').hidden = view !== 'app';
+    $('logout').hidden = view !== 'app';
+  }
+
+  async function call(fn, ...args) {
+    if (busy) return;
+    busy = true;
+    document.body.style.cursor = 'progress';
+    try {
+      const s = await api(fn, code, ...args);
+      apply(s);
+      return s;
+    } catch (err) {
+      const msg = String((err && err.message) || err);
+      if (msg.indexOf('codi-incorrecte') >= 0) { store.set(''); code = ''; show('login'); toast('Aquest codi no és vàlid.'); }
+      else toast(msg.replace(/^Error:\s*/, '') || 'No s\'ha pogut desar. Torna-ho a provar.');
+    } finally {
+      busy = false;
+      document.body.style.cursor = '';
+    }
+  }
+
+  function apply(s) {
+    state = s;
+    if (s.error) toast(s.error);
+    $('hello').textContent = 'Hola, ' + s.name;
+    $('noticeText').textContent = s.notice || '';
+    $('notice').hidden = !s.notice;
+    show('app');
+    render();
+  }
+
+  // ---------- Pintar ----------
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function meta(w) {
+    const m = el('div', 'meta');
+    if (w.price) m.appendChild(el('span', null, w.price));
+    if (/^https?:\/\//i.test(w.link)) {
+      const a = el('a', null, 'Veure l\'enllaç');
+      a.href = w.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      m.appendChild(a);
+    }
+    return m;
+  }
+
+  function render() {
+    // La meva llista
+    const mine = $('mineList');
+    mine.replaceChildren();
+    if (!state.mine.length) {
+      mine.appendChild(el('p', 'empty', 'Encara no has afegit res. Escriu el primer desig aquí dalt.'));
+    }
+    state.mine.forEach((w) => {
+      const t = el('article', 'tag');
+      t.appendChild(el('div', 'text', w.text));
+      if (w.price || w.link) t.appendChild(meta(w));
+      const bar = el('div', 'bar');
+      const left = el('div', 'actions');
+      const ed = el('button', 'small', 'Edita'); ed.type = 'button';
+      ed.onclick = () => startEdit(w);
+      const del = el('button', 'small danger', confirmDel === w.id ? 'Segur? Esborra' : 'Esborra'); del.type = 'button';
+      del.onclick = () => {
+        if (confirmDel !== w.id) { confirmDel = w.id; render(); return; }
+        confirmDel = null;
+        if (editing === w.id) stopEdit();
+        call('esborra', w.id).then((s) => s && toast('Desig esborrat.'));
+      };
+      left.append(ed, del);
+      bar.appendChild(left);
+      t.appendChild(bar);
+      mine.appendChild(t);
+    });
+
+    // Els altres
+    const others = $('othersList');
+    others.replaceChildren();
+    state.others.forEach((p) => {
+      const sec = el('section', 'person');
+      const h = el('h2', null, p.name);
+      const free = p.wishes.filter((w) => w.status === 'free').length;
+      if (p.wishes.length) {
+        const n = p.wishes.length + (p.wishes.length === 1 ? ' desig' : ' desitjos');
+        h.appendChild(el('span', null, n + ' · ' + (free === 0 ? (p.wishes.length === 1 ? 'agafat' : 'tots agafats') : free + (free === 1 ? ' lliure' : ' lliures'))));
+      }
+      sec.appendChild(h);
+      if (!p.wishes.length) {
+        sec.appendChild(el('p', 'empty', p.name + ' encara no ha posat cap desig. Torna-hi més tard.'));
+      } else {
+        const grid = el('div', 'tags');
+        p.wishes.forEach((w) => {
+          const t = el('article', 'tag' + (w.status === 'mine' ? ' is-mine' : w.status === 'taken' ? ' is-taken' : ''));
+          t.appendChild(el('div', 'text', w.text));
+          if (w.price || w.link) t.appendChild(meta(w));
+          const bar = el('div', 'bar');
+          const chip = el('span', 'chip ' + w.status, w.status === 'free' ? 'Lliure' : w.status === 'mine' ? 'El regales tu' : 'Ja està agafat');
+          bar.appendChild(chip);
+          if (w.status === 'free') {
+            const b = el('button', 'small mark', 'El regalo jo'); b.type = 'button';
+            b.onclick = () => call('marca', w.id).then((s) => s && !s.error && toast('Marcat. Ningú sabrà que has estat tu.'));
+            bar.appendChild(b);
+          } else if (w.status === 'mine') {
+            const b = el('button', 'small', 'Desmarca'); b.type = 'button';
+            b.onclick = () => call('desmarca', w.id).then((s) => s && toast('Desmarcat. Torna a estar lliure.'));
+            bar.appendChild(b);
+          }
+          t.appendChild(bar);
+          grid.appendChild(t);
+        });
+        sec.appendChild(grid);
+      }
+      others.appendChild(sec);
+    });
+  }
+
+  // ---------- Formulari ----------
+
+  function startEdit(w) {
+    editing = w.id;
+    $('wText').value = w.text; $('wLink').value = w.link; $('wPrice').value = w.price;
+    $('formTitle').textContent = 'Edita el desig';
+    $('saveBtn').textContent = 'Desa els canvis';
+    $('cancelEdit').hidden = false;
+    $('wishForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('wText').focus();
+  }
+  function stopEdit() {
+    editing = null;
+    $('wishForm').reset();
+    $('formTitle').textContent = 'Què t\'agradaria?';
+    $('saveBtn').textContent = 'Afegeix a la llista';
+    $('cancelEdit').hidden = true;
+  }
+  $('cancelEdit').onclick = stopEdit;
+
+  $('wishForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const wish = { text: $('wText').value, link: $('wLink').value, price: $('wPrice').value };
+    if (!wish.text.trim()) return;
+    $('saveBtn').disabled = true;
+    const s = editing ? await call('edita', editing, wish) : await call('afegeix', wish);
+    $('saveBtn').disabled = false;
+    if (s && !s.error) { toast(editing ? 'Canvis desats.' : 'Afegit a la teva llista.'); stopEdit(); }
+  });
+
+  // ---------- Pestanyes ----------
+
+  function tab(which) {
+    const mine = which === 'mine';
+    $('tabMine').setAttribute('aria-selected', String(mine));
+    $('tabOthers').setAttribute('aria-selected', String(!mine));
+    $('paneMine').hidden = !mine;
+    $('paneOthers').hidden = mine;
+  }
+  $('tabMine').onclick = () => tab('mine');
+  $('tabOthers').onclick = () => { tab('others'); refresh(); };
+
+  // ---------- Entrar i sortir ----------
+
+  async function login(c) {
+    code = String(c || '').trim().toUpperCase();
+    if (!code) { show('login'); return; }
+    show(state ? 'app' : 'loading');
+    const s = await call('entra');
+    if (s) store.set(code);
+  }
+
+  $('login').addEventListener('submit', (e) => { e.preventDefault(); login($('code').value); });
+  $('logout').onclick = () => { store.set(''); code = ''; state = null; stopEdit(); $('code').value = ''; show('login'); };
+
+  function refresh() { if (code && state && !busy && !editing) call('entra'); }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  setInterval(refresh, 60000);
+
+  // Codi de l'enllaç personal (?codi=XXXXXX) o el que es va desar l'última vegada.
+  const start = () => {
+    try {
+      google.script.url.getLocation((loc) => {
+        const fromLink = loc && loc.parameter && loc.parameter.codi;
+        login(fromLink || store.get());
+      });
+    } catch (e) { login(store.get()); }
+  };
+  start();
+})();
+</script>
+</body>
+</html>
