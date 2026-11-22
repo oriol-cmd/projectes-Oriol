@@ -15,7 +15,8 @@
  *      Qui hi té accés: Qualsevol
  *    Accepta els permisos.
  * 5. Tria la funció «prepara» i prem Executa. Al full hi apareixen les pestanyes:
- *      Configuració: títol, família, avís, data límit, temes per persona, colors i exemples.
+ *      Configuració: enllaç de l'aplicació (el que acaba en /exec), títol, família, avís,
+ *                    data límit, temes per persona, colors i exemples.
  *      Participants: noms (columna A) i, si vols, telèfons (columna D).
  * 6. Torna a carregar el full i, al menú «Amic invisible», prem «Genera codis i enllaços».
  *    A Participants surt l'enllaç de cadascú i un botó per enviar-li per WhatsApp.
@@ -29,6 +30,7 @@
 
 // Valors inicials. Només s'usen la primera vegada, per omplir les pestanyes del full.
 const INICIAL = {
+  url: '',
   titol: 'Amic invisible',
   familia: 'Bové Palau',
   avis: 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.',
@@ -48,6 +50,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sense 0/O ni 1/I, que 
 
 // Files de la pestanya Configuració: [etiqueta, clau, explicació].
 const CONFIG_ROWS = [
+  ['Enllaç de l\'aplicació', 'url', 'L\'adreça que acaba en /exec (Implementa > Gestiona les implementacions). Amb ella es fan els enllaços personals.'],
   ['Títol', 'titol', 'Surt a dalt de tot.'],
   ['Família', 'familia', 'Surt sota el títol, amb les inicials. Deixa-ho buit si no en vols.'],
   ['Avís', 'avis', 'Text per a tothom: pressupost, data de l\'intercanvi, lloc… Si és buit, no surt.'],
@@ -82,6 +85,8 @@ function onOpen() {
 function prepara() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const cs = sheet_(ss, SHEET_CONFIG, ['Opció', 'Valor', 'Explicació']);
+  // Text pla a la columna Valor: així «07/12/2026» és sempre dia/mes/any, sigui quin sigui l'idioma del full.
+  cs.getRange(2, 2, 30, 1).setNumberFormat('@');
   const have = rows_(cs).map((r) => String(r[0]).trim().toLowerCase());
   const missing = CONFIG_ROWS.filter((r) => have.indexOf(r[0].toLowerCase()) < 0);
   if (missing.length) {
@@ -103,9 +108,12 @@ function prepara() {
   });
 
   const used = new Set(source.map((r) => String(r[1] || '')).filter(Boolean));
-  let url = '';
-  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { url = ''; }
   const cfg = config_();
+  // L'enllaç de Configuració; si és buit, el que doni Google (només si és el públic, el que acaba en /exec).
+  let url = cfg.url;
+  if (!url) {
+    try { const u = ScriptApp.getService().getUrl() || ''; if (/\/exec$/.test(u)) url = u; } catch (e) { url = ''; }
+  }
 
   const out = source.map((r, i) => {
     let code = String(r[1] || '').trim().toUpperCase();
@@ -118,7 +126,7 @@ function prepara() {
       const to = digits.length === 9 ? '34' + digits : digits; // mòbils d'aquí sense prefix
       wa = '=HYPERLINK("https://wa.me/' + to + '?text=' + encodeURIComponent(message_(names[i], link, cfg)) + '", "Envia-li ➜")';
     }
-    return [names[i], code, link || '(primer implementa l\'aplicació web i torna-ho a executar)', phone, wa];
+    return [names[i], code, link || '(enganxa l\'enllaç de l\'aplicació a Configuració i torna a generar els enllaços)', phone, wa];
   });
 
   const last = ps.getLastRow();
@@ -152,7 +160,9 @@ function config_() {
   const n = parseInt(get('numTemes'), 10);
   const estil = String(get('estil') || '').trim().toLowerCase();
   const limit = parseDate_(get('dataLimit'));
+  const url = String(get('url') || '').trim().replace(/[?#].*$/, '');
   return {
+    url: /^https:\/\/script\.google\.com\/.+\/exec$/.test(url) ? url : '',
     titol: String(get('titol') || '').trim() || 'Amic invisible',
     familia: String(get('familia') || '').trim(),
     avis: String(get('avis') || '').trim(),

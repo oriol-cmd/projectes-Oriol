@@ -37,7 +37,7 @@ const sheets = {};
 const weekdays = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
 const ctx = {
   SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: (n) => sheets[n] || null, insertSheet: (n) => (sheets[n] = makeSheet(n)) }) },
-  ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/PROVA/exec' }) },
+  ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/EDITOR/dev' }) },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   Session: { getScriptTimeZone: () => 'Europe/Madrid' },
   Utilities: {
@@ -66,6 +66,9 @@ const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if 
 const J = JSON.stringify;
 
 console.log('Servidor');
+const first = gs('prepara()');
+ok(first[0][2].startsWith('(enganxa'), 'si Google només dona l\'enllaç /dev (que només et funciona a tu), no el fa servir i demana el bo');
+sheets['Configuració'].data.find((r) => r[0] === "Enllaç de l'aplicació")[1] = 'https://script.google.com/macros/s/PROVA/exec';
 const people = gs('prepara()');
 ok(people.length === 8 && people.every((p) => /^[A-Z][A-Z2-9]{5}$/.test(p[1])), 'prepara crea 8 codis de 6 caràcters');
 ok(people[0][2].endsWith('?codi=' + people[0][1]), 'enllaç personal amb el codi');

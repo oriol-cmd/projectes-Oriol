@@ -47,19 +47,62 @@ Si escrius el **telèfon** de cada persona a la columna D (p. ex. `600 11 22 33`
 
 Tot funciona amb un full de Google Sheets i Apps Script, amb el teu compte de Google.
 
-## Com posar-lo en marxa (uns 5 minuts)
+## Com posar-lo en marxa (uns 15 minuts)
 
-1. Crea un full de càlcul nou a [Google Sheets](https://sheets.new) (p. ex. «Amic invisible Bové Palau»).
-2. Menú **Extensions > Apps Script**. Esborra el que hi hagi a `Code.gs` i enganxa-hi [`Code.gs`](Code.gs).
-3. Al costat de «Fitxers», prem **+ > HTML**, posa-li de nom `Index` (sense `.html`) i enganxa-hi [`Index.html`](Index.html). Desa (💾).
-4. **Implementa > Nova implementació >** ⚙️ **Aplicació web**
-   - Executa com a: **Jo**
-   - Qui hi té accés: **Qualsevol**
-   - Prem **Implementa** i accepta els permisos (si surt «Google no ha verificat aquesta aplicació», prem *Configuració avançada > Ves a … (no segur)*: l'aplicació és teva).
-5. A l'editor, tria la funció **`prepara`** i prem **Executa**. Al full hi apareixen les pestanyes **Configuració**, **Participants** i **Temes**.
-6. A **Configuració**, posa la **data límit** i repassa la resta (vegeu més avall).
-7. A **Participants**, escriu els noms de la família a la columna A (n'hi ha uns de mostra: canvia'ls) i, si vols, els telèfons a la columna D.
-8. Torna a carregar el full. Al menú **Amic invisible**, prem **Genera codis i enllaços**. Surt l'enllaç de cadascú i el botó per enviar-li per WhatsApp (vegeu a dalt).
+Fes-ho des d'un ordinador. Millor amb un **compte de Google personal** (Gmail): els comptes d'empresa sovint no deixen obrir l'aplicació a gent de fora.
+
+**1. Crea el full**
+1. Ves a [sheets.new](https://sheets.new) i posa-li de nom «Amic invisible Bové Palau».
+
+**2. Enganxa el codi**
+1. Al full: menú **Extensions > Apps Script**. S'obre l'editor en una pestanya nova.
+2. A dalt a l'esquerra, canvia «Projecte sense títol» per «Amic invisible».
+3. A la llista de fitxers hi ha `Codi.gs` (o `Code.gs`). Obre'l, esborra tot el que hi ha i enganxa-hi el contingut de [`Code.gs`](Code.gs).
+4. Al costat de «Fitxers», prem **+ > HTML**. Posa-li de nom `Index` (exactament així, sense `.html`), esborra el que hi hagi i enganxa-hi [`Index.html`](Index.html).
+5. Prem **Desa** (💾).
+6. A l'esquerra, ⚙️ **Configuració del projecte > Zona horària**: tria *(GMT+01:00) Hora d'Europa central – Madrid*. Així la data límit és l'hora d'aquí.
+
+**3. Publica l'aplicació**
+1. A dalt a la dreta: **Implementa > Nova implementació**.
+2. A «Selecciona el tipus», prem ⚙️ i tria **Aplicació web**.
+3. Descripció: «Amic invisible». **Executa com a: Jo**. **Qui hi té accés: Qualsevol**.
+4. Prem **Implementa**. Google et demana permisos: **Autoritza l'accés**, tria el teu compte i, si surt «Google no ha verificat aquesta aplicació», prem **Configuració avançada > Ves a Amic invisible (no segur)** i **Permet**. És segur: l'aplicació és teva.
+5. Copia l'**URL de l'aplicació web** (acaba en `/exec`). La necessitaràs al pas 5.
+
+**4. Crea les pestanyes**
+1. A l'editor, a dalt, al desplegable de funcions, tria **`prepara`** i prem **Executa**.
+2. Al full hi apareixen les pestanyes **Configuració**, **Participants** i **Temes**.
+
+**5. Omple la configuració** (pestanya **Configuració**, columna Valor)
+- **Enllaç de l'aplicació:** enganxa-hi l'URL del pas 3, la que acaba en `/exec`.
+- **Data límit:** fins quan es poden escriure els temes, p. ex. `07/12/2026 22:00`.
+- **Avís:** pressupost i dia de l'intercanvi.
+- La resta, si vols: títol, família, temes per persona, estil i exemples (vegeu [Personalitza-ho](#personalitza-ho)).
+
+**6. Escriu la família** (pestanya **Participants**)
+- Columna A: els noms (n'hi ha uns de mostra: esborra'ls o canvia'ls). Cada nom ha de ser diferent.
+- Columna D (opcional): el mòbil de cadascú, p. ex. `600 11 22 33`.
+
+**7. Genera els enllaços**
+1. Torna a carregar el full (F5). Al cap d'uns segons, a dalt surt el menú **Amic invisible**.
+2. **Amic invisible > Genera codis i enllaços**. A Participants surt el codi, l'enllaç personal i el botó **Envia-li ➜** de cadascú.
+
+**8. Prova-ho tu primer**
+1. Obre el teu enllaç personal (columna C, la teva fila): hi has d'entrar directament i veure «Hola, …».
+2. Escriu-hi els teus temes. A la pestanya Temes del full hi apareixen.
+3. Obre l'enllaç general acabat en `?instruccions`: hi ha de sortir la targeta del cargol.
+4. Prem un botó **Envia-li ➜**: s'ha d'obrir el WhatsApp amb el missatge escrit (no cal enviar-lo).
+
+**9. Envia-ho** (vegeu [Com enviar-ho per WhatsApp](#com-enviar-ho-per-whatsapp))
+1. Al grup: la captura de la targeta i el text.
+2. A cadascú, per privat: el seu missatge amb el botó **Envia-li ➜**.
+
+### Si alguna cosa no va
+- **«No s'ha trobat el fitxer HTML Index»:** el fitxer HTML no es diu exactament `Index`.
+- **La família no hi pot entrar o els demana iniciar sessió:** a la implementació, «Qui hi té accés» ha de ser **Qualsevol**. Si no surt aquesta opció, és un compte d'empresa: fes-ho amb un Gmail personal.
+- **Els enllaços acaben en `/dev`:** aquests només funcionen per a tu. Enganxa a Configuració l'URL que acaba en `/exec`.
+- **No surt el menú «Amic invisible»:** torna a carregar el full i espera uns segons. També pots executar `prepara` des de l'editor: fa el mateix.
+- **Has canviat el codi:** **Implementa > Gestiona les implementacions > ✏️ > Versió: Versió nova > Implementa**. L'enllaç no canvia.
 
 ## Personalitza-ho
 
