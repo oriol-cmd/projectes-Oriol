@@ -352,7 +352,12 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
           <h3>Textos</h3>
           <label for="cTitol">Títol<input type="text" id="cTitol" maxlength="60"></label>
           <label for="cFamilia">Família<input type="text" id="cFamilia" maxlength="60"></label>
-          <label for="cAvis">Avís per a tothom<textarea id="cAvis" maxlength="300" rows="2"></textarea></label>
+          <label for="cAvis">Avís per a tothom (dia de l'intercanvi, lloc…)<textarea id="cAvis" maxlength="300" rows="2"></textarea></label>
+          <hr class="sep">
+          <h3>Pressupost</h3>
+          <label class="check" for="cBudgetOn"><input type="checkbox" id="cBudgetOn"> Hi ha un pressupost màxim</label>
+          <label for="cBudget" id="cBudgetBox">Quantitat màxima (€)<input type="text" id="cBudget" inputmode="decimal" maxlength="8" placeholder="20"></label>
+          <p class="hint" id="cBudgetNone">Sense límit: el pressupost no surt enlloc.</p>
           <hr class="sep">
           <h3>Joc</h3>
           <label for="cNum">Temes per persona<select id="cNum"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
@@ -477,8 +482,11 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     $('mono').textContent = initials;
     $('mono').hidden = !initials;
     $('giftIcon').hidden = !!initials;
-    $('noticeText').textContent = CFG.avis;
-    $('notice').hidden = !CFG.avis;
+    $('noticeText').replaceChildren();
+    if (CFG.pressupost) $('noticeText').appendChild(el('strong', null, budgetText()));
+    if (CFG.pressupost && CFG.avis) $('noticeText').append(' · ');
+    if (CFG.avis) $('noticeText').append(CFG.avis);
+    $('notice').hidden = !CFG.avis && !CFG.pressupost;
     $('tabMine').textContent = T.meus;
     $('mineHint').textContent = (N === 1 ? 'Escriu un tema' : 'Escriu ' + N + ' temes') +
       ' per al regal que t\'agradaria rebre. Qui te\'l faci ' + (N === 1 ? 'el llegirà' : 'els llegirà') +
@@ -499,6 +507,10 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
       f.appendChild(l);
     }
   }
+  const euros = (n) => (n % 1 ? n.toFixed(2).replace('.', ',') : String(n)) + ' €';
+  const budgetText = () => (CFG.pressupost ? 'Pressupost màxim: ' + euros(CFG.pressupost) : '');
+  // Pressupost i avís junts, per a la targeta i el full d'instruccions.
+  const infoText = () => [budgetText() && budgetText() + '.', CFG.avis].filter(Boolean).join(' ');
   const fieldIds = () => Array.from({ length: N }, (_, i) => 't' + (i + 1));
 
   const store = {
@@ -601,8 +613,8 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     $('helpDate').replaceChildren();
     if (date) $('helpDate').append('Data límit per posar els temes', el('strong', null, date));
     $('helpDate').hidden = !date;
-    $('helpAvis').textContent = CFG.avis;
-    $('helpAvis').hidden = !CFG.avis;
+    $('helpAvis').textContent = infoText();
+    $('helpAvis').hidden = !infoText();
     // A la pantalla d'inici: iPhone, Android o tots dos si no se sap; res si ja s'ha obert des de la icona.
     const ua = navigator.userAgent || '';
     const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
@@ -637,6 +649,9 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     if (!cfgDirty) {
       $('cDate').value = a.date; $('cTime').value = a.time;
       $('cTitol').value = a.titol; $('cFamilia').value = a.familia; $('cAvis').value = a.avis;
+      $('cBudgetOn').checked = a.pressupost > 0;
+      $('cBudget').value = a.pressupost ? String(a.pressupost).replace('.', ',') : '';
+      budgetUi();
       $('cNum').value = String(a.numTemes); $('cEx').value = a.exemples;
       document.querySelectorAll('#cEstil input').forEach((r) => { r.checked = r.value === a.estil; });
     }
@@ -689,16 +704,22 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     });
   }
 
+  function budgetUi() {
+    $('cBudgetBox').hidden = !$('cBudgetOn').checked;
+    $('cBudgetNone').hidden = $('cBudgetOn').checked;
+  }
+  $('cBudgetOn').addEventListener('change', () => { budgetUi(); if ($('cBudgetOn').checked) $('cBudget').focus(); });
+
   $('cfgForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const estil = (document.querySelector('#cEstil input:checked') || {}).value || 'avet';
-    const v = { date: $('cDate').value, time: $('cTime').value, titol: $('cTitol').value, familia: $('cFamilia').value, avis: $('cAvis').value, numTemes: $('cNum').value, estil, exemples: $('cEx').value };
+    const v = { date: $('cDate').value, time: $('cTime').value, titol: $('cTitol').value, familia: $('cFamilia').value, avis: $('cAvis').value, ambPressupost: $('cBudgetOn').checked, pressupost: $('cBudget').value, numTemes: $('cNum').value, estil, exemples: $('cEx').value };
+    // Mentre es desa, el formulari no es toca: si hi ha un error, el que has escrit es manté.
+    cfgDirty = true;
     $('cfgSave').disabled = true;
-    cfgDirty = false;
     const s = await call('desaAjustos', v);
     $('cfgSave').disabled = false;
-    if (s && !s.error) toast('Ajustos desats. Ja els veu tothom.');
-    else cfgDirty = true;
+    if (s && !s.error) { cfgDirty = false; renderAdmin(); toast('Ajustos desats. Ja els veu tothom.'); }
   });
 
   $('addPerson').addEventListener('submit', async (e) => {
@@ -920,8 +941,8 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
     $('gDate').replaceChildren();
     if (date) $('gDate').append('Data límit per posar els temes', el('strong', null, date));
     $('gDate').hidden = !date;
-    $('gAvis').textContent = CFG.avis;
-    $('gAvis').hidden = !CFG.avis;
+    $('gAvis').textContent = infoText();
+    $('gAvis').hidden = !infoText();
     $('notice').hidden = true;
     $('hello').textContent = familyLine;
 
@@ -934,6 +955,7 @@ a.small { text-decoration: none; color: inherit; display: inline-block; }
       '2. Obriu-lo i escriviu ' + temes + ' per al regal que us agradaria rebre.' + (date ? ' Teniu temps fins al *' + date + '*.' : ''),
       '3. ' + (date ? 'Passada aquesta data, torneu a entrar i trieu' : 'Després, trieu') + ' a qui regaleu llegint els temes de tothom. Qui arribi primer, tria primer, però ningú sabrà qui ha triat qui.',
     ];
+    if (CFG.pressupost) lines.push('', '💶 ' + budgetText() + '.');
     if (CFG.avis) lines.push('', CFG.avis);
     lines.push('', 'A poc a poc, com el cargol, però que no se us passi la data! 🐌');
     $('groupMsg').value = lines.join('\n');

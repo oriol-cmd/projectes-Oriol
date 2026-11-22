@@ -34,7 +34,8 @@ const INICIAL = {
   pagina: 'https://oriol-cmd.github.io/projectes-Oriol/amic-invisible-bove-palau/',
   titol: 'Amic invisible',
   familia: 'Bové Palau',
-  avis: 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.',
+  avis: 'Intercanvi el dia de Nadal, a casa dels avis.',
+  pressupost: '',
   dataLimit: '07/12/2026 22:00',
   numTemes: 2,
   estil: 'avet',
@@ -55,7 +56,8 @@ const CONFIG_ROWS = [
   ['Adreça de la pàgina', 'pagina', 'On s\'obre la pàgina per a la família (GitHub Pages): així funciona en qualsevol mòbil, encara que hi hagi diversos comptes de Google. Si és buit, s\'obre des de Google.'],
   ['Títol', 'titol', 'Surt a dalt de tot.'],
   ['Família', 'familia', 'Surt sota el títol, amb les inicials. Deixa-ho buit si no en vols.'],
-  ['Avís', 'avis', 'Text per a tothom: pressupost, data de l\'intercanvi, lloc… Si és buit, no surt.'],
+  ['Avís', 'avis', 'Text per a tothom: data de l\'intercanvi, lloc… Si és buit, no surt.'],
+  ['Pressupost màxim', 'pressupost', 'Quants euros com a màxim, p. ex. 20. Si és buit, no hi ha límit i no surt enlloc.'],
   ['Data límit', 'dataLimit', 'Fins quan es poden escriure i canviar els temes (dia/mes/any hora:minuts). Després ja es pot triar. Si és buit, es pot triar des del principi.'],
   ['Temes per persona', 'numTemes', '1, 2 o 3.'],
   ['Estil', 'estil', 'avet (verd i vermell), nit (blau i daurat), gerd (granat i taronja) o neu (blau gris i vermell).'],
@@ -199,7 +201,8 @@ function message_(name, link, cfg) {
   return 'Hola, ' + name + '! 🐌🎁\n\n' +
     'Aquest és el teu enllaç per a l\'amic invisible ' + who + ':\n' + link + '\n\n' +
     'És només teu: no el passis a ningú, que t\'hi podrien fer trampes.' +
-    (cfg.dataLimitText ? '\n\nTens fins al ' + cfg.dataLimitText + ' per posar ' + temes + '. Després podràs triar a qui regales.' : '');
+    (cfg.dataLimitText ? '\n\nTens fins al ' + cfg.dataLimitText + ' per posar ' + temes + '. Després podràs triar a qui regales.' : '') +
+    (cfg.pressupost ? '\n\nPressupost màxim: ' + euros_(cfg.pressupost) + '.' : '');
 }
 
 // Configuració actual, llegida de la pestanya Configuració (o els valors inicials).
@@ -223,12 +226,24 @@ function config_() {
     titol: String(get('titol') || '').trim() || 'Amic invisible',
     familia: String(get('familia') || '').trim(),
     avis: String(get('avis') || '').trim(),
+    pressupost: money_(get('pressupost')),
     numTemes: n >= 1 && n <= 3 ? n : 2,
     estil: ESTILS.indexOf(estil) >= 0 ? estil : 'avet',
     exemples: String(get('exemples') || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 3),
     dataLimit: limit ? limit.getTime() : 0,
     dataLimitText: limit ? formatDate_(limit) : '',
   };
+}
+
+// «20», «20 €» o «20,50» → 20 / 20.5. 0 si és buit o no és vàlid (sense límit).
+function money_(v) {
+  const n = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^\d.]/g, ''));
+  return n > 0 && n < 100000 ? Math.round(n * 100) / 100 : 0;
+}
+
+// «20 €», «20,50 €»
+function euros_(n) {
+  return (n % 1 ? n.toFixed(2).replace('.', ',') : String(n)) + ' €';
 }
 
 // El que pot veure tothom (sense l'enllaç de configuració).
@@ -352,7 +367,14 @@ function desaAjustos(code, v) {
     const n = parseInt(v.numTemes, 10);
     if (!(n >= 1 && n <= 3)) return 'Els temes per persona han de ser 1, 2 o 3.';
     if (ESTILS.indexOf(String(v.estil)) < 0) return 'Aquest estil no existeix.';
+    let budget = '';
+    if (v.ambPressupost) {
+      const b = money_(v.pressupost);
+      if (!b) return 'Escriu el pressupost màxim en euros (p. ex. 20), o desmarca la casella si no hi ha límit.';
+      budget = String(b);
+    }
     setConfig_({
+      pressupost: budget,
       titol: text(v.titol, 60) || 'Amic invisible',
       familia: text(v.familia, 60),
       avis: text(v.avis, 300),
@@ -448,7 +470,7 @@ function adminData_(cfg, themes) {
   const url = appUrl_(cfg);
   const written = new Set(themes.map((r) => r[1]));
   return {
-    titol: cfg.titol, familia: cfg.familia, avis: cfg.avis, numTemes: cfg.numTemes, estil: cfg.estil,
+    titol: cfg.titol, familia: cfg.familia, avis: cfg.avis, pressupost: cfg.pressupost, numTemes: cfg.numTemes, estil: cfg.estil,
     exemples: cfg.exemples.join(', '),
     date: limit ? Utilities.formatDate(limit, tz, 'yyyy-MM-dd') : '',
     time: limit ? Utilities.formatDate(limit, tz, 'HH:mm') : '',

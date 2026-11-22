@@ -280,6 +280,25 @@ ok(decodeURIComponent(sheets.Participants.data[1][4]).includes('dijous 10 de des
 await annaP.reload(); await annaP.waitForSelector('#app:not([hidden])');
 ok((await annaP.textContent('#phase')).includes('dijous 10 de desembre a les 21:30'), 'l\'Anna també veu la data nova');
 
+// Pressupost: per defecte sense límit; s'activa i es desactiva des dels ajustos.
+ok(gs('config_()').pressupost === 0 && !(await annaP.textContent('#notice')).includes('Pressupost màxim'), 'per defecte no hi ha pressupost i no surt enlloc');
+ok(await oriol.locator('#cBudgetBox').isHidden() && (await oriol.textContent('#cBudgetNone')).includes('Sense límit'), 'als ajustos posa «Sense límit»');
+await oriol.check('#cBudgetOn');
+await oriol.click('#cfgSave');
+await oriol.waitForFunction(() => !document.body.style.cursor);
+ok(sheets['Configuració'].data.find((r) => r[0] === 'Pressupost màxim')[1] === '' && await oriol.isChecked('#cBudgetOn'), 'si marques la casella sense quantitat, no es desa i la casella continua marcada');
+await oriol.fill('#cBudget', '30');
+await oriol.click('#cfgSave');
+await oriol.waitForFunction(() => document.getElementById('notice').textContent.includes('Pressupost màxim: 30 €'));
+ok(sheets['Configuració'].data.find((r) => r[0] === 'Pressupost màxim')[1] === '30', 'l\'Oriol posa un pressupost màxim de 30 €');
+ok(decodeURIComponent(sheets.Participants.data[1][4]).includes('Pressupost màxim: 30 €'), 'i surt als missatges de WhatsApp');
+await annaP.reload(); await annaP.waitForSelector('#app:not([hidden])');
+ok((await annaP.textContent('#notice')).includes('Pressupost màxim: 30 €'), 'i a dalt de la pàgina de tothom');
+await oriol.uncheck('#cBudgetOn');
+await oriol.click('#cfgSave');
+await oriol.waitForFunction(() => !document.getElementById('notice').textContent.includes('Pressupost màxim'));
+ok(gs('config_()').pressupost === 0, 'desmarcant la casella, torna a no haver-hi límit');
+
 // Família: afegir, donar accés i treure.
 await oriol.fill('#pName', 'Iu'); await oriol.fill('#pPhone', '611 22 33 44');
 await oriol.click('#addPerson button[type="submit"]');
@@ -316,7 +335,7 @@ ok(arch && sheets[arch].data.some((r) => r[0] === 'Anna' && r[1] === 'Cuina'), '
 ok(sheets.Temes.data.length === 1 && sheets.Tries.data.length === 1, 'el tauler queda net (sense temes ni tries)');
 ok(sheets.Participants.data.slice(1).map((r) => r[1]).join() === codesBefore, 'la família i els enllaços són els mateixos');
 ok(sheets['Configuració'].data.find((r) => r[0] === 'Data límit')[1] === '07/12/2027 22:00', 'amb la data límit nova: 07/12/2027 22:00');
-setCfg('Data límit', '07/12/2026 22:00'); setCfg('Estil', 'avet'); setCfg('Avís', 'Pressupost: uns 20 €. Intercanvi el dia de Nadal, a casa dels avis.');
+setCfg('Data límit', '07/12/2026 22:00'); setCfg('Estil', 'avet'); setCfg('Avís', 'Intercanvi el dia de Nadal, a casa dels avis.');
 
 {
   for (const [ua, name, show, hide] of [
