@@ -1,6 +1,6 @@
 /* Xiu-xiu · Base: configuració, utilitats, Markdown, base de dades i textos d'error. */
 'use strict';
-const APP_VERSION = 78;
+const APP_VERSION = 79;
 
 
 // ---------------------------------------------------------------------------
