@@ -652,3 +652,6 @@ body.sheet-open { overflow: hidden; }
 .rec-inputs .in.on { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
 .rec-inputs .in.off { text-decoration: line-through; opacity: .6; }
 #rec-warn { margin: 10px 0; }
+.resume-rec { background: var(--err-bg); }
+.resume-title { font-size: 28px; font-weight: 800; color: var(--err-text); margin: 0; text-align: center; }
+.resume-why { font-size: 16px; color: var(--err-text); text-align: center; max-width: 460px; margin: 0 0 8px; }

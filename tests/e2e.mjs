@@ -487,6 +487,30 @@ await step('Trossos «en silenci»: es tornen a provar abans de donar error', as
   ok(m.status === 'done' && m.segments.every((x) => x.text), `estat ${m.status} ${m.error || ''}`);
   return 'transcrit a la segona';
 });
+await step('Trucada durant la gravació: avís gran i continua', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  await p.evaluate(() => { saveSettings({ source: 'mic', liveSec: 120 }); renderSourceSwitch(); });
+  await p.click('#btn-record'); await waitView('rec', 10000);
+  try {
+    await p.waitForTimeout(2000);
+    // Entra una trucada: el micròfon queda mut
+    await p.evaluate(() => { const t = rec.stream.getAudioTracks()[0]; Object.defineProperty(t, 'muted', { get: () => true }); t.dispatchEvent(new Event('mute')); });
+    await p.waitForTimeout(400);
+    ok(await p.isVisible('#resume-rec') && /No s'està gravant/.test(await p.textContent('#resume-rec')), 'no surt l\'avís gran');
+    // Es penja: torna a gravar sol i l'avís desapareix
+    await p.waitForFunction(() => $('#resume-rec').hidden && rec.recorder && rec.recorder.state === 'recording' && !rec.stream.getAudioTracks()[0].muted, null, { timeout: 15000 });
+    // Segona trucada, i el mòbil no deixa obrir el micròfon sense un toc
+    await p.evaluate(() => { const t = rec.stream.getAudioTracks()[0]; Object.defineProperty(t, 'muted', { get: () => true }); window.__gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })); t.dispatchEvent(new Event('mute')); });
+    await p.waitForTimeout(6000);
+    ok(await p.isVisible('#btn-resume-rec'), 'sense botó per continuar');
+    await p.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gum; });
+    await p.click('#btn-resume-rec');
+    await p.waitForFunction(() => $('#resume-rec').hidden && rec.recorder && rec.recorder.state === 'recording', null, { timeout: 15000 });
+  } finally { await p.click('#btn-stop'); await waitView('result', 90000); await p.evaluate(() => saveSettings({ liveSec: 10 })); }
+  const m = await meeting(await lastId());
+  ok(m.status === 'done', `estat ${m.status} ${m.error || ''}`);
+  return `${m.segments.length} trams`;
+});
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');
   await p.click('#btn-tpl-new'); await p.fill('#tpl-name', 'Esportec'); await p.fill('#tpl-org', 'Esportec SL');

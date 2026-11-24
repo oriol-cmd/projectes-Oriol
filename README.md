@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v72: trucades durant la gravació
+
+- Si entra una trucada (o una altra app agafa el micròfon), Xiu-xiu ho detecta i, en penjar, **torna a obrir el micròfon sol** i continua al mateix document.
+- Mentre no s'està gravant surt un **avís a tota la pantalla, «⚠️ No s'està gravant»**, amb un botó gran **«Continua gravant»** (també vibra, a Android). Passa el mateix si es deixa de compartir una videotrucada o si la gravadora s'atura per qualsevol motiu.
+- El que s'ha gravat abans de la interrupció no es perd, i a la transcripció queda marcat el tall.
+
 ## Novetats de la v71: triar el micròfon
 
 - **Ajustos › Micròfon**: tria el micròfon (extern, auriculars…) i toca «Prova'l» per veure si et sent. També es pot triar a la finestra que surt abans de gravar una videotrucada.
