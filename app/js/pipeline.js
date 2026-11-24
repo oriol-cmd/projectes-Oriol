@@ -166,19 +166,21 @@ function runPipeline(id, { redoSummary = false } = {}) {
         });
         await saveMeeting(m);
       }
-      // 2a. Etiquetes automàtiques (no és imprescindible: si falla, es continua)
-      if (!m.tags && m.engine !== 'digest') { m.stage = 'summary'; await autoTag(m); }
       // 2b. Traducció a l'idioma per defecte (si no és el català)
       const lang = settings.summaryLang || 'ca';
       if (!m.textOnly && lang !== 'ca' && !(m.translations && m.translations[lang])) {
         m.stage = 'translate'; updateProcView(m);
         await translateSummary(m, lang);
       }
+      // L'acta ja està feta: es mostra ara mateix; el correu, el Google Doc i les etiquetes
+      // s'acaben en segon pla (abans calia esperar-los).
+      m.stage = 'finishing';
+      await saveMeeting(m);
+      if (currentView === 'proc' && viewingId === id) showResult(id);
       // 3. Correu
       if (!emailEnabled()) {
         if (m.email.status !== 'sent') m.email = { status: 'off' };
       } else if (m.email.status !== 'sent') {
-        m.stage = 'email'; updateProcView(m);
         try {
           const r = await sendEmail(buildEmail(m));
           m.email = { status: 'sent', at: Date.now(), confirmed: r.confirmed };
@@ -187,6 +189,8 @@ function runPipeline(id, { redoSummary = false } = {}) {
           m.email = { status: 'error', error: e.message };
         }
       }
+      // 4. Etiquetes automàtiques (no és imprescindible: si falla, es continua)
+      if (!m.tags && m.engine !== 'digest') await autoTag(m);
       m.status = 'done';
       m.doneAt = Date.now();
       m.stage = '';
@@ -216,6 +220,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
     }
     updateProcView(m);
     if (currentView === 'proc' && viewingId === id) showResult(id);
+    else if (currentView === 'result' && viewingId === id) refreshResultStatus(m);
     refreshHomeBanners();
     syncSoon(1500);
     return m;

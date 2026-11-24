@@ -323,47 +323,80 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
 
 const queueRunning = new Map(); // meetingId -> Promise
 function kickQueue(meetingId) {
-  if (queueRunning.has(meetingId)) return queueRunning.get(meetingId);
-  const p = (async () => {
+  if (queueRunning.has(meetingId)) { queueWiden(meetingId); return queueRunning.get(meetingId); }
+  // Mentre es grava, d'un en un (en ordre, per al text en directe). Quan s'ha acabat i en queden
+  // molts per fer (p. ex. sense cobertura una estona), fins a 3 alhora.
+  const st = { inFlight: new Set(), active: 0, failure: null, workers: [] };
+  queueState.set(meetingId, st);
+  const worker = async () => {
+    st.active++;
     try {
       for (;;) {
+        if (st.failure) return;
         const m = await getMeeting(meetingId);
-        const seg = m.segments.find((s) => s.status === 'pending');
+        const seg = m.segments.find((s) => s.status === 'pending' && !st.inFlight.has(s.idx));
         if (!seg) return;
-        const blob = await db.get('audio', audioKey(m.id, seg.idx));
-        if (!blob) { seg.status = 'error'; seg.error = "No s'ha trobat l'àudio"; await saveMeeting(m); continue; }
-        const prev = m.segments.filter((s) => s.idx < seg.idx && s.status === 'done').map((s) => s.text).join(' ');
-        const isRef = !!m.speakers && seg.idx === m.refIdx;
-        let ref = null;
-        if (m.speakers && m.refIdx != null && !isRef) {
-          const refSeg = m.segments.find((s) => s.idx === m.refIdx);
-          const refBlob = await db.get('audio', audioKey(m.id, m.refIdx));
-          if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx) };
-        }
-        try {
-          seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call', precise: m.type === 'important' || !!seg.retry });
-          seg.status = 'done';
-          delete seg.error;
-          // L'àudio de les presentacions es guarda fins al final: és la mostra de veus.
-          if (!seg.text) seg.empty = true; else delete seg.empty;
-          if (!keepAudioNow() && !isRef && seg.text) await db.del('audio', audioKey(m.id, seg.idx));
-        } catch (e) {
-          seg.status = 'error';
-          seg.error = e.message;
-          await saveMeeting(m);
-          if (e instanceof FatalError) { updateRecProgress(); throw e; }
-        }
-        await saveMeeting(m);
-        if (rec.meeting === m) updateRecProgress();
-        updateProcView(m);
+        st.inFlight.add(seg.idx);
+        try { await transcribeQueued(m, seg); }
+        catch (e) { st.failure = e; return; }
+        finally { st.inFlight.delete(seg.idx); }
+        queueWiden(meetingId);
       }
+    } finally { st.active--; }
+  };
+  st.spawn = () => { const w = worker(); st.workers.push(w); return w; };
+  const p = (async () => {
+    try {
+      st.spawn();
+      queueWiden(meetingId);
+      // Espera que acabin tots els treballadors (també els que s'afegeixen pel camí).
+      for (let i = 0; i < st.workers.length; i++) await st.workers[i];
+      if (st.failure) throw st.failure;
     } finally {
       queueRunning.delete(meetingId);
+      queueState.delete(meetingId);
     }
   })();
   p.catch(() => {});
   queueRunning.set(meetingId, p);
   return p;
+}
+const queueState = new Map();
+function queueWiden(meetingId) {
+  const st = queueState.get(meetingId);
+  if (!st || st.failure || (rec.meeting && rec.meeting.id === meetingId)) return;
+  const m = meetingCache.get(meetingId);
+  if (!m) return;
+  const free = m.segments.filter((s) => s.status === 'pending' && !st.inFlight.has(s.idx)).length;
+  while (st.active < 3 && free > st.active) { st.spawn(); if (st.active >= free) break; }
+}
+async function transcribeQueued(m, seg) {
+  const blob = await db.get('audio', audioKey(m.id, seg.idx));
+  if (!blob) { seg.status = 'error'; seg.error = "No s'ha trobat l'àudio"; await saveMeeting(m); return; }
+  const prev = m.segments.filter((s) => s.idx < seg.idx && s.status === 'done').map((s) => s.text).join(' ');
+  const isRef = !!m.speakers && seg.idx === m.refIdx;
+  let ref = null;
+  if (m.speakers && m.refIdx != null && !isRef) {
+    const refSeg = m.segments.find((s) => s.idx === m.refIdx);
+    const refBlob = await db.get('audio', audioKey(m.id, m.refIdx));
+    if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx) };
+  }
+  try {
+    seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call', precise: m.type === 'important' || !!seg.retry });
+    seg.status = 'done';
+    delete seg.error;
+    // L'àudio de les presentacions es guarda fins al final: és la mostra de veus.
+    if (!seg.text) seg.empty = true; else delete seg.empty;
+    if (!keepAudioNow() && !isRef && seg.text) await db.del('audio', audioKey(m.id, seg.idx));
+  } catch (e) {
+    seg.status = 'error';
+    seg.error = e.message;
+    await saveMeeting(m);
+    if (e instanceof FatalError) { updateRecProgress(); throw e; }
+  }
+  await saveMeeting(m);
+  if (rec.meeting === m) updateRecProgress();
+  updateProcView(m);
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +696,21 @@ Un paràgraf de 5-8 frases per a algú que no hi era: objectiu de la reunió, te
 Si una secció no té contingut, escriu "- Cap.". No escriguis res abans de la primera secció ni després de l'última.`;
 const isProMeeting = (m) => (m.type === 'important' || m.pro) && m.detail !== 'short' && !m.textOnly && m.type !== 'revisio';
 
+// El tros de la transcripció entre dos temps (amb marge), a partir de les marques [mm:ss].
+function sliceTranscript(transcript, fromMs, toMs, marginMs = 4 * 60000) {
+  if (fromMs == null) return transcript;
+  const end = toMs == null ? Infinity : toMs;
+  const out = [];
+  let cur = 0;
+  for (const line of transcript.split('\n')) {
+    const mk = line.trim().match(/^\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]$/);
+    if (mk) cur = (mk[3] != null ? (+mk[1] * 3600 + +mk[2] * 60 + +mk[3]) : (+mk[1] * 60 + +mk[2])) * 1000;
+    if (cur >= fromMs - marginMs && cur <= end + marginMs) out.push(line);
+  }
+  const t = out.join('\n').trim();
+  return t.length < 400 ? transcript : t; // si les marques no quadren, tota
+}
+
 async function proMinutes(m, info, photos, photoParts, onText) {
   const transcript = buildTranscript(m, 60000);
   const progress = (t) => { m.summaryProgress = t; updateProcView(m); };
@@ -713,7 +761,10 @@ async function proMinutes(m, info, photos, photoParts, onText) {
     const from = toMs(it.inici); const to = toMs(it.final);
     // Fotos fetes durant aquest punt (o afegides després).
     const extra = photoParts.filter((_, k) => { if (photos[k].agenda) return false; const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
-    const ask = `${head}\n\nORDRE DEL DIA:\n${agendaList}\n\nRedacta ara NOMÉS el punt ${i + 1}: «${it.titol}»${it.inici ? ` (aprox. de ${it.inici} a ${it.final || 'final'})` : ''}${it.nota ? `. Nota: ${it.nota}` : ''}.${extra.length ? " Les fotos adjuntes són documents mostrats a la reunió: fes-les servir NOMÉS com a ajuda per escriure bé noms, xifres i termes del que es diu en aquest punt (no en resumeixis ni en copiïs el contingut)." : ''}\n\n${trans}`;
+    // Només el tros de la reunió on es parla d'aquest punt (amb marge): molt més ràpid que llegir les 2 hores.
+    const part = sliceTranscript(transcript, from, to);
+    const trPart = part === transcript ? trans : `<transcripcio>\n${part}\n</transcripcio>\n(Fragment de la transcripció on es tracta aquest punt, amb uns minuts de marge abans i després.)`;
+    const ask = `${head}\n\nORDRE DEL DIA:\n${agendaList}\n\nRedacta ara NOMÉS el punt ${i + 1}: «${it.titol}»${it.inici ? ` (aprox. de ${it.inici} a ${it.final || 'final'})` : ''}${it.nota ? `. Nota: ${it.nota}` : ''}.${extra.length ? " Les fotos adjuntes són documents mostrats a la reunió: fes-les servir NOMÉS com a ajuda per escriure bé noms, xifres i termes del que es diu en aquest punt (no en resumeixis ni en copiïs el contingut)." : ''}\n\n${trPart}`;
     const t = strip(await gemini([{ text: ask }, ...extra], { system: PRO_SECTION_PROMPT, task: 'pro', thinking: 1024, maxTokens: 8192 }));
     sections[i] = /^###\s/.test(t) ? t : `### ${i + 1}. ${it.titol}\n\n${t}`;
     m.proDraft.sections = sections.slice();
@@ -725,7 +776,7 @@ async function proMinutes(m, info, photos, photoParts, onText) {
   progress(`Redactant l'acta: 0 de ${items.length} punts fets…`);
   let next = 0;
   const worker = async () => { while (next < items.length) { const i = next++; await writeItem(i); } };
-  await Promise.all([worker(), worker()]);
+  await Promise.all([worker(), worker(), worker()]);
 
   // 3. Resum executiu, acords, tasques…
   progress('Escrivint el resum executiu, els acords i les tasques…');

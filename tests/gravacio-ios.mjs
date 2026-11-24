@@ -46,7 +46,7 @@ const recOnce = async (label) => {
   try { await p.waitForFunction(() => currentView === 'rec', null, { timeout: 30000 }); } catch { console.log(label, '→ NO HA COMENÇAT', await p.evaluate(() => ({ starting: rec.starting, toast: document.querySelector('#toast').textContent }))); return; }
   console.log(label, `→ gravant en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await p.waitForTimeout(11000); await p.click('#btn-stop');
-  await p.waitForFunction(() => currentView === 'result', null, { timeout: 30000 });
+  await p.waitForFunction(() => currentView === 'result' && !pipelines.size, null, { timeout: 30000 });
   const m = await p.evaluate(async () => { const all = (await db.all('meetings')).sort((a, b) => b.updatedAt - a.updatedAt); return all[0]; });
   console.log('   trossos:', m.segments.map(s => s.silent ? 's' : (s.text ? 'T' : '-')).join(''), '| estat:', m.status);
   await p.evaluate(() => showView('home'));

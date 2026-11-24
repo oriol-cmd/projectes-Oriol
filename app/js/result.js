@@ -408,25 +408,13 @@ async function renderRecReport(m) {
 // ---------------------------------------------------------------------------
 // Pantalla del resultat
 // ---------------------------------------------------------------------------
-async function showResult(id) {
-  const m = await getMeeting(id);
-  if (!m) return;
-  $('#share-panel').hidden = true;
-  if (viewingId !== id) resultVersion = null; // en canviar de reunió, es torna a l'acta
-  viewingId = id;
-  if (m.status === 'processing' || pipelines.has(id)) { showView('proc'); updateProcView(m); return; }
-  showView('result');
-  renderRecReport(m);
-  renderDoubtBanner(m);
-  $('#doc-link').hidden = !m.docUrl;
-  if (m.docUrl) $('#doc-link').href = m.docUrl;
-  $('#btn-speakers').hidden = !(m.engine !== 'device' && speakerLabels(m).length);
-  $('#btn-continue').hidden = !(m.engine === 'audio' && m.status !== 'recording');
-  $('#btn-continue').textContent = m.type === 'revisio' ? '+ Continua aquesta revisió' : '+ Continua gravant aquí';
-  $('#btn-share-open').innerHTML = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
-    ? `${svgIcon('mail')} Envia-ho a ${escapeHtml(m.reviewFor.name)}` : `${svgIcon('share')} Comparteix`;
+function renderResultStatus(m) {
+  const id = m.id;
   const st = $('#result-status');
-  if (m.status === 'error') {
+  if (m.stage === 'finishing' && pipelines.has(m.id)) {
+    st.className = 'banner';
+    st.textContent = emailEnabled() && m.email.status !== 'sent' ? `✓ Acta feta. Enviant-la a ${settings.email}…` : '✓ Acta feta. Acabant…';
+  } else if (m.status === 'error') {
     st.className = 'banner err';
     const auto = m.retryAt && m.retryAt > Date.now();
     const mins = auto ? Math.ceil((m.retryAt - Date.now()) / 60000) : 0;
@@ -447,6 +435,35 @@ async function showResult(id) {
     st.className = 'banner warn';
     st.textContent = `No s'ha pogut enviar el correu (${friendlyError(m.email.error || '')}). Toca «Torna a enviar».`;
   }
+}
+// Quan acaba el correu (amb l'acta ja a la pantalla): s'actualitza l'avís, l'enllaç i les etiquetes.
+function refreshResultStatus(m) {
+  renderResultStatus(m);
+  $('#doc-link').hidden = !m.docUrl;
+  if (m.docUrl) $('#doc-link').href = m.docUrl;
+  renderResultTags(m);
+  $('#tags-current').textContent = (m.tags || []).length ? m.tags.map((t) => `#${t}`).join(' ') : 'cap';
+  $('#btn-resend').hidden = !m.summary || !emailEnabled();
+}
+async function showResult(id) {
+  const m = await getMeeting(id);
+  if (!m) return;
+  $('#share-panel').hidden = true;
+  if (viewingId !== id) resultVersion = null; // en canviar de reunió, es torna a l'acta
+  viewingId = id;
+  const finishing = m.summary && m.stage === 'finishing'; // acta feta; s'està enviant el correu
+  if ((m.status === 'processing' || pipelines.has(id)) && !finishing) { showView('proc'); updateProcView(m); return; }
+  showView('result');
+  renderRecReport(m);
+  renderDoubtBanner(m);
+  $('#doc-link').hidden = !m.docUrl;
+  if (m.docUrl) $('#doc-link').href = m.docUrl;
+  $('#btn-speakers').hidden = !(m.engine !== 'device' && speakerLabels(m).length);
+  $('#btn-continue').hidden = !(m.engine === 'audio' && m.status !== 'recording');
+  $('#btn-continue').textContent = m.type === 'revisio' ? '+ Continua aquesta revisió' : '+ Continua gravant aquí';
+  $('#btn-share-open').innerHTML = m.type === 'revisio' && m.reviewFor && m.reviewFor.name
+    ? `${svgIcon('mail')} Envia-ho a ${escapeHtml(m.reviewFor.name)}` : `${svgIcon('share')} Comparteix`;
+  renderResultStatus(m);
   resultLang = (m.translations && m.translations[settings.summaryLang]) ? settings.summaryLang : 'ca';
   renderResultSummary(m);
   renderTranscript(m);

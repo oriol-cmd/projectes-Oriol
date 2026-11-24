@@ -48,6 +48,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   if (sys) log.sys.push(sys);
   for (const x of parts) { const md = x.inlineData || x.fileData; if (md) log.mimes.push(md.mimeType || md.fileUri); }
   let txt;
+  if (log.slowSeg && /tram d'una reunió/.test(user)) await new Promise((res) => setTimeout(res, 500));
   const tros = user.match(/Aquest és el tros (\d+) de (\d+)/);
   if (tros) {
     await new Promise((res) => setTimeout(res, 600)); // com una resposta real: dona temps que en coincideixin diversos
@@ -91,6 +92,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
 });
 await ctx.route(/script\.google\.com/, async (r) => {
   const d = JSON.parse(r.request().postData() || '{}');
+  if (log.slowScript && !d.action) await new Promise((res) => setTimeout(res, 4000));
   if (d.action === 'currentEvent') { log.script.push('calendari'); const t = Date.now(); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, events: [{ title: 'Comitè de pressupostos', start: t - 300000, end: t + 3000000, guests: ['marta@exemple.cat', 'pere@exemple.cat'], location: 'Sala 2', description: '1. Pressupost\n2. Torn obert' }] }) }); }
   log.script.push(d.recipients ? `altres:${d.recipients.join(',')}` : `auto:${d.subject}`);
   await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, sentTo: d.recipients || [d.to], docUrl: 'https://docs.google.com/document/d/PROVA' }) });
@@ -108,7 +110,8 @@ const step = async (name, fn) => {
   catch (e) { results.push(`❌ ${name} — ${String(e.message).split('\n')[0]}`); await p.screenshot({ path: path.join(tmp, `fail-${name.replace(/\W+/g, '_')}.png`) }).catch(() => {}); }
 };
 const ok = (c, msg) => { if (!c) throw new Error(msg); };
-const waitView = (v, t = 30000) => p.waitForFunction((v) => currentView === v, v, { timeout: t });
+// En arribar al resultat, s'espera també que acabi la feina de fons (correu, etiquetes).
+const waitView = (v, t = 30000) => p.waitForFunction((v) => currentView === v && (v !== 'result' || !pipelines.size), v, { timeout: t });
 const waitStatus = async (id, want, ms = 60000) => { const t0 = Date.now(); for (;;) { const st = await p.evaluate(async (id) => { const m = await getMeeting(id); return m && m.status; }, id); if (want.includes(st)) return st; if (Date.now() - t0 > ms) throw new Error(`estat ${st}`); await p.waitForTimeout(300); } };
 const lastId = () => p.evaluate(async () => (await db.all('meetings')).sort((a, b) => b.updatedAt - a.updatedAt)[0].id);
 const meeting = (id) => p.evaluate((id) => getMeeting(id), id);
@@ -573,6 +576,43 @@ await step('Importar una gravació llarga (trossos alhora)', async () => {
   const alhora = await p.evaluate(() => window.__m);
   ok(alhora >= 2, `no van alhora (màx ${alhora})`);
   return `${tr.length} trossos, ${alhora} alhora, ${Math.round((Date.now() - t0) / 1000)} s`;
+});
+await step("Reunió llarga: trams pendents alhora i l'acta surt abans del correu", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  log.slowSeg = true; log.slowScript = true;
+  try {
+    const id = await p.evaluate(async () => {
+      if (!window.__wrapped) { window.__wrapped = true; window.__c = 0; const g = gemini; gemini = async (...a) => { window.__c++; window.__m = Math.max(window.__m || 0, window.__c); try { return await g(...a); } finally { window.__c--; } }; }
+      window.__m = 0;
+      const id = uid();
+      const segs = [];
+      for (let i = 0; i < 8; i++) { await db.put('audio', pcmToWav(new Float32Array(16000).map((_, k) => Math.sin(k / 5) * 0.3), 16000), audioKey(id, i)); segs.push({ idx: i, startMs: i * 60000, status: 'pending', text: '' }); }
+      await saveMeeting({ id, title: 'Llarga', startedAt: Date.now(), createdAt: Date.now(), durationMs: 480000, engine: 'audio', source: 'mic', type: 'general', status: 'processing', marks: [], summary: '', email: { status: 'pending' }, segments: segs });
+      viewingId = id; showView('proc'); runPipeline(id);
+      return id;
+    });
+    // L'acta es veu mentre el correu encara s'està enviant
+    await p.waitForFunction(() => currentView === 'result' && /Acta feta/.test($('#result-status').textContent), null, { timeout: 60000 });
+    const early = await p.evaluate(() => ({ email: !!pipelines.size, text: $('#result-summary').textContent.length }));
+    await p.waitForFunction(() => /Resum enviat/.test($('#result-status').textContent), null, { timeout: 30000 });
+    const alhora = await p.evaluate(() => window.__m);
+    const m = await meeting(id);
+    ok(early.email && early.text > 50, 'no surt abans del correu');
+    ok(alhora >= 2, `els trams no van alhora (${alhora})`);
+    ok(m.status === 'done' && m.segments.every((x) => x.status === 'done'), `estat ${m.status}`);
+    return `${alhora} trams alhora; acta visible abans del correu`;
+  } finally { log.slowSeg = false; log.slowScript = false; }
+});
+await step('Reunió important: cada punt rep només el seu tros', async () => {
+  const r = await p.evaluate(() => {
+    const lines = [];
+    for (let min = 0; min < 120; min++) lines.push(`[${String(min).padStart(2, '0')}:00]`, `Marta: minut ${min} ${'bla '.repeat(30)}`);
+    const t = lines.join('\n');
+    const part = sliceTranscript(t, 30 * 60000, 40 * 60000);
+    return { total: t.length, part: part.length, from: /minut 26 /.test(part), to: /minut 44 /.test(part), out: /minut 50 /.test(part) || /minut 20 /.test(part) };
+  });
+  ok(r.from && r.to && !r.out, JSON.stringify(r));
+  return `${Math.round(r.part / r.total * 100)}% de la transcripció per punt`;
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');

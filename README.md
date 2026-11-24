@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v77: reunions llargues més ràpides
+
+- **L'acta es mostra en el moment que està feta**; el correu, el Google Doc i les etiquetes s'acaben en segon pla (abans calia esperar-los).
+- **Trams pendents en acabar** (p. ex. si una estona no hi havia cobertura): es transcriuen **3 alhora** en lloc d'un en un. Mentre es grava, continuen d'un en un i en ordre.
+- **Reunió important**: cada punt de l'ordre del dia rep només el tros de reunió on es parla d'aquell punt (amb 4 minuts de marge) i se'n redacten 3 alhora. En una reunió de 2 hores, cada punt llegeix ~1/6 de la transcripció en lloc de tota.
+
 ## Novetats de la v73: transcripció més ràpida
 
 - **Gravacions llargues importades**: el primer tros de 5 minuts es fa sol (per agafar els noms de qui parla) i la resta, **3 trossos alhora**. Cada tros rep els noms que han sortit fins llavors perquè siguin els mateixos a tota la transcripció. Una gravació de 2 hores passa de ~12 minuts a ~4–5.
