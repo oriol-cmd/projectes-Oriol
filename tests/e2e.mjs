@@ -54,6 +54,12 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   } else if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
   else if (user.includes("fragment curt d'una reunió")) txt = 'Això és el text en directe de prova.';
   else if (user.includes("Transcriu literalment el text d'aquests documents")) txt = "[Document 1]\nApunts: pressupost 5.000 €\n- Revisar contracte";
+  else if (sys.includes('apunts o documents') && log.recitation && parts.some((x) => x.inlineData)) {
+    // Simula el filtre de «recitació» de Google quan s'envien les fotos.
+    log.blocked = (log.blocked || 0) + 1;
+    const pl = JSON.stringify({ candidates: [{ content: { parts: [{ text: '# Apunts' }] }, finishReason: 'RECITATION' }] });
+    return r.fulfill({ status: 200, contentType: url.includes('alt=sse') ? 'text/event-stream' : 'application/json', body: url.includes('alt=sse') ? `data: ${pl}\n\n` : pl });
+  }
   else if (sys.includes('apunts o documents')) txt = "# Apunts del pressupost\n\n## Resum\nNotes sobre el pressupost.\n\n## Punts principals\n- Pressupost de 5.000 €.\n\n## Dades clau\n- 5.000 €\n\n## Tasques\n- Cap.\n\n## Dubtes de comprensió\n- Cap.";
   else if (user.includes('Proposa etiquetes')) txt = '{"etiquetes":["pressupost","Finances 2027"]}';
   else if (sys.includes('Analitzes una reunió')) txt = '## Temps per tema\n- Pressupost [00:00]–[00:20]\n\n## Temes que han quedat oberts\n- Cap.';
@@ -441,6 +447,20 @@ await step("Fotos d'apunts → resum", async () => {
   ok(/Revisar contracte/.test(m.segments[0].text) && /^# Apunts del pressupost/.test(m.summary), 'sense text o sense resum');
   ok(/Revisar contracte/.test(await p.textContent('#result-transcript')), 'no es veu el text');
   return m.summary.split('\n')[0];
+});
+await step("Apunts: si Google bloqueja el resum, es fa sense les fotos", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  log.recitation = true; log.blocked = 0;
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
+  try {
+    await p.setInputFiles('#notes-input', [{ name: 'guio.png', mimeType: 'image/png', buffer: png }]);
+    await p.waitForSelector('#import-sheet:not([hidden])');
+    await p.click('#btn-import-summary'); await waitView('result', 90000);
+  } finally { log.recitation = false; }
+  const m = await meeting(await lastId());
+  ok(m.status === 'done' && /^# Apunts del pressupost/.test(m.summary), `estat ${m.status} ${m.error || ''}`);
+  ok(log.blocked >= 2, `només ${log.blocked} intents bloquejats`);
+  return `${log.blocked} bloquejos → resum fet sense fotos`;
 });
 await step('Text en directe mentre grava', async () => {
   await p.click('#btn-tab-home'); await waitView('home');

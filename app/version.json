@@ -1,1 +1,1 @@
-{ "v": 73, "notes": "Si entra una trucada mentre graves, continua sola en penjar, i si no s'està gravant surt un avís gran per continuar. Les gravacions llargues i els àudios importats es transcriuen fins a 3 vegades més de pressa." }
+{ "v": 74, "notes": "Si Google bloqueja un resum (sobretot amb fotos de documents impresos), ara ho torna a provar amb un altre model i, si cal, sense les fotos. Ja no s'atura." }
