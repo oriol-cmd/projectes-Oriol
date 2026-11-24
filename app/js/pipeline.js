@@ -362,9 +362,9 @@ function importList(m) {
 async function transcribeImport(m) {
   const files = importList(m);
   if (m.segments.length !== files.length) m.segments = files.map((f, i) => ({ idx: i, startMs: 0, status: 'pending', text: '' }));
-  for (let i = 0; i < files.length; i++) {
+  // Diversos fitxers (p. ex. notes de veu): 2 alhora, per anar més de pressa.
+  const one = async (i) => {
     const seg = m.segments[i];
-    if (seg.status === 'done') continue;
     const f = files[i];
     const blob = f.youtube ? null : await db.get('audio', f.key);
     if (!blob && !f.youtube) throw new FatalError(`No s'ha trobat el fitxer «${f.name || 'importat'}». Torna'l a importar.`);
@@ -380,10 +380,22 @@ async function transcribeImport(m) {
       await saveMeeting(m);
       throw e;
     }
-    delete m.importProgress;
+    if (files.length > 1) m.importProgress = `${m.segments.filter((x) => x.status === 'done').length} de ${files.length} àudios transcrits…`;
+    else delete m.importProgress;
     await saveMeeting(m);
     updateProcView(m);
-  }
+  };
+  const todo = m.segments.filter((x) => x.status !== 'done').map((x) => x.idx);
+  let next = 0, failure = null;
+  const worker = async () => {
+    while (next < todo.length && !failure) {
+      const i = todo[next++];
+      try { await one(i); } catch (e) { failure = failure || e; }
+    }
+  };
+  await Promise.all(files.length > 1 ? [worker(), worker()] : [worker()]);
+  delete m.importProgress;
+  if (failure) throw failure;
 }
 async function transcribeImportFile(m, blob, f, label) {
   const progress = (t) => { m.importProgress = label + t; updateProcView(m); };
@@ -530,26 +542,46 @@ async function transcribeLongImport(m, blob, f, label, basePrompt, clean, progre
   const saved = m.importParts[f.key] && m.importParts[f.key].n === n ? m.importParts[f.key] : { n, parts: [] };
   m.importParts[f.key] = saved;
   const prompt = basePrompt.replace(/\n?Cada 5 minuts aproximadament[^\n]*/, '');
-  for (let i = 0; i < n; i++) {
-    if (typeof saved.parts[i] === 'string') continue;
-    progress(`Transcrivint el tros ${i + 1} de ${n}…`);
+  // El primer tros es fa sol (hi surten les presentacions i els noms); després, 3 trossos alhora
+  // per anar molt més de pressa. Cada tros rep el final de l'anterior (si ja està fet) i els
+  // noms de qui parla que han sortit fins ara, perquè siguin els mateixos a tot arreu.
+  const namesSoFar = () => [...new Set(saved.parts.filter(Boolean).join('\n').split('\n')
+    .map((l) => (l.match(/^\s*([\p{L}][\p{L}\p{N} .'’-]{0,30}):\s/u) || [])[1]).filter(Boolean))].slice(0, 20);
+  const doneCount = () => saved.parts.filter((t) => typeof t === 'string').length;
+  const doChunk = async (i) => {
     let pcm = chunkPcm(buf, cuts[i], cuts[i + 1]);
     if (settings.boost !== false) { try { pcm = await enhancePcm(pcm, rate); } catch { /* sense millora */ } }
     const wav = pcmToWav(pcm, rate);
     pcm = null;
-    const prev = i > 0 ? saved.parts.slice(0, i).filter(Boolean).join(' ').slice(-800) : '';
+    const prev = i > 0 && typeof saved.parts[i - 1] === 'string' ? saved.parts[i - 1].slice(-800) : '';
+    const names = i > 0 ? namesSoFar() : [];
     const from = fmtClock(Math.round(cuts[i] / rate * 1000)), to = fmtClock(Math.round(cuts[i + 1] / rate * 1000));
     const ask = [
       prompt,
       `Aquest és el tros ${i + 1} de ${n} de la gravació (de ${from} a ${to}). Transcriu-lo sencer, des del principi fins al final.`,
       prev ? `Final del tros anterior (només per continuïtat i per fer servir els mateixos noms de qui parla; no el repeteixis): «${prev}»` : '',
+      names.length ? `Noms de qui parla que han sortit als trossos anteriors (fes-los servir si reconeixes la mateixa veu; no te'ls inventis si no hi són): ${names.join(', ')}` : '',
     ].filter(Boolean).join('\n');
     const part = wav.size <= 14e6
       ? { inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } }
       : { fileData: { mimeType: 'audio/wav', fileUri: await uploadToGemini(wav, 'audio/wav', `${f.name || 'reunio'}-${i + 1}`) } };
     saved.parts[i] = clean(await gemini([part, { text: ask }], { task: 'transcribe', thinking: 0, maxTokens: 16384 }));
     await saveMeeting(m);
-  }
+    progress(`Transcrivint: ${doneCount()} de ${n} trossos fets…`);
+  };
+  progress(`Transcrivint: ${doneCount()} de ${n} trossos fets…`);
+  if (typeof saved.parts[0] !== 'string') await doChunk(0);
+  const todo = [];
+  for (let i = 1; i < n; i++) if (typeof saved.parts[i] !== 'string') todo.push(i);
+  let next = 0, failure = null;
+  const worker = async () => {
+    while (next < todo.length && !failure) {
+      const i = todo[next++];
+      try { await doChunk(i); } catch (e) { failure = failure || e; }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  if (failure) throw failure; // la feina feta queda desada: es reprèn pels trossos que falten
   const text = saved.parts.map((t, i) => (m.textOnly || !t || i === 0 ? t : `[${fmtClock(Math.round(cuts[i] / rate * 1000))}]\n${t}`)).filter(Boolean).join('\n\n');
   delete m.importParts[f.key];
   return text;

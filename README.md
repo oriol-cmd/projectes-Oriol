@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v73: transcripció més ràpida
+
+- **Gravacions llargues importades**: el primer tros de 5 minuts es fa sol (per agafar els noms de qui parla) i la resta, **3 trossos alhora**. Cada tros rep els noms que han sortit fins llavors perquè siguin els mateixos a tota la transcripció. Una gravació de 2 hores passa de ~12 minuts a ~4–5.
+- **Diversos àudios alhora** (p. ex. notes de veu): se'n transcriuen 2 a la vegada.
+- Si una part falla, la feina feta queda desada i en tornar-ho a provar es reprèn pels trossos que falten.
+
 ## Novetats de la v72: trucades durant la gravació
 
 - Si entra una trucada (o una altra app agafa el micròfon), Xiu-xiu ho detecta i, en penjar, **torna a obrir el micròfon sol** i continua al mateix document.

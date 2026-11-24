@@ -1,1 +1,1 @@
-{ "v": 72, "notes": "Si entra una trucada mentre graves, la gravació continua sola en penjar. I si en algun moment no s'està gravant, surt un avís a tota la pantalla amb un botó gran per continuar." }
+{ "v": 73, "notes": "Si entra una trucada mentre graves, continua sola en penjar, i si no s'està gravant surt un avís gran per continuar. Les gravacions llargues i els àudios importats es transcriuen fins a 3 vegades més de pressa." }

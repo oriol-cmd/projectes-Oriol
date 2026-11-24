@@ -48,7 +48,10 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   if (sys) log.sys.push(sys);
   for (const x of parts) { const md = x.inlineData || x.fileData; if (md) log.mimes.push(md.mimeType || md.fileUri); }
   let txt;
-  if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
+  const tros = user.match(/Aquest és el tros (\d+) de (\d+)/);
+  if (tros) {
+    txt = `Marta: text del tros ${tros[1]}.`;
+  } else if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
   else if (user.includes("fragment curt d'una reunió")) txt = 'Això és el text en directe de prova.';
   else if (user.includes("Transcriu literalment el text d'aquests documents")) txt = "[Document 1]\nApunts: pressupost 5.000 €\n- Revisar contracte";
   else if (sys.includes('apunts o documents')) txt = "# Apunts del pressupost\n\n## Resum\nNotes sobre el pressupost.\n\n## Punts principals\n- Pressupost de 5.000 €.\n\n## Dades clau\n- 5.000 €\n\n## Tasques\n- Cap.\n\n## Dubtes de comprensió\n- Cap.";
@@ -96,6 +99,7 @@ const waitStatus = async (id, want, ms = 60000) => { const t0 = Date.now(); for 
 const lastId = () => p.evaluate(async () => (await db.all('meetings')).sort((a, b) => b.updatedAt - a.updatedAt)[0].id);
 const meeting = (id) => p.evaluate((id) => getMeeting(id), id);
 const fx = (f) => path.join(here, f);
+const buildOrder = (t) => [...(t || '').matchAll(/text del tros (\d+)/g)].map((x) => Number(x[1]));
 
 await p.goto(URL0);
 
@@ -510,6 +514,28 @@ await step('Trucada durant la gravació: avís gran i continua', async () => {
   const m = await meeting(await lastId());
   ok(m.status === 'done', `estat ${m.status} ${m.error || ''}`);
   return `${m.segments.length} trams`;
+});
+await step('Importar una gravació llarga (trossos alhora)', async () => {
+  // 13 minuts de so a 8 kHz
+  const rate = 8000, secs = 13 * 60, n = rate * secs;
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) buf.writeInt16LE(Math.round(Math.sin(i / 9) * 3000 * (((i / rate) % 4) < 2 ? 1 : 0.05)), 44 + i * 2);
+  const file = path.join(tmp, 'llarga.wav'); fs.writeFileSync(file, buf);
+  await p.click('#btn-tab-home'); await waitView('home');
+  // Compta quantes crides a Gemini van alhora dins de l'app.
+  await p.evaluate(() => { if (window.__wrapped) { window.__m = 0; return; } window.__wrapped = true; window.__c = 0; window.__m = 0; const g = gemini; gemini = async (...a) => { window.__c++; window.__m = Math.max(window.__m, window.__c); try { return await g(...a); } finally { window.__c--; } }; });
+  const t0 = Date.now();
+  await p.setInputFiles('#import-input', [file]); await p.click('#btn-import-text'); await waitView('result', 120000);
+  const m = await meeting(await lastId());
+  const tr = buildOrder(m.summary);
+  ok(m.status === 'done' && tr.length >= 3, `estat ${m.status}, ${tr.length} trossos`);
+  ok(tr.every((x, i) => x === i + 1), `ordre ${tr.join(',')}`);
+  const alhora = await p.evaluate(() => window.__m);
+  ok(alhora >= 2, `no van alhora (màx ${alhora})`);
+  return `${tr.length} trossos, ${alhora} alhora, ${Math.round((Date.now() - t0) / 1000)} s`;
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');
