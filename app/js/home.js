@@ -7,7 +7,17 @@
 let currentView = 'home';
 let viewingId = null;
 
+// Mentre es fa l'acta, la pantalla no s'apaga (si s'apaga, el mòbil atura l'app i tot s'espera).
+let procWake = null;
+async function keepAwake(on) {
+  try {
+    if (on && (!procWake || procWake.released) && 'wakeLock' in navigator && document.visibilityState === 'visible') procWake = await navigator.wakeLock.request('screen');
+    if (!on && procWake) { procWake.release().catch(() => {}); procWake = null; }
+  } catch { /* no disponible */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && currentView === 'proc') keepAwake(true); });
 function showView(name) {
+  if (name === 'proc') keepAwake(true); else if (procWake) keepAwake(false);
   if (name !== 'home' && $('#quick-rec')) $('#quick-rec').hidden = true;
   if (typeof closeSheets === 'function' && document.querySelector('.sheet:not([hidden])')) closeSheets();
   if (rec.meeting && name !== 'rec') { toast('Primer acaba la reunió'); return; }

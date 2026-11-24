@@ -39,6 +39,7 @@ let geminiFail = 0;
 const SUMMARY = "# Reunió de prova\n\n## Resum\nS'ha parlat del pressupost.\n\n## Desenvolupament de la reunió\n### Pressupost\n- Aprovat amb canvis.\n\n## Decisions\n- Tirar endavant.\n\n## Tasques\n- [ ] **Marta**: enviar l'informe — divendres\n- [ ] **Persona 1**: revisar el contracte [dubte de comprensió] — dilluns\n\n## Temes oberts i propers passos\n- Cap.\n\n## Dades clau\n- 5.000 €\n\n## Dubtes de comprensió\n- No s'entén el nom del proveïdor.";
 await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   const url = r.request().url();
+  if (log.hang && r.request().method() === 'POST') { log.hung = (log.hung || 0) + 1; return; } // es queda penjada (sense resposta)
   if (r.request().method() === 'GET') return r.fulfill({ status: 200, contentType: 'application/json', body: '{"models":[{"name":"models/x"}]}' });
   if (geminiFail > 0) { geminiFail--; return r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":503,"status":"UNAVAILABLE","message":"overloaded"}}' }); }
   const body = r.request().postDataJSON();
@@ -613,6 +614,23 @@ await step('Reunió important: cada punt rep només el seu tros', async () => {
   });
   ok(r.from && r.to && !r.out, JSON.stringify(r));
   return `${Math.round(r.part / r.total * 100)}% de la transcripció per punt`;
+});
+await step("Petició penjada: en tornar a l'app continua de seguida", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  log.hang = true; log.hung = 0;
+  await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary');
+  await p.waitForFunction(() => currentView === 'proc', null, { timeout: 15000 });
+  for (let i = 0; i < 40 && !log.hung; i++) await p.waitForTimeout(250);
+  ok(log.hung > 0, 'cap petició penjada');
+  const id = await p.evaluate(() => viewingId);
+  // El mòbil s'adorm i es desperta: les peticions mortes es tallen i es tornen a fer
+  log.hang = false;
+  const t0 = Date.now();
+  await p.evaluate(() => abortGeminiInflight());
+  await waitStatus(id, ['done'], 60000);
+  const secs = Math.round((Date.now() - t0) / 1000);
+  ok(secs < 30, `ha trigat ${secs} s`);
+  return `acabada ${secs} s després de despertar`;
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');

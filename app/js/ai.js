@@ -44,12 +44,17 @@ function noteGeminiSlow() {
 }
 
 // Llegeix una resposta en streaming (SSE) de Gemini i va cridant onText amb el text acumulat.
-async function readGeminiStream(res, onText) {
+async function readGeminiStream(res, onText, ctrl = null) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = '', text = '', finish = '', blocked = '';
   for (;;) {
-    const { value, done } = await reader.read();
+    // Si en 60 s no arriba res, la connexió s'ha mort (p. ex. el mòbil s'ha adormit): es talla i es torna a provar.
+    let idle;
+    const stalled = new Promise((_, rej) => { idle = setTimeout(() => { try { ctrl && ctrl.abort(); } catch { /* res */ } rej(new Error('La connexió amb Gemini s\'ha tallat')); }, 60000); });
+    let r;
+    try { r = await Promise.race([reader.read(), stalled]); } finally { clearTimeout(idle); }
+    const { value, done } = r;
     if (done) break;
     buf += dec.decode(value, { stream: true });
     let nl;
@@ -73,6 +78,19 @@ async function readGeminiStream(res, onText) {
   if (!text.trim() && finish && finish !== 'STOP') throw new Error(`Gemini no ha respost (${finish})`);
   return text.trim();
 }
+// Peticions en curs: en tornar a l'app després d'estar adormida, es tallen i es tornen a fer
+// (les que hi havia quedaven mortes i l'app s'esperava per res).
+const geminiInflight = new Set();
+function abortGeminiInflight() {
+  for (const c of geminiInflight) { c.xxWoke = true; try { c.abort(); } catch { /* res */ } }
+  geminiInflight.clear();
+}
+let hiddenAtProc = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { hiddenAtProc = Date.now(); return; }
+  if (hiddenAtProc && Date.now() - hiddenAtProc > 15000 && geminiInflight.size) abortGeminiInflight();
+  hiddenAtProc = 0;
+});
 const BLOCK_FINISH = /^(RECITATION|SAFETY|PROHIBITED_CONTENT|BLOCKLIST|SPII|OTHER|IMAGE_SAFETY)$/;
 // Els filtres de contingut de Google a vegades bloquegen reunions normals (paraules fortes,
 // temes de salut, seguretat…). Xiu-xiu només transcriu i resumeix: es demana que no bloquegin.
@@ -105,35 +123,51 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
         ? `${GEMINI_URL}${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
         : `${GEMINI_URL}${encodeURIComponent(model)}:generateContent`;
       let res;
+      // Temps màxim per petició: una transcripció de 1–2 minuts d'àudio triga segons; si passa d'aquí,
+      // la connexió està penjada. Es pot tallar des de fora (en tornar a l'app després d'adormir-se).
+      const ctrl = new AbortController();
+      geminiInflight.add(ctrl);
+      const limit = onText ? 90000 : task === 'transcribe' ? 120000 : 240000; // amb resposta en directe, fins que comença
+      const timer = setTimeout(() => ctrl.abort(), limit);
+      const done = () => { clearTimeout(timer); geminiInflight.delete(ctrl); };
       try {
-        res = await fetchWithTimeout(url, {
+        res = await fetch(url, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.geminiKey },
           body: JSON.stringify(body),
-        }, 300000);
+          signal: ctrl.signal,
+        });
       } catch (e) {
+        done();
         lastErr = new Error('Sense connexió amb Gemini');
+        if (ctrl.xxWoke) { await sleep(300); continue; } // l'app tornava d'estar adormida: de seguida
+        if (attempt >= 1 && hasNext && navigator.onLine !== false) break; // penjat dos cops: un altre model
         await sleep(3000 * 2 ** attempt);
         continue;
       }
+      if (onText) clearTimeout(timer); // en directe, a partir d'ara mana el límit d'inactivitat
       if (res.ok) {
         if (onText) {
-          try { return await readGeminiStream(res, onText); }
+          try { const t = await readGeminiStream(res, onText, ctrl); done(); return t; }
           catch (e) {
             if (/bloquejat|no ha respost/.test(e.message)) {
+              done();
               // Bloquejat per un filtre: prova el model següent (cada model filtra diferent).
               onText('');
               lastErr = e;
               if (hasNext) break;
               throw e;
             }
+            done();
             lastErr = new Error('La connexió amb Gemini s\'ha tallat');
             onText('');
-            await sleep(2000);
+            await sleep(ctrl.xxWoke ? 300 : 2000);
             continue;
           }
         }
-        const data = await res.json();
+        let data;
+        try { data = await res.json(); } catch (e) { done(); lastErr = new Error('La connexió amb Gemini s\'ha tallat'); await sleep(ctrl.xxWoke ? 300 : 2000); continue; }
+        done();
         const cand = (data.candidates || [])[0];
         const text = ((cand && cand.content && cand.content.parts) || [])
           .filter((pt) => pt.text && !pt.thought).map((pt) => pt.text).join('').trim();
@@ -144,7 +178,8 @@ async function gemini(parts, { system, maxTokens = 16384, task = 'summary', thin
         if (blockedErr) { lastErr = blockedErr; if (hasNext) break; throw blockedErr; } // prova el model següent
         return text;
       }
-      const errText = await res.text();
+      const errText = await res.text().catch(() => '');
+      done();
       if (res.status === 404) { missingModels.add(model); lastErr = new Error(`Model ${model} no disponible`); break; }
       if (/API_KEY_INVALID|API key not valid/i.test(errText)) throw new FatalError('La clau de Gemini no és vàlida');
       if (res.status === 403) throw new FatalError(`Gemini ha denegat l'accés: ${errText.slice(0, 160)}`);
