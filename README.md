@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v80: revisió de l'acta amb la gravació
+
+- Quan l'acta està feta (en segon pla, sense fer esperar), Gemini la torna a llegir al costat de la transcripció i comprova **frase per frase** que tot surti de la reunió: temes, noms, marques, xifres, colors, qui diu cada cosa, acords i conclusions.
+- El que no es troba a la gravació queda **ressaltat en groc**. A l'avís de dalt: **«Mira-les»** (motiu, què es va dir realment i ▶ el moment) i **«Corregeix-les»** (l'acta queda només amb el que es va dir, i es torna a comprovar).
+- També es pot fer a mà: **⋯ › Comprova l'acta amb la gravació**. Es pot desactivar a Ajustos (gasta 1 petició més per reunió).
+
 ## Novetats de la v77: reunions llargues més ràpides
 
 - **L'acta es mostra en el moment que està feta**; el correu, el Google Doc i les etiquetes s'acaben en segon pla (abans calia esperar-los).

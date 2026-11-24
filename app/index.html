@@ -252,6 +252,7 @@
       <div id="result-status" class="banner"></div>
       <div id="rec-report" class="banner warn rec-report" hidden></div>
       <div id="doubt-banner" class="banner doubt-banner" hidden></div>
+      <div id="verify-banner" class="banner verify-banner" hidden></div>
       <div id="lang-switch" class="seg" role="group" aria-label="Idioma del resum" hidden>
         <button type="button" data-lang="ca">Català</button>
         <button type="button" data-lang="es">Castellano</button>
@@ -387,6 +388,7 @@
         <label class="field"><span>Instruccions extra <em>(opcional)</em></span>
           <textarea id="set-extra" rows="3" placeholder="p. ex. Destaca sempre els imports econòmics i els terminis."></textarea></label>
         <label class="check"><input id="set-short-imports" type="checkbox"> Resum curt per als àudios importats</label>
+        <label class="check"><input id="set-verify" type="checkbox"> Revisa l'acta amb la gravació i marca el que no s'hi troba <em>(recomanat)</em></label>
         <label class="check"><input id="set-quick" type="checkbox"> En obrir Xiu-xiu, preparat per gravar amb un sol toc</label>
         <label class="check last"><input id="set-live" type="checkbox"> Text en directe mentre grava <em>(un esborrany cada 20 s, abans que arribi la transcripció bona; gasta més quota de Google)</em></label>
       </div>
@@ -826,6 +828,7 @@
       <div class="sheet-grip"></div>
       <h3>Més opcions</h3>
       <div class="sheet-list">
+        <button id="btn-verify-now" class="sheet-row" type="button" data-closes>🔍 Comprova l'acta amb la gravació</button>
         <button id="btn-analysis" class="sheet-row" type="button">📊 Anàlisi de la reunió (qui parla, temes oberts…)</button>
         <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
         <button id="btn-set-tags" class="sheet-row" type="button" data-closes># Etiquetes: <span id="tags-current">cap</span></button>
@@ -896,6 +899,18 @@
       <button id="btn-multi-go" class="btn primary full" type="button">Fes el resum</button>
       <p id="multi-msg" class="fineprint"></p>
       <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
+    </div>
+  </div>
+
+ <div id="verify-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Revisió de l'acta">
+      <div class="sheet-grip"></div>
+      <h3>Coses de l'acta que no es troben a la gravació</h3>
+      <div id="verify-list" class="verify-list"></div>
+      <button id="btn-verify-fix2" class="btn primary full" type="button">Corregeix l'acta perquè digui només el que es va dir</button>
+      <p id="verify-msg" class="fineprint"></p>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
     </div>
   </div>
 

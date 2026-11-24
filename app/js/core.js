@@ -1,6 +1,6 @@
 /* Xiu-xiu · Base: configuració, utilitats, Markdown, base de dades i textos d'error. */
 'use strict';
-const APP_VERSION = 79;
+const APP_VERSION = 80;
 
 
 // ---------------------------------------------------------------------------
@@ -331,6 +331,7 @@ async function translateSummary(m, lang) {
 }
 function renderResultSummary(m) {
   $('#result-summary').innerHTML = m.summary ? mdToHtml(viewSummary(m)) : '<p>Encara no hi ha resum.</p>';
+  if (typeof markUnverified === 'function') { try { markUnverified(m); } catch { /* res */ } if (typeof renderVerifyBanner === 'function') renderVerifyBanner(m); }
   document.querySelectorAll('#lang-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === resultLang)));
 }
 document.querySelectorAll('#lang-switch button').forEach((b) => {

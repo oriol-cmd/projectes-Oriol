@@ -71,6 +71,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
     return r.fulfill({ status: 200, contentType: url.includes('alt=sse') ? 'text/event-stream' : 'application/json', body: url.includes('alt=sse') ? `data: ${pl}\n\n` : pl });
   }
   else if (sys.includes('apunts o documents')) txt = "# Apunts del pressupost\n\n## Resum\nNotes sobre el pressupost.\n\n## Punts principals\n- Pressupost de 5.000 €.\n\n## Dades clau\n- 5.000 €\n\n## Tasques\n- Cap.\n\n## Dubtes de comprensió\n- Cap.";
+  else if (sys.includes('verificador molt estricte')) txt = log.verifyProblem ? JSON.stringify({ problemes: [{ text: 'Aprovat amb canvis.', motiu: 'A la reunió no es diu que s\'aprovi', correccio: 'Es parla del pressupost però no s\'aprova', moment: '[00:05]' }] }) : '{"problemes":[]}';
   else if (user.includes('Proposa etiquetes')) txt = '{"etiquetes":["pressupost","Finances 2027"]}';
   else if (sys.includes('Analitzes una reunió')) txt = '## Temps per tema\n- Pressupost [00:00]–[00:20]\n\n## Temes que han quedat oberts\n- Cap.';
   else if (sys.includes('correus de seguiment')) txt = JSON.stringify({ correus: [{ nom: 'Marta', assumpte: 'Seguiment de la reunió', text: "Hola Marta,\nEt toca enviar l'informe.\nSalutacions," }, { nom: 'Persona 1', assumpte: 'x', text: 'x' }] });
@@ -631,6 +632,23 @@ await step("Petició penjada: en tornar a l'app continua de seguida", async () =
   const secs = Math.round((Date.now() - t0) / 1000);
   ok(secs < 30, `ha trigat ${secs} s`);
   return `acabada ${secs} s després de despertar`;
+});
+await step("Revisió de l'acta amb la gravació (marca el que no es va dir)", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  log.verifyProblem = true;
+  try {
+    await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 90000);
+  } finally { log.verifyProblem = false; }
+  const id = await p.evaluate(() => viewingId);
+  ok(/1 cosa de l'acta no es troba/.test(await p.textContent('#verify-banner')), 'sense avís de revisió');
+  ok(/Aprovat amb canvis/.test(await p.textContent('#result-summary mark.unverified')), 'no ressalta la frase');
+  await p.click('#btn-verify-see'); await p.waitForSelector('#verify-sheet:not([hidden])');
+  ok(/no es diu/.test(await p.textContent('#verify-list')), 'sense motiu');
+  await p.click('#btn-verify-fix2');
+  await p.waitForFunction(() => /tot el que diu surt a la reunió/.test($('#verify-banner').textContent), null, { timeout: 30000 });
+  const m = await meeting(id);
+  ok((m.corrections || []).some((c) => /Aprovat amb canvis/.test(c)), 'no desa la correcció');
+  return 'marcada, explicada i corregida';
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');
