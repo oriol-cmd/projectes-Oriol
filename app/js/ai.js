@@ -289,11 +289,39 @@ const enhancedRef = new Map(); // àudio de presentacions -> versió millorada
 
 const LANG_NAMES = { ca: 'català', es: 'castellà', en: 'anglès' };
 // Evita que Gemini «ompli» la transcripció amb text de les instruccions quan l'àudio no s'entén.
+// Ritme de parla: ningú no pot dir més de ~230 paraules per minut (encara que parlin alhora).
+// Si un tros en té més, Gemini s'ha inventat part de la conversa (passa quan l'àudio no s'entén).
+const wordCount = (t) => (String(t || '').replace(/\[[^\]]*\]/g, ' ').match(/[\p{L}\p{N}]+/gu) || []).length;
+function speechLimits(durMs) {
+  if (!durMs || durMs < 4000) return null;
+  const min = durMs / 60000;
+  return {
+    maxWords: Math.round(min * 230 + 40),
+    maxTokens: Math.min(65536, Math.max(1024, Math.round(min * 600 + 500))),
+    note: `Aquest tros d'àudio dura uns ${durMs >= 120000 ? `${Math.round(min)} minuts` : `${Math.round(durMs / 1000)} segons`}: a un ritme normal hi caben com a molt unes ${Math.round(min * 180 + 30)} paraules. Transcriu NOMÉS el que se sent en aquest àudio i, quan s'acabi, atura't: no continuïs ni completis la conversa, i no hi afegeixis comiats, resums ni intervencions que no se sentin.`,
+  };
+}
+const tooLong = (text, lim) => !!lim && wordCount(text) > lim.maxWords;
+const SUSPECT_MARK = "[⚠️ Tros dubtós: té més text del que es pot dir en aquest temps; pot contenir parts inventades per la transcripció]";
+// Marca (també a reunions ja fetes) els trams amb més paraules de les que caben en la seva durada.
+function markSuspects(m) {
+  if (m.engine !== 'audio' || m.transcriptEdited) return false;
+  const segs = (m.segments || []).slice().sort((a, b) => a.idx - b.idx);
+  let changed = false;
+  segs.forEach((s, i) => {
+    if (s.status !== 'done' || !s.text || s.suspect != null) return;
+    const end = i + 1 < segs.length ? segs[i + 1].startMs : m.durationMs;
+    const lim = speechLimits(end - (s.startMs || 0));
+    if (lim && wordCount(s.text) > lim.maxWords * 1.15) { s.suspect = true; changed = true; }
+  });
+  return changed;
+}
 const NO_LEAK = "Transcriu NOMÉS el que se sent a l'àudio. No facis servir mai noms de persones, frases ni temes que no se sentin a l'àudio (les instruccions i el context només serveixen per escriure bé el que sí que se sent). Si hi ha veus però costa entendre-les, transcriu tot el que s'entengui i marca només les parts que no amb [dubte de comprensió]: no et saltis cap intervenció. Respon [silenci] només si no hi ha cap veu humana.";
 let forceWav = false;
 
 // ref: { blob, text } = àudio de les presentacions (mostra de veus) · isRef: és el tram de presentacions
-async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false, boost = false, call = false, precise = false } = {}) {
+async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef = false, speakers = false, boost = false, call = false, precise = false, durMs = null, meta = {} } = {}) {
+  const lim = speechLimits(durMs);
   const speakerRules = !speakers ? [
     'Escriu només la transcripció, sense títols, comentaris ni resums. Comença una línia nova cada cop que canviï la persona que parla.',
   ] : !isRef && !ref ? [
@@ -323,14 +351,15 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     context ? `Context de la reunió (per escriure bé noms i termes): ${context}` : '',
     settings.vocab ? `Noms i paraules que surten sovint (escriu-los exactament així quan els sentis): ${settings.vocab}` : '',
     prevText ? `Final del tram anterior (només per continuïtat i per saber de què es parla; no el repeteixis): «${prevText.slice(-800)}»` : '',
+    lim ? lim.note : '',
   ].filter(Boolean).join('\n');
 
   const audioPart = async (b) => ({ inlineData: { mimeType: (b.type || 'audio/mp4').split(';')[0], data: await blobToBase64(b) } });
-  const send = async (b, r) => gemini([
+  const send = async (b, r, strict = false) => gemini([
     ...(r ? [await audioPart(r)] : []),
     await audioPart(b),
-    { text: prompt },
-  ], { task: 'transcribe', thinking: 0, precise }); // transcriure no requereix «pensar»: més ràpid
+    { text: strict ? `${prompt}\nATENCIÓ: un intent anterior va retornar molt més text del que cap en aquest àudio, és a dir, s'hi va inventar conversa. Aquest cop transcriu exclusivament les paraules que sents; si una part no s'entén, posa [dubte de comprensió] i continua.` : prompt },
+  ], { task: 'transcribe', thinking: 0, precise: precise || strict, ...(lim ? { maxTokens: lim.maxTokens } : {}) }); // transcriure no requereix «pensar»: més ràpid
   let refBlob = ref && ref.blob ? ref.blob : null;
   let text;
   if (boost) {
@@ -351,8 +380,15 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
       forceWav = true;
     }
   }
-  if (text === undefined) text = await send(blob.type === 'audio/wav' ? blob : await toWav(blob), refBlob ? (refBlob.type === 'audio/wav' ? refBlob : await toWav(refBlob)) : null);
+  if (text === undefined) { blob = blob.type === 'audio/wav' ? blob : await toWav(blob); refBlob = refBlob ? (refBlob.type === 'audio/wav' ? refBlob : await toWav(refBlob)) : null; text = await send(blob, refBlob); }
   text = text.trim();
+  // Massa text per a la durada: es torna a fer amb el model precís i més estricte; si continua, es marca.
+  if (tooLong(text, lim)) {
+    let again = '';
+    try { again = (await send(blob, refBlob, true)).trim(); } catch (e) { if (e instanceof FatalError) throw e; }
+    if (again && wordCount(again) < wordCount(text)) text = again;
+    meta.suspect = tooLong(text, lim);
+  } else meta.suspect = false;
   return /^\s*(\[silenci\]\.?\s*)+$/i.test(text) ? '' : text;
 }
 
@@ -417,12 +453,18 @@ async function transcribeQueued(m, seg) {
     if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx) };
   }
   try {
-    seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call', precise: m.type === 'important' || !!seg.retry });
+    const segs = m.segments.slice().sort((a, b) => a.idx - b.idx);
+    const next = segs.find((s) => s.idx > seg.idx);
+    const end = next ? next.startMs : (rec.meeting === m ? rec.segStartMs : m.durationMs);
+    const durMs = end > (seg.startMs || 0) ? end - (seg.startMs || 0) : null;
+    const meta = {};
+    seg.text = await transcribeBlob(blob, seg.idx, prev, m.context, { ref, isRef, speakers: !!m.speakers, boost: settings.boost !== false, call: m.source === 'call', precise: m.type === 'important' || !!seg.retry, durMs, meta });
+    if (meta.suspect) seg.suspect = true; else seg.suspect = false;
     seg.status = 'done';
     delete seg.error;
     // L'àudio de les presentacions es guarda fins al final: és la mostra de veus.
     if (!seg.text) seg.empty = true; else delete seg.empty;
-    if (!keepAudioNow() && !isRef && seg.text) await db.del('audio', audioKey(m.id, seg.idx));
+    if (!keepAudioNow() && !isRef && seg.text && !seg.suspect) await db.del('audio', audioKey(m.id, seg.idx)); // el dubtós es guarda per escoltar-lo
   } catch (e) {
     seg.status = 'error';
     seg.error = e.message;
@@ -544,6 +586,7 @@ function buildTranscript(m, markEveryMs = 300000) {
         acc.lastMark = t;
         acc.out.push(`\n[${fmtClock(t)}]`);
       }
+      if (s.suspect) acc.out.push(SUSPECT_MARK);
       acc.out.push(s.text);
       return acc;
     }, { out: [], lastMark: null, gaps: (m.gaps || []).slice().sort((a, b) => a.atMs - b.atMs) }).out
@@ -875,6 +918,7 @@ async function summaryByParts(m, transcript, onText) {
 }
 
 async function summarize(m, onText = null) {
+  if (markSuspects(m)) await saveMeeting(m);
   const transcript = buildTranscript(m);
   if (!transcript) throw new FatalError(m.source === 'call'
     ? "No s'ha captat cap paraula a la gravació. En una videotrucada, en compartir cal triar la pestanya de la reunió (o «Tota la pantalla») i marcar «Comparteix també l'àudio»; i a Ajustos › Micròfon, triar el micròfon que fas servir."
@@ -905,6 +949,7 @@ async function summarize(m, onText = null) {
   if (settings.extra) info.push(`Instruccions addicionals de l'usuari: ${settings.extra}`);
   // El context (títol, convocatòria, assistents, ordre del dia previst, fotos) NO és el que s'ha dit.
   info.push(CONTEXT_IS_NOT_CONTENT);
+  if (/⚠️ Tros dubtós/.test(transcript)) info.push("Alguns trossos de la transcripció estan marcats amb «⚠️ Tros dubtós»: hi ha més text del que es pot dir en aquell temps, i per tant part del seu contingut pot ser inventat per la transcripció automàtica. No en treguis acords, decisions, tasques, xifres, dates ni temes que no es confirmin en altres parts de la transcripció; si els esmentes, marca-ho amb [dubte de comprensió].");
 
   // Fotos de documents (p. ex. notes escrites a mà) com a context.
   const photos = (m.photos || []).slice(0, MAX_PHOTOS);

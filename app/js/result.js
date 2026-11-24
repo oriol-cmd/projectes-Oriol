@@ -395,12 +395,24 @@ async function renderRecReport(m) {
   const empties = [];
   for (const sg of m.segments || []) if (sg.empty && await db.get('audio', audioKey(m.id, sg.idx))) empties.push(sg);
   const silent = (m.segments || []).filter((sg) => sg.silent).length;
+  if (markSuspects(m)) await saveMeeting(m);
+  const suspects = (m.segments || []).filter((sg) => sg.suspect);
+  const suspAudio = [];
+  for (const sg of suspects) if (await db.get('audio', audioKey(m.id, sg.idx))) suspAudio.push(sg);
   const parts = [];
+  if (suspects.length) parts.push(`<b>${suspects.length === 1 ? '1 tros de la transcripció té' : `${suspects.length} trossos de la transcripció tenen`} més text del que es pot dir en aquell temps</b>: segurament s'hi ha inventat part de la conversa. A la transcripció surten marcats amb ⚠️ i l'acta no en treu acords ni tasques.${suspAudio.length ? ` <button class="link" id="btn-retry-suspect" type="button">Torna'ls a transcriure</button> (amb el model més precís).` : " Si l'acta es va fer abans d'aquesta revisió, toca ⋯ › «Refés el resum»."}`);
   if (gaps.length) parts.push(`<b>${gaps.length === 1 ? '1 interrupció' : `${gaps.length} interrupcions`} (${fmtGap(gapMs)} sense gravar)</b> perquè el mòbil s'ha bloquejat o s'ha canviat d'app. Aquest tros no es pot recuperar.`);
   if (empties.length) parts.push(`<b>${empties.length === 1 ? "1 tros d'àudio ha tornat" : `${empties.length} trossos d'àudio han tornat`}</b> sense text. <button class="link" id="btn-retry-empty" type="button">${empties.length === 1 ? "Torna'l" : "Torna'ls"} a transcriure</button> (amb el model més precís).`);
   if (!parts.length) return;
   box.innerHTML = parts.map((x) => `<p>${x}</p>`).join('') + (silent ? `<p class="muted">${silent === 1 ? '1 tros en silenci descartat' : `${silent} trossos en silenci descartats`}.</p>` : '');
   box.hidden = false;
+  const bs = $('#btn-retry-suspect');
+  if (bs) bs.onclick = async () => {
+    for (const sg of suspAudio) { sg.status = 'pending'; sg.retry = true; delete sg.suspect; delete sg.error; }
+    await saveMeeting(m);
+    showView('proc'); updateProcView(m);
+    runPipeline(m.id, { redoSummary: true });
+  };
   const btn = $('#btn-retry-empty');
   if (btn) btn.onclick = async () => {
     for (const sg of empties) { sg.status = 'pending'; sg.retry = true; delete sg.error; }
@@ -681,6 +693,7 @@ async function renderTranscript(m) {
       head.appendChild(b);
     } else head.textContent = fmtClock(sg.startMs || 0);
     div.appendChild(head);
+    if (sg.suspect) { div.classList.add('suspect'); const w = document.createElement('div'); w.className = 'tseg-warn'; w.textContent = '⚠️ Tros dubtós: té més text del que es pot dir en aquest temps. Escolta l\'àudio per comprovar-lo.'; div.appendChild(w); }
     const body = document.createElement('div');
     body.innerHTML = sg.text.split('\n').map(speakerHtml).join('<br>');
     div.appendChild(body);

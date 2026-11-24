@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v82: transcripció sense conversa inventada
+
+- Quan un tros d'àudio no s'entén, Gemini a vegades **s'inventa una conversa sencera** per omplir-lo. Ara cada tros es transcriu sabent quant dura (i amb un límit de text proporcional), i es compara el **nombre de paraules amb la durada**: ningú no pot dir més de ~230 paraules per minut.
+- Si un tros en té més, es torna a transcriure amb el model precís i més estricte; si continua igual, queda **marcat amb ⚠️ com a dubtós** (es guarda l'àudio per escoltar-lo) i **l'acta no en treu acords, tasques ni xifres** si no es confirmen en altres parts.
+- També es revisen les **reunions ja fetes**: els trossos impossibles surten marcats a l'informe de la gravació; toca ⋯ › «Refés el resum».
+
 ## Novetats de la v80: revisió de l'acta amb la gravació
 
 - Quan l'acta està feta (en segon pla, sense fer esperar), Gemini la torna a llegir al costat de la transcripció i comprova **frase per frase** que tot surti de la reunió: temes, noms, marques, xifres, colors, qui diu cada cosa, acords i conclusions.

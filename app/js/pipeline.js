@@ -566,16 +566,25 @@ async function transcribeLongImport(m, blob, f, label, basePrompt, clean, progre
     const prev = i > 0 && typeof saved.parts[i - 1] === 'string' ? saved.parts[i - 1].slice(-800) : '';
     const names = i > 0 ? namesSoFar() : [];
     const from = fmtClock(Math.round(cuts[i] / rate * 1000)), to = fmtClock(Math.round(cuts[i + 1] / rate * 1000));
+    const lim = speechLimits(Math.round((cuts[i + 1] - cuts[i]) / rate * 1000));
     const ask = [
       prompt,
       `Aquest és el tros ${i + 1} de ${n} de la gravació (de ${from} a ${to}). Transcriu-lo sencer, des del principi fins al final.`,
+      lim ? lim.note : '',
       prev ? `Final del tros anterior (només per continuïtat i per fer servir els mateixos noms de qui parla; no el repeteixis): «${prev}»` : '',
       names.length ? `Noms de qui parla que han sortit als trossos anteriors (fes-los servir si reconeixes la mateixa veu; no te'ls inventis si no hi són): ${names.join(', ')}` : '',
     ].filter(Boolean).join('\n');
     const part = wav.size <= 14e6
       ? { inlineData: { mimeType: 'audio/wav', data: await blobToBase64(wav) } }
       : { fileData: { mimeType: 'audio/wav', fileUri: await uploadToGemini(wav, 'audio/wav', `${f.name || 'reunio'}-${i + 1}`) } };
-    saved.parts[i] = clean(await gemini([part, { text: ask }], { task: 'transcribe', thinking: 0, maxTokens: 16384 }));
+    let t = clean(await gemini([part, { text: ask }], { task: 'transcribe', thinking: 0, maxTokens: lim ? lim.maxTokens : 16384 }));
+    if (tooLong(t, lim)) { // massa text per a la durada: s'ha inventat part de la conversa
+      let again = '';
+      try { again = clean(await gemini([part, { text: `${ask}\nATENCIÓ: un intent anterior va retornar molt més text del que cap en aquest àudio. Transcriu exclusivament les paraules que sents.` }], { task: 'transcribe', precise: true, thinking: 0, maxTokens: lim.maxTokens })); } catch (e) { if (e instanceof FatalError) throw e; }
+      if (again && wordCount(again) < wordCount(t)) t = again;
+      if (tooLong(t, lim)) t = `${SUSPECT_MARK}\n${t}`;
+    }
+    saved.parts[i] = t;
     await saveMeeting(m);
     progress(`Transcrivint: ${doneCount()} de ${n} trossos fets…`);
   };

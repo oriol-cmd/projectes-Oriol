@@ -664,3 +664,5 @@ mark.unverified { background: #ffe58a; color: inherit; border-bottom: 2px dashed
 .vi-why { color: var(--warn-text); font-size: 14px; }
 .vi-fix { font-size: 14px; color: var(--muted); }
 .docs-role { margin-top: 10px; }
+.tseg.suspect { border-left: 3px solid #d08a00; padding-left: 8px; background: rgba(255, 229, 138, .15); }
+.tseg-warn { font-size: 13px; color: var(--warn-text); margin: 2px 0 4px; }

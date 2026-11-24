@@ -50,6 +50,12 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   for (const x of parts) { const md = x.inlineData || x.fileData; if (md) log.mimes.push(md.mimeType || md.fileUri); }
   if (sys) (log.asks = log.asks || []).push(user.slice(0, 6000));
   let txt;
+  if (log.inventa && /tram d'una reunió/.test(user)) {
+    log.inventaN = (log.inventaN || 0) + 1;
+    const t = /un intent anterior va retornar molt més text/.test(user) ? 'Marta: hola, comencem pel pressupost.' : `Marta: ${'paraula inventada '.repeat(450)}`;
+    const pl = JSON.stringify({ candidates: [{ content: { parts: [{ text: t }] }, finishReason: 'STOP' }] });
+    return r.fulfill({ status: 200, contentType: 'application/json', body: pl });
+  }
   if (log.slowSeg && /tram d'una reunió/.test(user)) await new Promise((res) => setTimeout(res, 500));
   const tros = user.match(/Aquest és el tros (\d+) de (\d+)/);
   if (tros) {
@@ -667,6 +673,41 @@ await step("Revisió de l'acta amb la gravació (marca el que no es va dir)", as
   const m = await meeting(id);
   ok((m.corrections || []).some((c) => /Aprovat amb canvis/.test(c)), 'no desa la correcció');
   return 'marcada, explicada i corregida';
+});
+await step('Transcripció inventada: es detecta pel ritme de parla', async () => {
+  // 1. En transcriure: 900 paraules en 30 s és impossible → es torna a fer i queda bé
+  log.inventa = true; log.inventaN = 0;
+  let id;
+  try {
+    id = await p.evaluate(async () => {
+      const id = uid();
+      const segs = [];
+      for (let i = 0; i < 2; i++) { await db.put('audio', pcmToWav(new Float32Array(16000 * 30).map((_, k) => Math.sin(k / 5) * 0.3), 16000), audioKey(id, i)); segs.push({ idx: i, startMs: i * 30000, status: 'pending', text: '' }); }
+      await saveMeeting({ id, title: 'Inventada', startedAt: Date.now(), createdAt: Date.now(), durationMs: 60000, engine: 'audio', source: 'mic', type: 'general', status: 'processing', marks: [], summary: '', email: { status: 'pending' }, segments: segs });
+      runPipeline(id);
+      return id;
+    });
+    await waitStatus(id, ['done', 'error'], 60000);
+  } finally { log.inventa = false; }
+  let m = await meeting(id);
+  ok(m.segments.every((x) => x.text === 'Marta: hola, comencem pel pressupost.' && x.suspect === false), `trams: ${m.segments.map((x) => (x.text || '').length).join(',')}`);
+  ok(log.inventaN >= 4, `intents ${log.inventaN}`);
+  // 2. Reunió ja feta amb un tros impossible: es marca i l'acta en desconfia
+  log.asks = [];
+  const id2 = await p.evaluate(async () => {
+    const id = uid();
+    await saveMeeting({ id, title: 'Antiga', startedAt: Date.now(), createdAt: Date.now(), durationMs: 120000, engine: 'audio', source: 'mic', type: 'general', status: 'done', marks: [], summary: '# Antiga\n\n## Resum\nx', email: { status: 'off' },
+      segments: [{ idx: 0, startMs: 0, status: 'done', text: 'Marta: hola a tothom.' }, { idx: 1, startMs: 60000, status: 'done', text: `Martí: ${'conversa inventada '.repeat(400)}` }] });
+    return id;
+  });
+  await p.evaluate((id) => showResult(id), id2); await waitView('result');
+  await p.waitForFunction(() => /més text del que es pot dir/.test($('#rec-report').textContent), null, { timeout: 10000 });
+  m = await meeting(id2);
+  ok(m.segments[1].suspect === true && !m.segments[0].suspect, 'no marca el tros');
+  await p.evaluate((id) => runPipeline(id, { redoSummary: true }), id2);
+  await waitStatus(id2, ['done'], 60000);
+  ok(log.asks.some((t) => /Tros dubtós/.test(t)), "l'acta no rep l'avís");
+  return 'refet amb el model precís; els antics es marquen';
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');
