@@ -713,7 +713,7 @@ async function proMinutes(m, info, photos, photoParts, onText) {
     const from = toMs(it.inici); const to = toMs(it.final);
     // Fotos fetes durant aquest punt (o afegides després).
     const extra = photoParts.filter((_, k) => { if (photos[k].agenda) return false; const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
-    const ask = `${head}\n\nORDRE DEL DIA:\n${agendaList}\n\nRedacta ara NOMÉS el punt ${i + 1}: «${it.titol}»${it.inici ? ` (aprox. de ${it.inici} a ${it.final || 'final'})` : ''}${it.nota ? `. Nota: ${it.nota}` : ''}.${extra.length ? " Les fotos adjuntes són documents mostrats a la reunió: fes-les servir si tenen relació amb aquest punt." : ''}\n\n${trans}`;
+    const ask = `${head}\n\nORDRE DEL DIA:\n${agendaList}\n\nRedacta ara NOMÉS el punt ${i + 1}: «${it.titol}»${it.inici ? ` (aprox. de ${it.inici} a ${it.final || 'final'})` : ''}${it.nota ? `. Nota: ${it.nota}` : ''}.${extra.length ? " Les fotos adjuntes són documents mostrats a la reunió: fes-les servir NOMÉS com a ajuda per escriure bé noms, xifres i termes del que es diu en aquest punt (no en resumeixis ni en copiïs el contingut)." : ''}\n\n${trans}`;
     const t = strip(await gemini([{ text: ask }, ...extra], { system: PRO_SECTION_PROMPT, task: 'pro', thinking: 1024, maxTokens: 8192 }));
     sections[i] = /^###\s/.test(t) ? t : `### ${i + 1}. ${it.titol}\n\n${t}`;
     m.proDraft.sections = sections.slice();
@@ -826,7 +826,7 @@ async function summarize(m, onText = null) {
     info.push(`S'adjunten els ${photoParts.length} documents originals (fotos d'apunts o PDF). La transcripció és el seu text: fes servir els originals per comprovar xifres, noms, esquemes i paraules dubtoses.`);
   } else if (photoParts.length) {
     info.push(`S'adjunten ${photoParts.length} document${photoParts.length > 1 ? 's' : ''} (fotos, sovint escrites a mà, o PDF) mostrats o comentats a la reunió, en aquest ordre: ${photos.map((ph, i) => `${ph.pdf ? `document ${i + 1} (PDF «${ph.name || 'document'}»)` : `foto ${i + 1}`}${ph.agenda ? " (ORDRE DEL DIA o convocatòria de la reunió: fes-la servir com a ordre del dia previst)" : ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
-Llegeix-les amb atenció i fes-les servir per entendre de què es parla (xifres, noms, llistes, esquemes) i relaciona-les amb el que es deia en aquell moment. Afegeix una secció «## Documents comentats» just abans de «## Dubtes de comprensió», amb què conté cada document i com s'ha fet servir a la reunió. Si alguna part escrita a mà no es llegeix bé, no t'ho inventis: marca-ho amb [dubte de comprensió].`);
+MOLT IMPORTANT: l'acta es fa a partir del que ES DIU a la reunió (la transcripció). Les fotos són NOMÉS UNA AJUDA per entendre i escriure bé el que es diu: noms, xifres, termes, punts de l'ordre del dia, esquemes. No resumeixis el contingut de les fotos, no en copiïs el text i no hi afegeixis res que a la reunió no s'hagi dit. Si a la reunió es parla d'un document, explica el que se'n va dir.`);
   }
 
   if (isProMeeting(m)) {

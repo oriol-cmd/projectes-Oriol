@@ -50,6 +50,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   let txt;
   const tros = user.match(/Aquest és el tros (\d+) de (\d+)/);
   if (tros) {
+    await new Promise((res) => setTimeout(res, 600)); // com una resposta real: dona temps que en coincideixin diversos
     txt = `Marta: text del tros ${tros[1]}.`;
   } else if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
   else if (user.includes("fragment curt d'una reunió")) txt = 'Això és el text en directe de prova.';
