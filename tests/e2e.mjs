@@ -78,7 +78,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
     return r.fulfill({ status: 200, contentType: url.includes('alt=sse') ? 'text/event-stream' : 'application/json', body: url.includes('alt=sse') ? `data: ${pl}\n\n` : pl });
   }
   else if (sys.includes('apunts o documents')) txt = "# Apunts del pressupost\n\n## Resum\nNotes sobre el pressupost.\n\n## Punts principals\n- Pressupost de 5.000 €.\n\n## Dades clau\n- 5.000 €\n\n## Tasques\n- Cap.\n\n## Dubtes de comprensió\n- Cap.";
-  else if (sys.includes('verificador molt estricte')) txt = log.verifyProblem ? JSON.stringify({ problemes: [{ text: 'Aprovat amb canvis.', motiu: 'A la reunió no es diu que s\'aprovi', correccio: 'Es parla del pressupost però no s\'aprova', moment: '[00:05]' }] }) : '{"problemes":[]}';
+  else if (sys.includes('verificador molt estricte')) txt = (log.verifyProblem && log.verifyProblem-- > 0) ? JSON.stringify({ problemes: [{ text: 'Aprovat amb canvis.', motiu: 'A la reunió no es diu que s\'aprovi', correccio: 'Es parla del pressupost però no s\'aprova', moment: '[00:05]' }] }) : '{"problemes":[]}';
   else if (sys.includes("Algunes línies diuen «Persona no identificada»")) txt = '{"canvis":[{"id":"s0:1","nom":"Oriol","motiu":"continua la frase"},{"id":"s0:3","nom":"Inventat","motiu":"x"}]}';
   else if (sys.includes('Extreu-ne les CITES')) txt = JSON.stringify({ cites: [{ titol: 'Reunió del projecte Artic', data: '2026-12-02', hora_inici: '10:00', hora_final: '', lloc: 'Teams', qui: 'Oriol, Martí', quan: 'dimecres a les deu per Teams', segur: true }, { titol: 'Rodatge a la neu', data: '', quan: 'quan hi hagi neu', segur: false }] });
   else if (user.includes('Proposa etiquetes')) txt = '{"etiquetes":["pressupost","Finances 2027"]}';
@@ -660,9 +660,26 @@ await step("Petició penjada: en tornar a l'app continua de seguida", async () =
   ok(secs < 30, `ha trigat ${secs} s`);
   return `acabada ${secs} s després de despertar`;
 });
+await step("Revisió de l'acta: el que no es va dir es corregeix sol abans d'enviar-la", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  log.verifyProblem = 1; log.script = [];
+  const order = [];
+  await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 90000);
+  const m = await meeting(await lastId());
+  ok(m.autoFix && m.autoFix.items.length === 1 && m.verify.items.length === 0, `autoFix ${JSON.stringify(m.autoFix && m.autoFix.items.length)} verify ${m.verify && m.verify.items.length}`);
+  ok(!(m.corrections || []).length, 'les correccions automàtiques no han de quedar com a correccions de la persona');
+  ok(/S'ha corregit 1 frase/.test(await p.textContent('#verify-banner')), 'no explica què ha corregit');
+  await p.click('#btn-autofix-see'); await p.waitForSelector('#verify-sheet:not([hidden])');
+  ok(/corregides/.test(await p.textContent('#verify-sheet h3')) && await p.isHidden('#btn-verify-fix2'), 'full de canvis');
+  await p.evaluate(() => closeSheets());
+  // El correu surt després de la revisió (amb l'acta ja corregida)
+  ok(m.email.status === 'sent', 'sense correu');
+  return 'corregida abans del correu i explicada';
+});
 await step("Revisió de l'acta amb la gravació (marca el que no es va dir)", async () => {
   await p.click('#btn-tab-home'); await waitView('home');
-  log.verifyProblem = true;
+  await p.evaluate(() => saveSettings({ autoFix: false }));
+  log.verifyProblem = 1;
   try {
     await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 90000);
   } finally { log.verifyProblem = false; }
@@ -675,6 +692,7 @@ await step("Revisió de l'acta amb la gravació (marca el que no es va dir)", as
   await p.waitForFunction(() => /tot el que diu surt a la reunió/.test($('#verify-banner').textContent), null, { timeout: 30000 });
   const m = await meeting(id);
   ok((m.corrections || []).some((c) => /Aprovat amb canvis/.test(c)), 'no desa la correcció');
+  await p.evaluate(() => saveSettings({ autoFix: true }));
   return 'marcada, explicada i corregida';
 });
 await step('Transcripció inventada: es detecta pel ritme de parla', async () => {

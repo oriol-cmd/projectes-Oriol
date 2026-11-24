@@ -18,6 +18,7 @@ function fillSettings() {
   $('#set-short-imports').checked = settings.shortImports !== false;
   $('#set-quick').checked = !!settings.quickStart;
   $('#set-verify').checked = settings.verify !== false;
+  $('#set-autofix').checked = settings.autoFix !== false;
   $('#set-live').checked = settings.liveText !== false;
   fillMicSelects();
   $('#set-detail').value = settings.detail || 'full';
@@ -47,6 +48,7 @@ function readSettingsForm() {
     shortImports: $('#set-short-imports').checked,
     quickStart: $('#set-quick').checked,
     verify: $('#set-verify').checked,
+    autoFix: $('#set-autofix').checked,
     liveText: $('#set-live').checked,
     detail: $('#set-detail').value,
     liveSec: Math.min(300, Math.max(10, Number($('#set-segment').value) || DEFAULTS.liveSec)),

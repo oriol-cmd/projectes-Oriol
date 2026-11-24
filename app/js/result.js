@@ -317,12 +317,13 @@ async function openFix() {
   openSheet('#fix-sheet');
 }
 // Aplica correccions a l'acta (sense refer-la sencera) i les guarda perquè manin si es refà.
-async function correctActa(m, items) {
+async function correctActa(m, items, { remember = true } = {}) {
   const text = await gemini([{ text: `<acta>\n${m.summary}\n</acta>\n\n<correccions>\n- ${items.join('\n- ')}\n</correccions>` }], { system: FIX_PROMPT, maxTokens: 32768, thinking: 1024 });
   const clean = text.replace(/^```(?:markdown)?\s*/i, '').replace(/```\s*$/, '').replace(/^\s*<acta>\s*/i, '').replace(/\s*<\/acta>\s*$/i, '').trim();
   if (!clean || !/^#\s/.test(clean)) throw new Error("Gemini no ha tornat l'acta sencera");
   m.summary = clean;
-  m.corrections = [...(m.corrections || []), ...items];
+  // Les correccions de la persona es guarden (manen si es refà l'acta); les automàtiques, no.
+  if (remember) m.corrections = [...(m.corrections || []), ...items];
   m.translations = {};
   await saveMeeting(m);
 }
@@ -931,16 +932,26 @@ function renderVerifyBanner(m) {
   const n = m.verify.items.length;
   b.hidden = false;
   syncQuality();
-  if (!n) { b.className = 'banner ok verify-banner'; b.textContent = 'Comprovada amb la gravació: tot el que diu surt a la reunió.'; return; }
+  const auto = m.autoFix && m.autoFix.items && m.autoFix.items.length;
+  if (!n) {
+    b.className = 'banner ok verify-banner';
+    if (auto) {
+      b.innerHTML = `Comprovada amb la gravació. <b>S'${auto === 1 ? 'ha corregit 1 frase que no es trobava' : `han corregit ${auto} frases que no es trobaven`}</b> a la reunió. <button class="link" id="btn-autofix-see">Mira què s'ha canviat</button>`;
+      $('#btn-autofix-see').onclick = () => openVerify(m, m.autoFix.items, true);
+    } else b.textContent = 'Comprovada amb la gravació: tot el que diu surt a la reunió.';
+    return;
+  }
   b.className = 'banner warn verify-banner';
   b.innerHTML = `<b>${n === 1 ? '1 frase no es troba' : `${n} frases no es troben`} a la gravació</b> (en groc). <button class="link" id="btn-verify-see">${n === 1 ? 'Mira-la' : 'Mira-les'}</button> · <button class="link" id="btn-verify-fix">${n === 1 ? 'Corregeix-la' : 'Corregeix-les'}</button>`;
   $('#btn-verify-see').onclick = () => openVerify(m);
   $('#btn-verify-fix').onclick = () => fixUnverified(m);
 }
-function openVerify(m) {
+function openVerify(m, items = m.verify.items, done = false) {
   const list = $('#verify-list');
   list.textContent = '';
-  for (const it of m.verify.items) {
+  $('#verify-sheet h3').textContent = done ? "Frases corregides perquè no es trobaven a la gravació" : "Frases de l'acta que no es troben a la gravació";
+  $('#btn-verify-fix2').hidden = done;
+  for (const it of items) {
     const d = document.createElement('div');
     d.className = 'verify-item';
     d.innerHTML = `<p class="vi-text">«${escapeHtml(it.text)}»</p><p class="vi-why">${escapeHtml(it.motiu)}</p>${it.correccio ? `<p class="vi-fix">A la reunió: ${escapeHtml(it.correccio)}</p>` : ''}${/\d+:\d{2}/.test(it.moment) ? `<button type="button" class="play-btn vi-at">▶ ${escapeHtml(it.moment.replace(/[[\]]/g, ''))}</button>` : ''}`;
@@ -951,10 +962,11 @@ function openVerify(m) {
   $('#verify-msg').textContent = '';
   openSheet('#verify-sheet');
 }
+const fixInstruction = (it) => `A l'acta posa «${it.text}», però a la reunió no es diu així (${it.motiu || 'no es troba a la gravació'}). ${it.correccio ? `Segons la gravació: ${it.correccio}. Corregeix-ho.` : "Treu-ho de l'acta."}`;
 async function fixUnverified(m) {
   m = await getMeeting(m.id);
   if (!verifyFresh(m) || !m.verify.items.length) return;
-  const items = m.verify.items.map((it) => `A l'acta posa «${it.text}», però a la reunió no es diu així (${it.motiu || 'no es troba a la gravació'}). ${it.correccio ? `Segons la gravació: ${it.correccio}. Corregeix-ho.` : "Treu-ho de l'acta."}`);
+  const items = m.verify.items.map(fixInstruction);
   const btns = document.querySelectorAll('#btn-verify-fix, #btn-verify-fix2');
   btns.forEach((b) => { b.disabled = true; });
   $('#verify-banner').className = 'banner verify-banner';

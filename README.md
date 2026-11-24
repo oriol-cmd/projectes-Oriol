@@ -128,6 +128,13 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v85: res d'inventat
+
+- L'acta es **revisa amb la gravació abans d'enviar-la**: primer es comprova i es corregeix, i després es tradueix, s'envia per correu i es desa al Google Doc.
+- El que no es troba a la gravació **es corregeix sol** (es treu o es canvia pel que es va dir) i l'acta es torna a comprovar. A «Revisió de l'acta» surt quantes frases s'han corregit i **«Mira què s'ha canviat»**.
+- Les correccions automàtiques no es guarden com si les hagués fet la persona (només les teves manen si es refà l'acta).
+- Es pot desactivar a Ajustos («Corregeix sol…»): llavors només ho marca en groc.
+
 ## Novetats de la v83
 
 - **📋 Copia la transcripció**: a «Transcripció completa», copia el text literal (amb noms i temps) per enganxar-lo on vulguis.

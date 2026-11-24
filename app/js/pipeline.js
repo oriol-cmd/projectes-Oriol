@@ -110,7 +110,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
     if (!m || deletedIds.has(id)) return; // s'ha esborrat
     if (rec.meeting && rec.meeting.id === id) return; // s'està gravant (p. ex. continuació): ja es processarà en acabar
     if (m.needsResummary) { redoSummary = true; delete m.needsResummary; }
-    if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; m.textOnly = false; delete m.proDraft; }
+    if (redoSummary) { m.summary = ''; m.translations = {}; m.email = { status: 'pending' }; m.textOnly = false; delete m.proDraft; delete m.autoFix; delete m.verify; }
     m.status = 'processing';
     m.error = '';
     await saveMeeting(m);
@@ -166,17 +166,34 @@ function runPipeline(id, { redoSummary = false } = {}) {
         });
         await saveMeeting(m);
       }
-      // 2b. Traducció a l'idioma per defecte (si no és el català)
-      const lang = settings.summaryLang || 'ca';
-      if (!m.textOnly && lang !== 'ca' && !(m.translations && m.translations[lang])) {
-        m.stage = 'translate'; updateProcView(m);
-        await translateSummary(m, lang);
-      }
-      // L'acta ja està feta: es mostra ara mateix; el correu, el Google Doc i les etiquetes
-      // s'acaben en segon pla (abans calia esperar-los).
+      // L'acta ja està feta: es mostra ara mateix; la revisió, el correu, el Google Doc i les
+      // etiquetes s'acaben en segon pla (abans calia esperar-los).
       m.stage = 'finishing';
       await saveMeeting(m);
       if (currentView === 'proc' && viewingId === id) showResult(id);
+      // 2a. Revisió amb la gravació ABANS d'enviar res: el que no s'hi troba es corregeix sol.
+      if (settings.verify !== false && !m.textOnly && m.engine !== 'digest' && !verifyFresh(m)) {
+        const live = () => currentView === 'result' && viewingId === id;
+        const say = (t) => { if (live()) { $('#verify-banner').hidden = false; $('#verify-banner').className = 'banner verify-banner'; $('#verify-banner').textContent = t; syncQuality(); } };
+        say("Comprovant l'acta amb la gravació…");
+        try {
+          const v = await verifyActa(m);
+          if (v && v.items.length && settings.autoFix !== false && !m.autoFix) {
+            say(`Corregint ${v.items.length === 1 ? '1 frase que no es troba' : `${v.items.length} frases que no es troben`} a la gravació…`);
+            const found = v.items.slice();
+            await correctActa(m, found.map(fixInstruction), { remember: false });
+            m.autoFix = { at: Date.now(), items: found };
+            await saveMeeting(m);
+            await verifyActa(m); // es torna a comprovar l'acta corregida
+          }
+        } catch (e) { if (e instanceof FatalError) { /* sense quota: es podrà fer a mà */ } }
+        if (live()) { renderResultSummary(m); }
+      }
+      // 2b. Traducció a l'idioma per defecte (si no és el català), ja de l'acta revisada
+      const lang = settings.summaryLang || 'ca';
+      if (!m.textOnly && lang !== 'ca' && !(m.translations && m.translations[lang])) {
+        await translateSummary(m, lang);
+      }
       // 3. Correu
       if (!emailEnabled()) {
         if (m.email.status !== 'sent') m.email = { status: 'off' };
@@ -191,11 +208,6 @@ function runPipeline(id, { redoSummary = false } = {}) {
       }
       // 4. Etiquetes automàtiques (no és imprescindible: si falla, es continua)
       if (!m.tags && m.engine !== 'digest') await autoTag(m);
-      // 5. Revisió de l'acta amb la gravació (marca el que no s'hi troba)
-      if (settings.verify !== false && !m.textOnly && m.engine !== 'digest' && !verifyFresh(m)) {
-        if (currentView === 'result' && viewingId === id) { $('#verify-banner').hidden = false; $('#verify-banner').className = 'banner verify-banner'; $('#verify-banner').textContent = "Comprovant l'acta amb la gravació…"; syncQuality(); }
-        try { await verifyActa(m); } catch (e) { if (e instanceof FatalError) { /* sense quota: es podrà fer a mà */ } }
-      }
       m.status = 'done';
       m.doneAt = Date.now();
       m.stage = '';
