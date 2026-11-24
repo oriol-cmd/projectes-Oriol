@@ -38,7 +38,7 @@
           <button class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>Entra amb Google</button>
           <p class="or"><span>o comença de zero</span></p>
         </div>
-        <p>Escolta les teves reunions i en fa un resum ordenat amb les tasques de cadascú. Per començar només cal una <b>clau gratuïta de Google</b>. Són 3 passos i uns 2 minuts: t'hi acompanyo.</p>
+        <p>Escolta les teves reunions i en fa l'acta, amb els acords i les tasques de cadascú. Per començar només cal una <b>clau gratuïta de Google</b>. Són 3 passos i uns 2 minuts: t'hi acompanyo.</p>
 
         <div id="kw" class="kw" data-step="1">
           <div class="kw-dots" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -188,13 +188,15 @@
             <small class="fineprint left">En tots dos casos, a l'acta només hi surt el que es diu a la reunió.</small></label>
         </div>
 
-        <button id="btn-import" class="qa card" type="button">
-          <span class="qa-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg></span>
-          <span class="qa-t"><b>Importa un àudio o vídeo</b><small>Notes de veu, àudios de WhatsApp, gravacions de Zoom o Teams…</small></span>
-        </button>
+        <div class="sources card">
+          <p class="sources-title">O fes l'acta a partir de…</p>
+          <div class="sources-grid">
+            <button id="btn-import" class="src" type="button"><span class="src-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg></span><b>Àudio o vídeo</b><small>Notes de veu, Zoom, Teams…</small></button>
+            <button id="btn-youtube" class="src" type="button"><span class="src-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="3.5"/><path d="M10.5 9.5v5l4.2-2.5z"/></svg></span><b>YouTube</b><small>Un enllaç de vídeo</small></button>
+            <button id="btn-notes" class="src" type="button"><span class="src-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M9 13h6.5M9 16.5h6.5"/></svg></span><b>Fotos o PDF</b><small>Apunts, documents</small></button>
+          </div>
+        </div>
 
-        <p class="voicememo-tip yt-tip"><button id="btn-youtube" class="link" type="button">▶ O fes-ne el resum d'un vídeo de YouTube</button></p>
-        <p class="voicememo-tip yt-tip"><button id="btn-notes" class="link" type="button">📷 O fes-ne el resum d'unes fotos d'apunts o d'un PDF</button></p>
         <p id="call-tip" class="voicememo-tip" hidden>Vols l'acta d'una trucada de telèfon? <button id="btn-call-guide" class="link" type="button">Mira com fer-ho</button></p>
         <p id="voicememo-tip" class="voicememo-tip" hidden>Reunió llarga o necessites fer servir el mòbil mentre graves? <button id="btn-voicememo" class="link" type="button">Grava-la amb Notes de veu</button></p>
 
@@ -246,7 +248,7 @@
       <h2 id="proc-title">Processant la reunió…</h2>
       <ol class="steps">
         <li id="step-transcribe"><span class="st"></span><div><b>Transcripció</b><small id="step-transcribe-info"></small></div></li>
-        <li id="step-summary"><span class="st"></span><div><b>Resum</b><small id="step-summary-info"></small></div></li>
+        <li id="step-summary"><span class="st"></span><div><b>Acta</b><small id="step-summary-info"></small></div></li>
         <li id="step-email"><span class="st"></span><div><b>Correu i full de càlcul</b><small id="step-email-info"></small></div></li>
       </ol>
       <article id="proc-summary" class="summary card" hidden></article>
@@ -262,17 +264,19 @@
         <div id="doubt-banner" class="banner doubt-banner" hidden></div>
         <div id="rec-report" class="banner warn rec-report" hidden></div>
       </section>
-      <div id="lang-switch" class="seg" role="group" aria-label="Idioma de l'acta" hidden>
-        <button type="button" data-lang="ca">Català</button>
-        <button type="button" data-lang="es">Castellano</button>
-        <button type="button" data-lang="en">English</button>
+      <div class="result-head">
+        <div id="version-tabs" class="ver-tabs" hidden></div>
+        <div id="lang-switch" class="seg seg-sm" role="group" aria-label="Idioma de l'acta" hidden>
+          <button type="button" data-lang="ca" aria-label="Català">CA</button>
+          <button type="button" data-lang="es" aria-label="Castellano">ES</button>
+          <button type="button" data-lang="en" aria-label="English">EN</button>
+        </div>
       </div>
-      <div id="version-tabs" class="ver-tabs" hidden></div>
       <div id="result-tags" class="tags result-tags" hidden></div>
       <div class="result-tools">
         <button id="btn-map" class="chip-btn" type="button">Mapa mental</button>
         <button id="btn-speakers" class="chip-btn" type="button">Noms de qui parla</button>
-        <button id="btn-events" class="chip-btn" type="button">📅 Cites al calendari</button>
+        <button id="btn-events" class="chip-btn" type="button">Cites al calendari</button>
         <a id="doc-link" class="chip-btn" target="_blank" rel="noopener" hidden>Google Doc ↗</a>
         <button id="btn-ver-delete" class="chip-btn danger-text" type="button" hidden>Esborra aquesta versió</button>
       </div>

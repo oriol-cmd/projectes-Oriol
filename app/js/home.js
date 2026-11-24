@@ -68,11 +68,11 @@ function updateProcView(m) {
     else if (m.status === 'error' && m.stage === 'transcribe') setStep('step-transcribe', 'error', friendlyError(m.error));
     else setStep('step-transcribe', 'active', m.importProgress || 'Transcrivint el fitxer… (pot trigar uns minuts)');
   }
-  else if (total && done === total) setStep('step-transcribe', 'done', `${total} trams`);
+  else if (total && done === total) setStep('step-transcribe', 'done', total === 1 ? '1 tram' : `${total} trams`);
   else if (segErr && m.status === 'error') setStep('step-transcribe', 'error', friendlyError(segErr.error));
-  else setStep('step-transcribe', 'active', total ? `${done} de ${total} trams` : 'Preparant…');
+  else setStep('step-transcribe', 'active', total ? `${done} de ${total} ${total === 1 ? 'tram' : 'trams'}` : 'Preparant…');
 
-  if (m.summary) setStep('step-summary', 'done', 'Fet');
+  if (m.summary) setStep('step-summary', 'done', 'Feta');
   else if (m.stage === 'summary') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : (m.summaryProgress || 'Escrivint el resum…'));
   else if (m.stage === 'translate') setStep('step-summary', m.status === 'error' ? 'error' : 'active', m.status === 'error' ? friendlyError(m.error) : 'Traduint el resum…');
   else setStep('step-summary', '', '');
