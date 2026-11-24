@@ -79,6 +79,8 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   }
   else if (sys.includes('apunts o documents')) txt = "# Apunts del pressupost\n\n## Resum\nNotes sobre el pressupost.\n\n## Punts principals\n- Pressupost de 5.000 €.\n\n## Dades clau\n- 5.000 €\n\n## Tasques\n- Cap.\n\n## Dubtes de comprensió\n- Cap.";
   else if (sys.includes('verificador molt estricte')) txt = log.verifyProblem ? JSON.stringify({ problemes: [{ text: 'Aprovat amb canvis.', motiu: 'A la reunió no es diu que s\'aprovi', correccio: 'Es parla del pressupost però no s\'aprova', moment: '[00:05]' }] }) : '{"problemes":[]}';
+  else if (sys.includes("Algunes línies diuen «Persona no identificada»")) txt = '{"canvis":[{"id":"s0:1","nom":"Oriol","motiu":"continua la frase"},{"id":"s0:3","nom":"Inventat","motiu":"x"}]}';
+  else if (sys.includes('Extreu-ne les CITES')) txt = JSON.stringify({ cites: [{ titol: 'Reunió del projecte Artic', data: '2026-12-02', hora_inici: '10:00', hora_final: '', lloc: 'Teams', qui: 'Oriol, Martí', quan: 'dimecres a les deu per Teams', segur: true }, { titol: 'Rodatge a la neu', data: '', quan: 'quan hi hagi neu', segur: false }] });
   else if (user.includes('Proposa etiquetes')) txt = '{"etiquetes":["pressupost","Finances 2027"]}';
   else if (sys.includes('Analitzes una reunió')) txt = '## Temps per tema\n- Pressupost [00:00]–[00:20]\n\n## Temes que han quedat oberts\n- Cap.';
   else if (sys.includes('correus de seguiment')) txt = JSON.stringify({ correus: [{ nom: 'Marta', assumpte: 'Seguiment de la reunió', text: "Hola Marta,\nEt toca enviar l'informe.\nSalutacions," }, { nom: 'Persona 1', assumpte: 'x', text: 'x' }] });
@@ -106,6 +108,7 @@ await ctx.route(/script\.google\.com/, async (r) => {
   log.script.push(d.recipients ? `altres:${d.recipients.join(',')}` : `auto:${d.subject}`);
   await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, sentTo: d.recipients || [d.to], docUrl: 'https://docs.google.com/document/d/PROVA' }) });
 });
+await ctx.route(/calendar\.google\.com|accounts\.google\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: 'ok' }));
 await ctx.route(/youtube\.com\/oembed/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"title":"Xerrada de prova"}' }));
 await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 
@@ -708,6 +711,50 @@ await step('Transcripció inventada: es detecta pel ritme de parla', async () =>
   await waitStatus(id2, ['done'], 60000);
   ok(log.asks.some((t) => /Tros dubtós/.test(t)), "l'acta no rep l'avís");
   return 'refet amb el model precís; els antics es marquen';
+});
+await step('Copiar la transcripció i canviar qui parla en una línia', async () => {
+  await p.evaluate((id) => showResult(id), micId); await waitView('result');
+  await p.evaluate(() => { document.querySelector('details.transcript').open = true; });
+  await p.click('#btn-tr-copy'); await p.waitForTimeout(300);
+  const clip = await p.evaluate(() => navigator.clipboard.readText());
+  ok(/Marta:/.test(clip), `copiat: ${clip.slice(0, 60)}`);
+  await p.click('#result-transcript button.spk >> nth=0'); await p.waitForTimeout(500);
+  const m = await meeting(micId);
+  ok(m.segments.some((x) => /^Projecte Prova:/m.test(x.text || '')), 'no canvia la línia');
+  return `${clip.length} caràcters copiats`;
+});
+await step('Identificar les «Persona no identificada»', async () => {
+  const id = await p.evaluate(async () => {
+    const id = uid();
+    await saveMeeting({ id, title: 'Noms', startedAt: Date.now(), createdAt: Date.now(), durationMs: 600000, engine: 'audio', source: 'mic', type: 'general', status: 'done', marks: [], summary: '# Noms\n\n## Resum\nx', email: { status: 'off' },
+      segments: [{ idx: 0, startMs: 0, status: 'done', text: 'Oriol: Doncs penso que el\nPersona no identificada: el pressupost està bé.\nMartí: D\'acord.\nPersona no identificada: no sé.' }] });
+    return id;
+  });
+  await p.evaluate((id) => showResult(id), id); await waitView('result');
+  await p.click('#btn-speakers'); await p.click('#btn-spk-auto');
+  await p.waitForFunction(() => /línies identificades|cap d'evident/.test($('#spk-msg').textContent) || currentView === 'proc', null, { timeout: 30000 });
+  await waitStatus(id, ['done'], 60000);
+  const m = await meeting(id);
+  const lines = m.segments[0].text.split('\n');
+  ok(lines[1].startsWith('Oriol:') && lines[3].startsWith('Persona no identificada:'), lines.join(' | '));
+  return "1 identificada; la que no era evident es queda";
+});
+await step('Cites acordades al calendari', async () => {
+  await p.evaluate((id) => showResult(id), micId); await waitView('result');
+  await p.click('#btn-events');
+  await p.waitForSelector('#ev-list .ev-card', { timeout: 30000 });
+  const n = await p.$$eval('#ev-list .ev-card', (l) => l.length);
+  ok(n === 2, `${n} cites`);
+  ok(/Data poc clara/.test(await p.textContent('#ev-list .ev-card >> nth=1')), 'no avisa de la data dubtosa');
+  await p.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; });
+  await p.click('#ev-list .ev-card >> nth=0 >> .ev-g');
+  const url = await p.evaluate(() => window.__opened[0] || '');
+  ok(/calendar\.google\.com/.test(url) && /dates=20261202T100000\/20261202T110000/.test(url) && /Teams/.test(decodeURIComponent(url)), url.slice(0, 160));
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#ev-list .ev-card >> nth=0 >> .ev-ics')]);
+  const ics = fs.readFileSync(await dl.path(), 'utf8');
+  ok(/DTSTART:20261202T100000/.test(ics) && /SUMMARY:Reunió del projecte Artic/.test(ics), ics.slice(0, 120));
+  await p.evaluate(() => closeSheets());
+  return 'Google Calendar i .ics';
 });
 await step('Plantilla de PDF amb logotip', async () => {
   await p.click('#btn-settings'); await waitView('settings');

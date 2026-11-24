@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v83
+
+- **📋 Copia la transcripció**: a «Transcripció completa», copia el text literal (amb noms i temps) per enganxar-lo on vulguis.
+- **Qui parla**: Gemini rep els noms de qui s'ha presentat i només posa «Persona no identificada» si de debò no és cap d'ells. A «Noms de qui parla», **🔎 Identifica les «Persona no identificada»** les assigna només quan és evident. I **tocant el nom d'una línia** el pots canviar només allà.
+- **📅 Cites al calendari**: busca les cites, reunions, rodatges, formacions… acordades a la reunió, passa les dates relatives a dates reals (a partir del dia de la reunió) i les afegeix a **Google Calendar** o al **calendari del mòbil** (.ics). Les dates dubtoses surten marcades per revisar-les.
+
 ## Novetats de la v82: transcripció sense conversa inventada
 
 - Quan un tros d'àudio no s'entén, Gemini a vegades **s'inventa una conversa sencera** per omplir-lo. Ara cada tros es transcriu sabent quant dura (i amb un límit de text proporcional), i es compara el **nombre de paraules amb la durada**: ningú no pot dir més de ~230 paraules per minut.

@@ -269,6 +269,7 @@
       <div class="result-tools">
         <button id="btn-map" class="chip-btn" type="button">Mapa mental</button>
         <button id="btn-speakers" class="chip-btn" type="button">Noms de qui parla</button>
+        <button id="btn-events" class="chip-btn" type="button">📅 Cites al calendari</button>
         <a id="doc-link" class="chip-btn" target="_blank" rel="noopener" hidden>Google Doc ↗</a>
         <button id="btn-ver-delete" class="chip-btn danger-text" type="button" hidden>Esborra aquesta versió</button>
       </div>
@@ -278,7 +279,8 @@
       </div>
       <details class="transcript card">
         <summary>Transcripció completa</summary>
-        <button id="btn-tr-edit" class="chip-btn tr-edit" type="button">Edita la transcripció</button>
+        <div class="tr-tools"><button id="btn-tr-copy" class="chip-btn" type="button">📋 Copia la transcripció</button><button id="btn-tr-edit" class="chip-btn" type="button">Edita la transcripció</button></div>
+        <p class="fineprint left tr-hint">Toca el nom de qui parla en una línia per canviar-lo només allà.</p>
         <pre id="result-transcript"></pre>
       </details>
       <details id="mq" class="card mq" hidden>
@@ -796,6 +798,8 @@
       <div class="sheet-grip"></div>
       <h3>Noms de qui parla</h3>
       <p class="fineprint left first">Escriu el nom real de cada persona. Es canviarà a tota la transcripció i a l'acta.</p>
+      <button id="btn-spk-auto" class="btn secondary full" type="button">🔎 Identifica les «Persona no identificada»</button>
+      <p class="fineprint left">Gemini revisa tota la conversa i hi posa el nom només quan és evident (una frase que continua, algú que respon quan l'anomenen…).</p>
       <div id="spk-list" class="fix-doubts"></div>
       <label class="check"><input id="spk-remember" type="checkbox" checked> Recorda els noms per a les properes reunions</label>
       <button id="btn-spk-apply" class="btn primary full" type="button">Canvia els noms</button>
@@ -917,6 +921,20 @@
       <div id="verify-list" class="verify-list"></div>
       <button id="btn-verify-fix2" class="btn primary full" type="button">Corregeix l'acta perquè digui només el que es va dir</button>
       <p id="verify-msg" class="fineprint"></p>
+      <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
+    </div>
+  </div>
+
+  <div id="ev-sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel" role="dialog" aria-label="Cites al calendari">
+      <div class="sheet-grip"></div>
+      <h3>Cites i reunions acordades</h3>
+      <p class="fineprint left first">Les que s'han dit a la reunió. Revisa la data i l'hora abans d'afegir-les.</p>
+      <p id="ev-msg" class="fineprint"></p>
+      <div id="ev-list" class="ev-list"></div>
+      <button id="btn-ev-all" class="btn primary full" type="button" hidden>Afegeix-les totes al calendari del mòbil</button>
+      <button id="btn-ev-redo" class="btn ghost full" type="button" hidden>Torna-les a buscar</button>
       <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
     </div>
   </div>

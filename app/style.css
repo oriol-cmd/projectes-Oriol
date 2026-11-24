@@ -592,7 +592,7 @@ body.has-tabbar .toast { bottom: calc(env(safe-area-inset-bottom) + 84px); }
 .ver-tab[aria-pressed="true"] { color: var(--accent-ink); border-bottom-color: var(--accent); }
 .ver-tab.add { color: var(--accent); font-weight: 500; }
 @media (prefers-color-scheme: dark) { .ver-tab[aria-pressed="true"] { color: var(--accent); } }
-.tr-edit { margin: 0 0 10px; }
+
 
 /* v67: documents PDF, YouTube, etiquetes, pregunta, anàlisi, seguiment, recull, un toc */
 .docs-row { margin-top: 12px; }
@@ -666,3 +666,15 @@ mark.unverified { background: #ffe58a; color: inherit; border-bottom: 2px dashed
 .docs-role { margin-top: 10px; }
 .tseg.suspect { border-left: 3px solid #d08a00; padding-left: 8px; background: rgba(255, 229, 138, .15); }
 .tseg-warn { font-size: 13px; color: var(--warn-text); margin: 2px 0 4px; }
+
+.tr-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 4px; }
+.tr-hint { margin: 0 0 8px; }
+button.spk { font: inherit; font-weight: 700; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-bottom: 1px dashed var(--muted); }
+button.spk.unknown { color: var(--warn-text); }
+.ev-list { display: grid; gap: 10px; margin: 8px 0 12px; }
+.ev-card { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface); display: grid; gap: 6px; }
+.ev-card .ev-said { font-size: 13px; color: var(--muted); }
+.ev-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ev-row input { font: inherit; font-size: 14px; }
+.ev-card input[type=text] { width: 100%; box-sizing: border-box; }
+.ev-warn { font-size: 13px; color: var(--warn-text); }

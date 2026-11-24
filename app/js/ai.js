@@ -302,6 +302,15 @@ function speechLimits(durMs) {
   };
 }
 const tooLong = (text, lim) => !!lim && wordCount(text) > lim.maxWords;
+// Noms de les persones que s'han presentat (o que ja surten a la transcripció).
+function knownSpeakers(m) {
+  const count = new Map();
+  for (const sg of m.segments || []) for (const line of (sg.text || '').split('\n')) {
+    const mt = line.match(/^\s*([^:\n[\]]{2,40}):\s/);
+    if (mt && !/no identificada|^Persona \d|^(http|Nota|Context)/i.test(mt[1])) count.set(mt[1].trim(), (count.get(mt[1].trim()) || 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n).slice(0, 12);
+}
 const SUSPECT_MARK = "[⚠️ Tros dubtós: té més text del que es pot dir en aquest temps; pot contenir parts inventades per la transcripció]";
 // Marca (també a reunions ja fetes) els trams amb més paraules de les que caben en la seva durada.
 function markSuspects(m) {
@@ -335,6 +344,7 @@ async function transcribeBlob(blob, idx, prevText, context, { ref = null, isRef 
     "El SEGON àudio és el tram que has de transcriure.",
     "Escriu només la transcripció del segon àudio, sense títols ni comentaris. Comença cada intervenció en una línia nova amb el nom de qui parla i dos punts («Nom: …»). Identifica qui parla comparant la veu amb la mostra i ajudant-te del context (si algú s'adreça a una persona pel nom, qui respon probablement és aquella persona).",
     "Fes servir només noms de persones que s'hagin presentat. Si no pots saber amb seguretat qui parla, posa «Persona no identificada:».",
+    ...(ref && ref.names && ref.names.length ? [`Les persones que es van presentar són: ${ref.names.join(', ')}. Abans de posar «Persona no identificada», compara bé la veu amb la de cadascuna d'aquestes persones: normalment qui parla és una d'elles. Si una frase continua la de la línia anterior, és la mateixa persona.`] : []),
   ];
   const prompt = [
     (isRef || !ref ? "Transcriu literalment aquest àudio, que és un tram d'una reunió" : "Transcriu literalment un tram d'una reunió")
@@ -450,7 +460,7 @@ async function transcribeQueued(m, seg) {
   if (m.speakers && m.refIdx != null && !isRef) {
     const refSeg = m.segments.find((s) => s.idx === m.refIdx);
     const refBlob = await db.get('audio', audioKey(m.id, m.refIdx));
-    if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx) };
+    if (refBlob) ref = { blob: refBlob, text: refSeg && refSeg.text, key: audioKey(m.id, m.refIdx), names: knownSpeakers(m) };
   }
   try {
     const segs = m.segments.slice().sort((a, b) => a.idx - b.idx);
