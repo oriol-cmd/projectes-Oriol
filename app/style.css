@@ -678,3 +678,19 @@ button.spk.unknown { color: var(--warn-text); }
 .ev-row input { font: inherit; font-size: 14px; }
 .ev-card input[type=text] { width: 100%; box-sizing: border-box; }
 .ev-warn { font-size: 13px; color: var(--warn-text); }
+
+/* Revisió de l'acta: tots els avisos en un sol bloc compacte */
+.quality { padding: 10px 14px; margin-bottom: 14px; }
+.quality-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 2px 0 4px; }
+.quality .banner { background: none; color: var(--text); border-radius: 0; margin: 0; padding: 8px 0; font-size: 14px; border-top: 1px solid var(--border); }
+.quality .banner:first-of-type { border-top: 0; }
+.quality .banner.warn::before, .quality .banner.ok::before, .quality .banner.err::before { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; content: ''; vertical-align: middle; }
+.quality .banner.warn::before { background: #d08a00; }
+.quality .banner.ok::before { background: var(--ok); }
+.quality .banner.err::before { background: var(--rec); }
+.quality .banner p { margin: 0 0 4px; } .quality .banner p:last-child { margin: 0; }
+.sheet-sec { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 10px 2px 0; }
+.sheet-sec:first-child { margin-top: 0; }
+.sheet-row small { color: var(--muted); font-size: 13px; }
+.quality .rec-report::before { display: none !important; }
+.quality .rec-report p::before { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; content: ''; vertical-align: middle; background: #d08a00; }

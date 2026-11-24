@@ -377,7 +377,7 @@ $('#btn-mail').onclick = async () => {
       const r = await sendEmail(buildEmail(m, resultLang), { noFallback: true });
       m.email = { status: 'sent', at: Date.now(), confirmed: r.confirmed };
       await saveMeeting(m);
-      toast(`✓ Resum enviat a ${settings.email}`);
+      toast(`✓ Acta enviada a ${settings.email}`);
       showResult(m.id);
     } catch (e) {
       toast(`✗ No s'ha pogut enviar: ${e.message}`, 6000);
@@ -394,7 +394,8 @@ $('#btn-mail').onclick = async () => {
   location.href = `mailto:${encodeURIComponent(settings.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
 $('#btn-copy').onclick = async () => {
-  const m = await getMeeting(viewingId);
+  // Sense esperar res abans de copiar: a l'iPhone, si no es copia dins del toc, falla.
+  const m = meetingCache.get(viewingId) || await getMeeting(viewingId);
   // Amb format (per enganxar a un correu) i en text pla com a alternativa.
   const md = viewSummary(m);
   const html = `<div style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.5">${mdToHtml(md, EMAIL_STYLE)}</div>`;
@@ -408,9 +409,9 @@ $('#btn-copy').onclick = async () => {
     } else {
       await navigator.clipboard.writeText(plain);
     }
-    toast('Resum copiat amb format. Enganxa\'l al correu.');
+    toast('Acta copiada amb format. Enganxa-la al correu.');
   } catch {
-    try { await navigator.clipboard.writeText(plain); toast('Resum copiat'); } catch { toast("No s'ha pogut copiar"); }
+    try { await navigator.clipboard.writeText(plain); toast('Acta copiada'); } catch { toast("No s'ha pogut copiar"); }
   }
 };
 

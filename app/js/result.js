@@ -380,9 +380,16 @@ function renderDoubtBanner(m) {
   const box = $('#doubt-banner');
   const n = m.summary ? (m.summary.match(/\[(dubte de comprensió|duda de comprensión|unclear)\]/gi) || []).length : 0;
   box.hidden = !n || m.status !== 'done';
-  if (box.hidden) return;
-  box.innerHTML = `${n === 1 ? 'Hi ha <b>1 dubte de comprensió</b>' : `Hi ha <b>${n} dubtes de comprensió</b>`} a l'acta. <button class="link" id="btn-fix-banner" type="button">Corregeix-los</button>`;
+  if (box.hidden) { syncQuality(); return; }
+  box.className = 'banner warn doubt-banner';
+  box.innerHTML = `<b>${n === 1 ? '1 dubte de comprensió' : `${n} dubtes de comprensió`}</b> a l'acta. <button class="link" id="btn-fix-banner" type="button">${n === 1 ? "Corregeix-lo" : 'Corregeix-los'}</button>`;
   $('#btn-fix-banner').onclick = openFix;
+  syncQuality();
+}
+// El bloc «Revisió de l'acta» només es veu si hi ha algun avís a dins.
+function syncQuality() {
+  const q = $('#quality');
+  if (q) q.hidden = ['#verify-banner', '#doubt-banner', '#rec-report'].every((s) => $(s).hidden);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,7 +399,7 @@ function renderDoubtBanner(m) {
 async function renderRecReport(m) {
   const box = $('#rec-report');
   box.hidden = true;
-  if (m.engine !== 'audio') return;
+  if (m.engine !== 'audio') { syncQuality(); return; }
   const gaps = m.gaps || [];
   const gapMs = gaps.reduce((a, g) => a + g.ms, 0);
   const empties = [];
@@ -403,12 +410,13 @@ async function renderRecReport(m) {
   const suspAudio = [];
   for (const sg of suspects) if (await db.get('audio', audioKey(m.id, sg.idx))) suspAudio.push(sg);
   const parts = [];
-  if (suspects.length) parts.push(`<b>${suspects.length === 1 ? '1 tros de la transcripció té' : `${suspects.length} trossos de la transcripció tenen`} més text del que es pot dir en aquell temps</b>: segurament s'hi ha inventat part de la conversa. A la transcripció surten marcats amb ⚠️ i l'acta no en treu acords ni tasques.${suspAudio.length ? ` <button class="link" id="btn-retry-suspect" type="button">Torna'ls a transcriure</button> (amb el model més precís).` : " Si l'acta es va fer abans d'aquesta revisió, toca ⋯ › «Refés el resum»."}`);
-  if (gaps.length) parts.push(`<b>${gaps.length === 1 ? '1 interrupció' : `${gaps.length} interrupcions`} (${fmtGap(gapMs)} sense gravar)</b> perquè el mòbil s'ha bloquejat o s'ha canviat d'app. Aquest tros no es pot recuperar.`);
-  if (empties.length) parts.push(`<b>${empties.length === 1 ? "1 tros d'àudio ha tornat" : `${empties.length} trossos d'àudio han tornat`}</b> sense text. <button class="link" id="btn-retry-empty" type="button">${empties.length === 1 ? "Torna'l" : "Torna'ls"} a transcriure</button> (amb el model més precís).`);
-  if (!parts.length) return;
+  if (suspects.length) parts.push(`<b>${suspects.length === 1 ? '1 tros de la transcripció pot tenir text inventat' : `${suspects.length} trossos de la transcripció poden tenir text inventat`}</b> (més paraules de les que caben en el temps). Surten marcats amb ⚠️ i l'acta no en treu acords ni tasques.${suspAudio.length ? ` <button class="link" id="btn-retry-suspect" type="button">${suspAudio.length === 1 ? "Torna'l" : "Torna'ls"} a transcriure</button>` : ''}`);
+  if (gaps.length) parts.push(`<b>${gaps.length === 1 ? '1 interrupció' : `${gaps.length} interrupcions`}: ${fmtGap(gapMs)} sense gravar</b> (mòbil bloquejat, trucada o una altra app).`);
+  if (empties.length) parts.push(`<b>${empties.length === 1 ? "1 tros d'àudio sense text" : `${empties.length} trossos d'àudio sense text`}</b>. <button class="link" id="btn-retry-empty" type="button">${empties.length === 1 ? "Torna'l" : "Torna'ls"} a transcriure</button>`);
+  if (!parts.length) { syncQuality(); return; }
   box.innerHTML = parts.map((x) => `<p>${x}</p>`).join('') + (silent ? `<p class="muted">${silent === 1 ? '1 tros en silenci descartat' : `${silent} trossos en silenci descartats`}.</p>` : '');
   box.hidden = false;
+  syncQuality();
   const bs = $('#btn-retry-suspect');
   if (bs) bs.onclick = async () => {
     for (const sg of suspAudio) { sg.status = 'pending'; sg.retry = true; delete sg.suspect; delete sg.error; }
@@ -444,12 +452,12 @@ function renderResultStatus(m) {
     $('#btn-retry').onclick = () => { resetQuota(); m.autoRetries = 0; showView('proc'); updateProcView(m); runPipeline(id); };
   } else if (m.email.status === 'off') {
     st.className = 'banner ok';
-    st.textContent = '✓ Resum llest';
+    st.textContent = '✓ Acta llesta';
   } else if (m.email.status === 'sent') {
     st.className = m.email.confirmed === false ? 'banner warn' : 'banner ok';
     st.textContent = m.email.confirmed === false
       ? `No s'ha pogut confirmar que el correu hagi sortit: l'script de Google no ha respost. Revisa l'URL i que estigui publicat per a «Qualsevol», i toca «Torna a enviar».`
-      : `✓ Resum enviat a ${settings.email}`;
+      : `✓ Acta enviada a ${settings.email}`;
   } else {
     st.className = 'banner warn';
     st.textContent = `No s'ha pogut enviar el correu (${friendlyError(m.email.error || '')}). Toca «Torna a enviar».`;
@@ -646,6 +654,7 @@ player.onpause = () => { if (playingBtn) playingBtn.classList.remove('playing');
 let transcriptFor = null;
 async function renderTranscript(m) {
   transcriptFor = m.id;
+  $('.tr-hint').hidden = true;
   const box = $('#result-transcript');
   const text = buildTranscript(m) || '(buida)';
   const plain = () => { box.innerHTML = text.split('\n').map(speakerHtml).join('\n'); };
@@ -673,7 +682,8 @@ async function renderTranscript(m) {
     }
     return;
   }
-  // Gravació en directe: un botó per tros.
+  // Gravació en directe: un botó per tros (i els noms es poden tocar per canviar-los).
+  $('.tr-hint').hidden = false;
   const segs = (m.segments || []).slice().sort((a, b) => a.idx - b.idx).filter((sg) => sg.text);
   const blobs = await Promise.all(segs.map((sg) => db.get('audio', audioKey(m.id, sg.idx))));
   if (transcriptFor !== m.id) return; // s'ha obert una altra reunió mentrestant
@@ -859,7 +869,7 @@ $('#btn-toggle-detail').onclick = async () => {
   runPipeline(m.id, { redoSummary: true });
 };
 $('#btn-redo').onclick = async () => {
-  if (!confirm('Tornar a generar el resum i enviar-lo de nou?')) return;
+  if (!confirm("Tornar a fer l'acta i enviar-la de nou?")) return;
   showView('proc');
   runPipeline(viewingId, { redoSummary: true });
   updateProcView(await getMeeting(viewingId));
@@ -917,12 +927,13 @@ function markUnverified(m) {
 }
 function renderVerifyBanner(m) {
   const b = $('#verify-banner');
-  if (!m.summary || !verifyFresh(m) || viewVersion(m)) { b.hidden = true; return; }
+  if (!m.summary || !verifyFresh(m) || viewVersion(m)) { b.hidden = true; syncQuality(); return; }
   const n = m.verify.items.length;
   b.hidden = false;
-  if (!n) { b.className = 'banner ok verify-banner'; b.textContent = "🔍 Acta revisada amb la gravació: tot el que diu surt a la reunió."; return; }
+  syncQuality();
+  if (!n) { b.className = 'banner ok verify-banner'; b.textContent = 'Comprovada amb la gravació: tot el que diu surt a la reunió.'; return; }
   b.className = 'banner warn verify-banner';
-  b.innerHTML = `🔍 <b>${n === 1 ? "1 cosa de l'acta no es troba" : `${n} coses de l'acta no es troben`} a la gravació</b> (en groc). <button class="link" id="btn-verify-see">Mira-les</button> · <button class="link" id="btn-verify-fix">Corregeix-les</button>`;
+  b.innerHTML = `<b>${n === 1 ? '1 frase no es troba' : `${n} frases no es troben`} a la gravació</b> (en groc). <button class="link" id="btn-verify-see">${n === 1 ? 'Mira-la' : 'Mira-les'}</button> · <button class="link" id="btn-verify-fix">${n === 1 ? 'Corregeix-la' : 'Corregeix-les'}</button>`;
   $('#btn-verify-see').onclick = () => openVerify(m);
   $('#btn-verify-fix').onclick = () => fixUnverified(m);
 }
@@ -947,7 +958,7 @@ async function fixUnverified(m) {
   const btns = document.querySelectorAll('#btn-verify-fix, #btn-verify-fix2');
   btns.forEach((b) => { b.disabled = true; });
   $('#verify-banner').className = 'banner verify-banner';
-  $('#verify-banner').textContent = '🔍 Corregint l\'acta perquè digui només el que es va dir…';
+  $('#verify-banner').textContent = "Corregint l'acta perquè digui només el que es va dir…";
   try {
     await correctActa(m, items);
     closeSheets();
@@ -965,7 +976,7 @@ $('#btn-verify-now').onclick = async () => {
   const m = await getMeeting(viewingId);
   if (!m || !m.summary) return;
   const b = $('#verify-banner');
-  b.hidden = false; b.className = 'banner verify-banner'; b.textContent = "🔍 Comprovant l'acta amb la gravació…";
+  b.hidden = false; b.className = 'banner verify-banner'; b.textContent = "Comprovant l'acta amb la gravació…"; syncQuality();
   try { await verifyActa(m); } catch (e) { b.className = 'banner warn verify-banner'; b.textContent = `No s'ha pogut comprovar: ${friendlyError(e.message)}`; return; }
   if (viewingId === m.id) { renderResultSummary(m); renderVerifyBanner(m); }
 };
@@ -997,8 +1008,9 @@ async function copyText(text) {
     ta.remove(); return ok;
   }
 }
+$('#btn-copy-tr').onclick = () => $('#btn-tr-copy').click();
 $('#btn-tr-copy').onclick = async () => {
-  const m = await getMeeting(viewingId);
+  const m = meetingCache.get(viewingId) || await getMeeting(viewingId); // sense esperar: l'iPhone només copia dins del toc
   if (!m) return;
   const t = buildTranscript(m, 60000).replace(/^\[⚠️ Tros dubtós[^\]]*\]\n?/gm, '');
   toast(t && await copyText(t) ? '📋 Transcripció copiada' : "No s'ha pogut copiar");
@@ -1024,7 +1036,7 @@ document.addEventListener('click', async (e) => {
   sg.text = lines.join('\n');
   await saveMeeting(m);
   renderTranscript(m);
-  toast("✓ Canviat. Si vols que l'acta ho tingui en compte, toca ⋯ › «Refés el resum».", 5000);
+  toast("✓ Canviat. Si vols que l'acta ho tingui en compte, toca ⋯ › «Refés l'acta».", 5000);
 });
 const SPK_PROMPT = `Reps la transcripció d'una reunió amb línies numerades. Algunes línies diuen «Persona no identificada»: la transcripció automàtica no va saber qui parlava.
 Per a cada una d'aquestes línies, digues qui parla NOMÉS si és evident pel context:

@@ -303,7 +303,7 @@ async function deleteMeeting(m, { ask = true } = {}) {
     if (ask) toast("Aquesta reunió s'està gravant o processant. Espera que acabi per esborrar-la.", 5000);
     return false;
   }
-  if (ask && !confirm('Esborrar aquesta reunió (resum, transcripció i fotos)?')) return false;
+  if (ask && !confirm('Esborrar aquesta reunió (acta, transcripció i documents)?')) return false;
   deletedIds.add(m.id);
   for (const s of m.segments || []) await db.del('audio', audioKey(m.id, s.idx));
   for (const ph of m.photos || []) await db.del('audio', ph.key);
@@ -451,7 +451,7 @@ function updateTypeChips() {
     const sub = mode === 'general' && type !== 'general' && MEETING_TYPES[type] ? ` · ${MEETING_TYPES[type].label}` : '';
     $('#record-caption').textContent = mode === 'important' ? 'Reunió important · acta professional'
       : mode === 'revisio' ? 'Revisió de feina · llista de correccions'
-      : `Reunió${sub} · ${(settings.detail || 'full') === 'short' ? 'resum breu' : 'resum detallat'}`;
+      : `Reunió${sub} · ${(settings.detail || 'full') === 'short' ? 'acta breu' : 'acta detallada'}`;
   }
   if ($('#review-fields')) $('#review-fields').hidden = !review;
   if ($('#agenda-field')) $('#agenda-field').hidden = type !== 'important';
@@ -646,7 +646,7 @@ async function askMeetings(q) {
   if (scope.startsWith('type:')) list = filterMeetings(list, { kind: 'type', value: scope.slice(5) });
   if (scope.startsWith('group:')) list = filterMeetings(list, { kind: 'group', value: scope.slice(6) });
   if (scope.startsWith('tag:')) list = filterMeetings(list, { kind: 'tag', value: scope.slice(4) });
-  if (!list.length) throw new FatalError('Encara no hi ha cap reunió amb resum en aquest apartat.');
+  if (!list.length) throw new FatalError('Encara no hi ha cap reunió amb acta en aquest apartat.');
   // Context: resums (més recents primer) i, per a les 3 reunions més relacionades, la transcripció.
   const words = q.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 3);
   const related = list.slice().sort((a, b) => scoreMeeting(b, words) - scoreMeeting(a, words)).slice(0, 3).filter((m) => scoreMeeting(m, words) > 0);

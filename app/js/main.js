@@ -28,7 +28,7 @@ $('#btn-continue').onclick = async () => {
   const m = await getMeeting(viewingId);
   if (!m || rec.meeting) return;
   if (pipelines.has(m.id) || m.status === 'processing') { toast("Espera que s'acabi de processar."); return; }
-  if (!confirm("Continuar gravant aquí? El que diguis s'afegirà a aquesta reunió i se'n refarà el resum amb tot.")) return;
+  if (!confirm("Continuar gravant aquí? El que diguis s'afegirà a aquesta reunió i se'n refarà l'acta amb tot.")) return;
   if (m.source === 'call' && CAN_CAPTURE_CALL) {
     pendingContinue = m;
     $('#consent-ok').checked = false;
@@ -39,7 +39,7 @@ $('#btn-continue').onclick = async () => {
   startRecording(m);
 };
 $('#btn-pause').onclick = togglePause;
-$('#btn-stop').onclick = () => { if (confirm('Acabar la reunió i fer-ne el resum?')) stopRecording(); };
+$('#btn-stop').onclick = () => { if (confirm('Acabar la reunió i fer-ne l\'acta?')) stopRecording(); };
 $('#btn-mark').onclick = addMark;
 // Fotos: durant la reunió (amb el minut) o després (des del resultat).
 let photoTarget = null;
@@ -58,7 +58,7 @@ $('#photo-input').onchange = async (e) => {
     const n = await addPhotos(m, files, null);
     await renderPhotos(m, $('#result-photos'));
     $('#result-photos-wrap').hidden = !(m.photos && m.photos.length);
-    if (n) toast('Foto afegida. A «⋯» toca «Refés el resum» perquè la tingui en compte.', 5000);
+    if (n) toast('Document afegit. A «⋯» toca «Refés l\'acta» perquè el tingui en compte.', 5000);
   }
 };
 $('#btn-intro').onclick = () => {

@@ -193,7 +193,7 @@ function runPipeline(id, { redoSummary = false } = {}) {
       if (!m.tags && m.engine !== 'digest') await autoTag(m);
       // 5. Revisió de l'acta amb la gravació (marca el que no s'hi troba)
       if (settings.verify !== false && !m.textOnly && m.engine !== 'digest' && !verifyFresh(m)) {
-        if (currentView === 'result' && viewingId === id) { $('#verify-banner').hidden = false; $('#verify-banner').className = 'banner verify-banner'; $('#verify-banner').textContent = "🔍 Comprovant l'acta amb la gravació…"; }
+        if (currentView === 'result' && viewingId === id) { $('#verify-banner').hidden = false; $('#verify-banner').className = 'banner verify-banner'; $('#verify-banner').textContent = "Comprovant l'acta amb la gravació…"; syncQuality(); }
         try { await verifyActa(m); } catch (e) { if (e instanceof FatalError) { /* sense quota: es podrà fer a mà */ } }
       }
       m.status = 'done';

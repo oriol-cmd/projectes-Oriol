@@ -138,7 +138,7 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 
 - Quan un tros d'àudio no s'entén, Gemini a vegades **s'inventa una conversa sencera** per omplir-lo. Ara cada tros es transcriu sabent quant dura (i amb un límit de text proporcional), i es compara el **nombre de paraules amb la durada**: ningú no pot dir més de ~230 paraules per minut.
 - Si un tros en té més, es torna a transcriure amb el model precís i més estricte; si continua igual, queda **marcat amb ⚠️ com a dubtós** (es guarda l'àudio per escoltar-lo) i **l'acta no en treu acords, tasques ni xifres** si no es confirmen en altres parts.
-- També es revisen les **reunions ja fetes**: els trossos impossibles surten marcats a l'informe de la gravació; toca ⋯ › «Refés el resum».
+- També es revisen les **reunions ja fetes**: els trossos impossibles surten marcats a l'informe de la gravació; toca ⋯ › «Refés l'acta».
 
 ## Novetats de la v80: revisió de l'acta amb la gravació
 
@@ -232,7 +232,7 @@ A cada reunió hi ha el botó **«👥 Envia a altres persones»**: escrius les 
 
 ## Fotos de documents
 
-Si a la reunió parleu d'un document (notes escrites a mà, un esquema, un pressupost…), toca **«📷 Foto d'un document»** mentre graves. L'app guarda en quin minut s'ha fet. En fer el resum, Gemini llegeix les fotos juntament amb la transcripció, les relaciona amb el que es deia i afegeix una secció **«Documents comentats»**. El que no es llegeixi bé surt marcat com a [dubte de comprensió]. També pots afegir fotos després, des de la reunió guardada, i tocar «Refés el resum».
+Si a la reunió parleu d'un document (notes escrites a mà, un esquema, un pressupost…), toca **«📷 Foto d'un document»** mentre graves. L'app guarda en quin minut s'ha fet. En fer el resum, Gemini llegeix les fotos juntament amb la transcripció, les relaciona amb el que es deia i afegeix una secció **«Documents comentats»**. El que no es llegeixi bé surt marcat com a [dubte de comprensió]. També pots afegir fotos després, des de la reunió guardada, i tocar «Refés l'acta».
 
 ## Compartir l'app amb altres persones
 

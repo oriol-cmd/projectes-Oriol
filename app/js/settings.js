@@ -159,8 +159,8 @@ async function testEmail() {
   try {
     const r = await sendEmail({
       subject: 'Prova: Xiu-xiu',
-      html: '<p>Si reps aquest correu, l\'enviament automàtic de resums funciona correctament. ✅</p>',
-      text: "Si reps aquest correu, l'enviament automàtic de resums funciona correctament.",
+      html: '<p>Si reps aquest correu, l\'enviament automàtic d\'actes funciona correctament. ✅</p>',
+      text: "Si reps aquest correu, l'enviament automàtic d'actes funciona correctament.",
     });
     msg.textContent = r.confirmed ? `✓ Correu enviat a ${settings.email}` : `✗ L'script de Google no respon. Comprova l'URL (ha d'acabar en /exec) i que l'accés sigui «Qualsevol».`;
   } catch (e) {
@@ -307,7 +307,7 @@ function renderStplList() {
 function openStpl(id = null) {
   const found = (settings.summaryTemplates || []).find((t) => t.id === id);
   stplEdit = found ? { ...found } : { id: uid(), name: '', structure: '' };
-  $('#stpl-title').textContent = found ? 'Edita la plantilla de resum' : 'Nova plantilla de resum';
+  $('#stpl-title').textContent = found ? 'Edita la plantilla d\'acta' : 'Nova plantilla d\'acta';
   $('#stpl-name').value = stplEdit.name;
   $('#stpl-structure').value = stplEdit.structure;
   $('#btn-stpl-delete').hidden = !found;
@@ -753,7 +753,7 @@ $('#btn-save-settings').onclick = async () => {
   // Abans d'activar l'esborrat de reunions antigues, diu quantes se n'esborrarien ara.
   if (next.meetingDays > 0 && next.meetingDays !== Number(settings.meetingDays || 0)) {
     const n = oldMeetings(await db.all('meetings'), next.meetingDays).length;
-    if (n && !confirm(`Amb aquest ajust s'esborraran ara ${n === 1 ? '1 reunió antiga' : `${n} reunions antigues`} (resum, transcripció i fotos). Vols continuar?`)) return;
+    if (n && !confirm(`Amb aquest ajust s'esborraran ara ${n === 1 ? '1 reunió antiga' : `${n} reunions antigues`} (acta, transcripció i documents). Vols continuar?`)) return;
   }
   saveSettings(next);
   retentionCleanup().catch(() => {});

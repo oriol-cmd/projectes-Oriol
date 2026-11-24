@@ -121,7 +121,7 @@
           <button id="btn-record" class="record-btn" aria-label="Comença a gravar"><span class="dot"></span></button>
           <div class="record-text">
             <b>Comença a gravar</b>
-            <span id="record-caption">Reunió · resum detallat</span>
+            <span id="record-caption">Reunió · acta detallada</span>
           </div>
           <div id="source-switch" class="seg source-seg" role="group" aria-label="Font de l'àudio" hidden>
             <button type="button" data-source="mic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg> Micròfon</button>
@@ -171,7 +171,7 @@
             <datalist id="groups-list"></datalist>
           </label>
           <label class="field last">
-            <span>Assistents i context <em>(opcional, millora el resum)</em></span>
+            <span>Assistents i context <em>(opcional, millora l'acta)</em></span>
             <textarea id="meeting-context" rows="2" placeholder="p. ex. Anna (finances), Jordi (vendes). Tema: pressupost 2027"></textarea>
           </label>
           <div class="agenda-photo-row docs-row">
@@ -256,10 +256,13 @@
     <!-- RESULTAT -->
     <section id="view-result" class="view" hidden>
       <div id="result-status" class="banner"></div>
-      <div id="rec-report" class="banner warn rec-report" hidden></div>
-      <div id="doubt-banner" class="banner doubt-banner" hidden></div>
-      <div id="verify-banner" class="banner verify-banner" hidden></div>
-      <div id="lang-switch" class="seg" role="group" aria-label="Idioma del resum" hidden>
+      <section id="quality" class="quality card" aria-label="Revisió de l'acta" hidden>
+        <div class="quality-title">Revisió de l'acta</div>
+        <div id="verify-banner" class="banner verify-banner" hidden></div>
+        <div id="doubt-banner" class="banner doubt-banner" hidden></div>
+        <div id="rec-report" class="banner warn rec-report" hidden></div>
+      </section>
+      <div id="lang-switch" class="seg" role="group" aria-label="Idioma de l'acta" hidden>
         <button type="button" data-lang="ca">Català</button>
         <button type="button" data-lang="es">Castellano</button>
         <button type="button" data-lang="en">English</button>
@@ -327,7 +330,7 @@
     <!-- PREGUNTA -->
     <section id="view-ask" class="view" hidden>
       <h2>Pregunta a les reunions</h2>
-      <p class="fineprint left first">Xiu-xiu buscarà la resposta en els resums (i, si cal, en les transcripcions) de les teves reunions.</p>
+      <p class="fineprint left first">Xiu-xiu buscarà la resposta en les actes (i, si cal, en les transcripcions) de les teves reunions.</p>
       <label class="field"><span>On busco?</span>
         <select id="ask-scope"></select></label>
       <div id="ask-log" class="ask-log"></div>
@@ -382,13 +385,13 @@
 
       <h3>Resums</h3>
       <div class="card group">
-        <label class="field"><span>Idioma dels resums</span>
+        <label class="field"><span>Idioma de les actes</span>
           <select id="set-summary-lang">
             <option value="ca">Català</option>
             <option value="es">Castellano</option>
             <option value="en">English</option>
           </select></label>
-        <label class="field"><span>Com vols el resum</span>
+        <label class="field"><span>Com vols l'acta</span>
           <select id="set-detail">
             <option value="full">Detallat: tot el que s'ha parlat, ben ordenat (recomanat)</option>
             <option value="short">Resumit: només el més important</option>
@@ -401,7 +404,7 @@
         <label class="check last"><input id="set-live" type="checkbox"> Text en directe mentre grava <em>(un esborrany cada 20 s, abans que arribi la transcripció bona; gasta més quota de Google)</em></label>
       </div>
 
-      <h3>Les meves plantilles de resum</h3>
+      <h3>Les meves plantilles d'acta</h3>
       <div class="card group">
         <p class="fineprint left first">Escriu l'estructura que vols (p. ex. «Acta de patronat» o «Seguiment de client») i surtirà com un tipus de reunió més.</p>
         <div id="stpl-list" class="tpl-list"></div>
@@ -443,7 +446,7 @@
 
       <h3>Correu i Google Sheets <em class="opt">opcional</em></h3>
       <div class="card group">
-        <p class="fineprint left first">Si ho omples, cada resum t'arribarà sol per correu i es desarà en un full de càlcul.</p>
+        <p class="fineprint left first">Si ho omples, cada acta t'arribarà sola per correu i es desarà en un full de càlcul.</p>
         <label class="field"><span>El teu correu</span>
           <input id="set-email" type="email" autocomplete="off"></label>
         <label class="field"><span>URL de l'script del full de Google</span>
@@ -514,19 +517,19 @@
           <ul>
             <li>L'àudio es guarda <b>només al mòbil</b>, el temps que triïs a «Privadesa i espai» (de sèrie, 7 dies, per poder-lo escoltar). Després s'esborra sol.</li>
             <li>Els trossos en silenci no es guarden mai.</li>
-            <li>El tros de les presentacions (per saber qui parla) i els fitxers importats s'esborren quan el resum està fet.</li>
+            <li>El tros de les presentacions (per saber qui parla) i els fitxers importats s'esborren quan l'acta està feta.</li>
             <li>Si falla la transcripció (p. ex. sense cobertura), l'àudio es guarda fins que es pugui fer, per no perdre res.</li>
-            <li><b>Quan el resum està fet, al mòbil no hi queda cap àudio</b>, excepte si actives «Conserva l'àudio després de processar» (a Avançat). En aquest cas, s'esborra quan esborris la reunió.</li>
+            <li><b>Quan l'acta està feta, al mòbil no hi queda cap àudio</b>, excepte si actives «Conserva l'àudio després de processar» (a Avançat). En aquest cas, s'esborra quan esborris la reunió.</li>
           </ul>
           <h4>📄 El que es queda guardat</h4>
           <ul>
-            <li>Al mòbil: la transcripció en text, el resum, les tasques i les fotos dels documents, fins que esborris la reunió.</li>
+            <li>Al mòbil: la transcripció en text, l'acta, les tasques i les fotos dels documents, fins que esborris la reunió.</li>
             <li>Si entres amb Google: el mateix (sense àudio), en una carpeta privada i oculta del teu Google Drive.</li>
             <li>La clau de Google i la configuració es guarden al mòbil (i al teu Drive, si ho tens activat).</li>
           </ul>
           <h4>☁️ Què s'envia a Google (Gemini)</h4>
           <ul>
-            <li>L'àudio, el text i les fotos s'envien a Gemini per transcriure'ls i fer-ne el resum.</li>
+            <li>L'àudio, el text i les fotos s'envien a Gemini per transcriure'ls i fer-ne l'acta.</li>
             <li><b>Amb la facturació activada</b>, Google no fa servir aquestes dades per millorar els seus productes. Les pot conservar un temps limitat per detectar abusos.</li>
             <li><b>Amb la clau gratuïta</b>, Google pot fer servir el contingut per millorar els seus productes, i el pot revisar personal humà. No ho recomanem per a reunions confidencials.</li>
             <li>Els fitxers grans importats que es pugen a Google s'esborren sols al cap de 48 hores.</li>
@@ -539,7 +542,7 @@
           <h4>👥 Les persones de la reunió</h4>
           <ul>
             <li>Abans de gravar, informa les persones assistents que la reunió es grava per fer-ne l'acta. Si cal, demana'n el consentiment.</li>
-            <li>Pots esborrar en qualsevol moment una reunió (resum, transcripció, fotos i àudio) des de <i>⋯ > Esborra aquesta reunió</i>.</li>
+            <li>Pots esborrar en qualsevol moment una reunió (acta, transcripció, documents i àudio) des de <i>⋯ > Esborra aquesta reunió</i>.</li>
           </ul>
           <p class="fineprint left">Xiu-xiu no té cap servidor propi: ni l'autor de l'app ni ningú més pot veure les teves reunions.</p>
         </div>
@@ -550,25 +553,26 @@
   <!-- Full de compartir -->
   <div id="share-sheet" class="sheet" hidden>
     <div class="sheet-backdrop" data-close-sheet></div>
-    <div class="sheet-panel" role="dialog" aria-label="Comparteix el resum">
+    <div class="sheet-panel" role="dialog" aria-label="Comparteix l'acta">
       <div class="sheet-grip"></div>
-      <h3>Comparteix el resum</h3>
+      <h3>Comparteix l'acta</h3>
       <div class="sheet-grid">
-        <button id="btn-mail" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></span>Envia-me'l per correu</button>
+        <button id="btn-mail" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></span>Envia-me-la per correu</button>
         <button id="btn-wa" class="sheet-item" type="button" data-closes><span class="ic wa"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.3-4.4A8.5 8.5 0 1 1 20.5 11.5z"/></svg></span>WhatsApp</button>
         <button id="btn-pdf" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M9 13h6.5M9 16.5h6.5"/></svg></span>Acta en PDF</button>
         <button id="btn-share" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><path d="M15.5 5.5a3 3 0 0 1 0 6M17.5 14.6c1.7.6 2.8 2.2 3.2 4.9"/></svg></span>A altres persones</button>
         <button id="btn-docx" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M8.5 12l1.5 5 2-4 2 4 1.5-5"/></svg></span>Word</button>
         <button id="btn-md" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M6.5 15V9l2.5 3 2.5-3v6M15.5 9v6M13.5 13l2 2 2-2"/></svg></span>Markdown</button>
         <button id="btn-followup" class="sheet-item" type="button"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M3.5 7l8.5 6 8.5-6"/><path d="M15 15.5h5M17.5 13v5"/></svg></span>Correu a cada assistent</button>
-        <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3.5"/></svg></span>Copia el text</button>
+        <button id="btn-copy" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3.5"/></svg></span>Copia l'acta</button>
+        <button id="btn-copy-tr" class="sheet-item" type="button" data-closes><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M8 11h8M8 14.5h8M8 18h5"/></svg></span>Copia la transcripció</button>
       </div>
       <div id="share-panel" class="share-panel" hidden>
         <label class="field"><span>Adreces de correu <em>(separades per comes)</em></span>
           <textarea id="share-to" rows="2" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="nom@exemple.com, altra.persona@exemple.com"></textarea></label>
         <div id="share-recent" class="chips"></div>
         <label class="check"><input id="share-transcript" type="checkbox"> Adjunta també la transcripció completa</label>
-        <button id="btn-share-send" class="btn primary" type="button">Envia el resum</button>
+        <button id="btn-share-send" class="btn primary" type="button">Envia l'acta</button>
         <button id="btn-share-mail" class="btn ghost" type="button">o obre-ho al correu del mòbil</button>
         <p id="share-msg" class="fineprint"></p>
       </div>
@@ -646,7 +650,7 @@
     <div class="sheet-panel" role="dialog" aria-label="Biblioteca de plantilles">
       <div class="sheet-grip"></div>
       <h3>Biblioteca de plantilles</h3>
-      <p class="fineprint left first">Toca la que vulguis i surtirà com un tipus de reunió més. Després la pots canviar a Ajustos › Les meves plantilles de resum.</p>
+      <p class="fineprint left first">Toca la que vulguis i surtirà com un tipus de reunió més. Després la pots canviar a Ajustos › Les meves plantilles d'acta.</p>
       <div id="gallery-list" class="sheet-list"></div>
       <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
     </div>
@@ -655,9 +659,9 @@
   <!-- Plantilla de resum de l'usuari -->
   <div id="stpl-sheet" class="sheet" hidden>
     <div class="sheet-backdrop" data-close-sheet></div>
-    <div class="sheet-panel" role="dialog" aria-label="Plantilla de resum">
+    <div class="sheet-panel" role="dialog" aria-label="Plantilla d'acta">
       <div class="sheet-grip"></div>
-      <h3 id="stpl-title">Nova plantilla de resum</h3>
+      <h3 id="stpl-title">Nova plantilla d'acta</h3>
       <div class="card group">
         <label class="field"><span>Nom</span>
           <input id="stpl-name" type="text" placeholder="p. ex. Acta de patronat" autocomplete="off"></label>
@@ -838,17 +842,21 @@
       <div class="sheet-grip"></div>
       <h3>Més opcions</h3>
       <div class="sheet-list">
+        <p class="sheet-sec">Revisar</p>
         <button id="btn-verify-now" class="sheet-row" type="button" data-closes>🔍 Comprova l'acta amb la gravació</button>
-        <button id="btn-analysis" class="sheet-row" type="button">📊 Anàlisi de la reunió (qui parla, temes oberts…)</button>
-        <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
-        <button id="btn-set-tags" class="sheet-row" type="button" data-closes># Etiquetes: <span id="tags-current">cap</span></button>
-        <button id="btn-docs-role" class="sheet-row" type="button" hidden>📎 Documents: <span id="docs-role-current">només ajuda</span> <small>(toca per canviar)</small></button>
-        <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📎 Afegeix un document (foto o PDF)</button>
-        <button id="btn-pro" class="sheet-row" type="button" data-closes>⭐ Refés-la com a acta professional (punt per punt)</button>
+        <button id="btn-fix-open" class="sheet-row" type="button">✏️ Corregeix l'acta <small>(dubtes, noms, errors)</small></button>
+        <button id="btn-analysis" class="sheet-row" type="button">📊 Anàlisi de la reunió <small>(qui parla, temes oberts…)</small></button>
+        <p class="sheet-sec">Refer l'acta</p>
+        <button id="btn-redo" class="sheet-row" type="button" data-closes>↻ Refés l'acta</button>
+        <button id="btn-pro" class="sheet-row" type="button" data-closes>⭐ Refés-la com a acta professional <small>(punt per punt)</small></button>
         <button id="btn-toggle-detail" class="sheet-row" type="button" data-closes>✂️ Fes-ne una versió més resumida</button>
-        <button id="btn-fix-open" class="sheet-row" type="button">✏️ Corregeix l'acta (dubtes, noms, errors)</button>
-        <button id="btn-redo" class="sheet-row" type="button" data-closes>✨ Refés el resum</button>
-        <button id="btn-resend" class="sheet-row" type="button" data-closes>🔁 Torna a enviar el correu automàtic</button>
+        <p class="sheet-sec">Organitzar</p>
+        <button id="btn-set-group" class="sheet-row" type="button" data-closes>🗂 Grup o projecte: <span id="group-current">cap</span></button>
+        <button id="btn-set-tags" class="sheet-row" type="button" data-closes>🏷 Etiquetes: <span id="tags-current">cap</span></button>
+        <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📎 Afegeix un document <small>(foto o PDF)</small></button>
+        <button id="btn-docs-role" class="sheet-row" type="button" hidden>📎 Els documents són: <span id="docs-role-current">només ajuda</span> <small>(toca per canviar)</small></button>
+        <p class="sheet-sec">Correu</p>
+        <button id="btn-resend" class="sheet-row" type="button" data-closes>✉️ Torna a enviar el correu automàtic</button>
         <button id="btn-delete" class="sheet-row danger-text" type="button" data-closes>🗑 Esborra aquesta reunió</button>
       </div>
       <button class="btn secondary full" type="button" data-close-sheet>Tanca</button>
@@ -907,7 +915,7 @@
       <div id="multi-list" class="multi-list"></div>
       <label class="field"><span>Què vols saber? <em>(opcional)</em></span>
         <input id="multi-ask" type="text" placeholder="p. ex. Com ha anat el pressupost aquest trimestre"></label>
-      <button id="btn-multi-go" class="btn primary full" type="button">Fes el resum</button>
+      <button id="btn-multi-go" class="btn primary full" type="button">Fes el recull</button>
       <p id="multi-msg" class="fineprint"></p>
       <button class="btn secondary full" type="button" data-close-sheet>Cancel·la</button>
     </div>

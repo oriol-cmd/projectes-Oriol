@@ -623,7 +623,7 @@ await step("Reunió llarga: trams pendents alhora i l'acta surt abans del correu
     // L'acta es veu mentre el correu encara s'està enviant
     await p.waitForFunction(() => currentView === 'result' && /Acta feta/.test($('#result-status').textContent), null, { timeout: 60000 });
     const early = await p.evaluate(() => ({ email: !!pipelines.size, text: $('#result-summary').textContent.length }));
-    await p.waitForFunction(() => /Resum enviat/.test($('#result-status').textContent), null, { timeout: 30000 });
+    await p.waitForFunction(() => /Acta enviada/.test($('#result-status').textContent), null, { timeout: 30000 });
     const alhora = await p.evaluate(() => window.__m);
     const m = await meeting(id);
     ok(early.email && early.text > 50, 'no surt abans del correu');
@@ -667,7 +667,7 @@ await step("Revisió de l'acta amb la gravació (marca el que no es va dir)", as
     await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 90000);
   } finally { log.verifyProblem = false; }
   const id = await p.evaluate(() => viewingId);
-  ok(/1 cosa de l'acta no es troba/.test(await p.textContent('#verify-banner')), 'sense avís de revisió');
+  ok(/1 frase no es troba/.test(await p.textContent('#verify-banner')), 'sense avís de revisió');
   ok(/Aprovat amb canvis/.test(await p.textContent('#result-summary mark.unverified')), 'no ressalta la frase');
   await p.click('#btn-verify-see'); await p.waitForSelector('#verify-sheet:not([hidden])');
   ok(/no es diu/.test(await p.textContent('#verify-list')), 'sense motiu');
@@ -704,7 +704,7 @@ await step('Transcripció inventada: es detecta pel ritme de parla', async () =>
     return id;
   });
   await p.evaluate((id) => showResult(id), id2); await waitView('result');
-  await p.waitForFunction(() => /més text del que es pot dir/.test($('#rec-report').textContent), null, { timeout: 10000 });
+  await p.waitForFunction(() => /pot tenir text inventat/.test($('#rec-report').textContent), null, { timeout: 10000 });
   m = await meeting(id2);
   ok(m.segments[1].suspect === true && !m.segments[0].suspect, 'no marca el tros');
   await p.evaluate((id) => runPipeline(id, { redoSummary: true }), id2);
