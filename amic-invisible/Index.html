@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amic invisible</title>
+<link rel="apple-touch-icon" href="icona-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icona-192.png">
+<meta name="apple-mobile-web-app-title" content="Amic invisible">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Disseny: etiquetes de regal (amb el foradet del cordill). Quatre estils de color, triats a la pestanya Configuració. */
+:root {
+  --bg: #eef2ef; --paper: #ffffff; --ink: #17231f; --muted: #5b6b65; --line: #d5ddd9;
+  --primary: #1f5a4a; --primary-soft: #e1ece7; --accent: #b3263e; --accent-soft: #f8e3e7;
+  --taken: #8a958f; --head: #173f35; --head-ink: #f3f7f5;
+  --snail-body: #f1c27d; --snail-line: #4a2f18; --snail-shadow: rgb(0 0 0 / 0.07);
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+:root[data-estil="nit"] {
+  --bg: #eef0f6; --paper: #ffffff; --ink: #161b2e; --muted: #5a6178; --line: #d6dae6;
+  --primary: #24408e; --primary-soft: #e3e8f6; --accent: #a5660a; --accent-soft: #f8ecd6;
+  --taken: #8a90a2; --head: #18213f; --head-ink: #f3f4fa;
+}
+:root[data-estil="gerd"] {
+  --bg: #f5eff1; --paper: #ffffff; --ink: #2a1520; --muted: #6e5862; --line: #e5d6dc;
+  --primary: #8a2456; --primary-soft: #f5e2eb; --accent: #c2410c; --accent-soft: #fde8dc;
+  --taken: #9a8a91; --head: #4a1330; --head-ink: #fbf1f5;
+}
+:root[data-estil="neu"] {
+  --bg: #f1f4f7; --paper: #ffffff; --ink: #1a222b; --muted: #5b6774; --line: #d8dfe6;
+  --primary: #2c6488; --primary-soft: #e1edf5; --accent: #c0392b; --accent-soft: #f9e2df;
+  --taken: #8b96a1; --head: #2e3d4c; --head-ink: #f4f7fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101816; --paper: #18231f; --ink: #e6eeea; --muted: #9aaba4; --line: #2b3a35;
+    --primary: #6cc2a5; --primary-soft: #1c3029; --accent: #f0758a; --accent-soft: #3a1f26;
+    --taken: #6f7d77; --head: #0b1311; --head-ink: #e6eeea; color-scheme: dark;
+    --snail-body: #e0b06c; --snail-line: #2b1a0b; --snail-shadow: rgb(0 0 0 / 0.35);
+  }
+  :root[data-estil="nit"] {
+    --bg: #0e1120; --paper: #171b2e; --ink: #e7e9f3; --muted: #9ca2bb; --line: #2a3048;
+    --primary: #93aef5; --primary-soft: #1c2440; --accent: #f1c26b; --accent-soft: #3a2f17;
+    --taken: #6f7590; --head: #0a0d1a; --head-ink: #e7e9f3;
+  }
+  :root[data-estil="gerd"] {
+    --bg: #170e12; --paper: #22151b; --ink: #f2e6eb; --muted: #b49ca7; --line: #3d2630;
+    --primary: #f08cbb; --primary-soft: #3a1a2a; --accent: #fb9a63; --accent-soft: #3d2216;
+    --taken: #7d6871; --head: #12080d; --head-ink: #f2e6eb;
+  }
+  :root[data-estil="neu"] {
+    --bg: #0f1419; --paper: #182029; --ink: #e6ecf1; --muted: #9eabb8; --line: #2b3743;
+    --primary: #85c1e6; --primary-soft: #1b2b38; --accent: #f2857a; --accent-soft: #3b1f1d;
+    --taken: #6d7a87; --head: #0a0e12; --head-ink: #e6ecf1;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); -webkit-text-size-adjust: 100%; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+
+header.top { background: var(--head); color: var(--head-ink); padding-block: 18px 20px; }
+header.top .wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.mono { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font: 700 15px/1 var(--font-display); letter-spacing: 0.02em; }
+.brand small { display: block; font: 500 13px var(--font-body); opacity: 0.75; }
+.ghost { background: transparent; border: 1px solid color-mix(in srgb, var(--head-ink) 35%, transparent); color: var(--head-ink); border-radius: 999px; padding: 6px 14px; font-size: 13px; }
+
+.notice { background: var(--primary-soft); color: var(--ink); border-bottom: 1px solid var(--line); padding-block: 10px; font-size: 14px; }
+
+main { padding-block: 20px 60px; display: grid; gap: 20px; }
+
+/* Entrada */
+.login { max-width: 420px; margin: 40px auto 0; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 24px; display: grid; gap: 14px; }
+.login h2 { font-size: 22px; }
+.login p { margin: 0; color: var(--muted); }
+.code-input { text-transform: uppercase; letter-spacing: 0.25em; font-size: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* Pestanyes */
+.tabs.three { grid-template-columns: 1fr 1fr 0.8fr; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.tabs button { border: 0; background: transparent; border-radius: 9px; padding: 10px 8px; font-weight: 600; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--head); color: var(--head-ink); }
+
+.hint { color: var(--muted); font-size: 13.5px; margin: 0; display: flex; gap: 8px; align-items: flex-start; }
+.hint svg { flex: none; margin-top: 2px; }
+
+/* Formulari */
+.add { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+.add h3 { font-size: 17px; }
+label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); min-width: 0; }
+input[type="text"], input[type="url"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); }
+input:focus { border-color: var(--primary); outline: none; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 0; border-radius: 9px; padding: 10px 16px; font-weight: 600; background: var(--primary); color: var(--paper); }
+.btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+/* Etiquetes de regal */
+.tags { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tag { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 6px 14px 14px 6px; padding: 14px 14px 14px 34px; display: grid; gap: 8px; min-width: 0; }
+.tag::before { content: ""; position: absolute; left: 12px; top: 18px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 1.5px solid var(--line); }
+.tag .text { font-weight: 600; overflow-wrap: anywhere; }
+.tag .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.tag .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.themes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.themes li { font-weight: 600; overflow-wrap: anywhere; padding-left: 14px; position: relative; }
+.themes li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+.tag.is-mine .themes li::before, .pick .themes li::before { background: var(--accent); }
+.tag.is-taken .themes li { color: var(--taken); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tag.is-taken .themes li::before { background: var(--line); }
+.pick .themes li { font-weight: 500; }
+.tag.is-empty { border-style: dashed; background: transparent; }
+.tag.is-empty .text { color: var(--muted); font-weight: 500; }
+.tag.is-mine .who { color: var(--accent); }
+.pick { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 4px; }
+.pick .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.pick-name { font: 700 22px/1.2 var(--font-display); }
+.pick .themes { margin-top: 6px; }
+.pick .hint { margin-top: 2px; }
+.pick.chosen { border-color: var(--accent); background: var(--accent-soft); }
+.tag.is-mine { border-color: var(--accent); background: var(--accent-soft); }
+.tag.is-mine::before { border-color: var(--accent); }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 3px 10px; letter-spacing: 0.01em; }
+.chip.free { color: var(--primary); background: var(--primary-soft); }
+.chip.mine { color: var(--paper); background: var(--accent); }
+.chip.taken { color: var(--taken); border: 1px solid var(--line); }
+.small { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 5px 11px; font-size: 13px; font-weight: 600; }
+.small.mark { border-color: var(--primary); color: var(--primary); }
+
+
+/* Fase (data límit) */
+.phase { border-radius: 14px; padding: 14px 16px; display: grid; gap: 2px; border: 1px solid var(--line); background: var(--paper); }
+.phase.temes { border-color: var(--primary); }
+.phase.tria { background: var(--primary); border-color: var(--primary); color: var(--paper); }
+.phase-title { font: 700 17px/1.3 var(--font-display); }
+.phase-text { font-size: 14px; opacity: 0.85; }
+.phase-count { font: 700 14px var(--font-body); color: var(--primary); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.chip.done { color: var(--primary); background: var(--primary-soft); }
+.chip.wait { color: var(--muted); border: 1px dashed var(--line); }
+.tag .note { color: var(--muted); font-size: 14px; }
+
+/* Cargol */
+.snail { display: block; width: 150px; height: auto; aspect-ratio: 220 / 150; margin: -6px auto 0; }
+
+/* Instruccions per a WhatsApp */
+#guide { display: grid; gap: 22px; justify-items: center; }
+.guide-card { width: 100%; max-width: 440px; background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 26px 24px 24px; display: grid; gap: 14px; }
+.guide-card .snail { width: 210px; margin: 0 auto; }
+.g-eyebrow { text-align: center; font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.guide-card h2 { text-align: center; font-size: 27px; line-height: 1.15; }
+.steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 12px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 10px; font-size: 15px; line-height: 1.45; }
+.steps li::before { content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: var(--paper); display: grid; place-items: center; font: 700 14px var(--font-body); }
+.steps b { font-weight: 650; }
+.g-date { background: var(--accent-soft); color: var(--ink); border-radius: 12px; padding: 10px 14px; text-align: center; font-size: 14.5px; }
+.g-date strong { display: block; font: 700 18px/1.3 var(--font-display); color: var(--accent); }
+.g-avis { margin: 0; text-align: center; color: var(--muted); font-size: 14px; }
+.g-motto { margin: 0; text-align: center; font: 600 15px var(--font-display); color: var(--primary); }
+.guide-tools { width: 100%; max-width: 440px; display: grid; gap: 10px; }
+.guide-tools h3 { font-size: 17px; }
+.guide-tools textarea { width: 100%; min-height: 230px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); color: var(--ink); font: 13.5px/1.5 var(--font-body); resize: vertical; }
+
+/* Ajustos */
+.add h3 + .hint { margin-top: -4px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+select, textarea, input[type="date"], input[type="time"], input[type="tel"] { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 10px 12px; color: var(--ink); font: inherit; }
+textarea { resize: vertical; }
+.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.swatches { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.swatches legend { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 4px; padding: 0; }
+.swatch { position: relative; display: grid; gap: 6px; justify-items: center; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 4px 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink); }
+.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch .dots { display: flex; }
+.swatch .dots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--paper); margin-left: -5px; }
+.swatch:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+.swatch:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.people { display: grid; gap: 8px; }
+.person-row { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.person-row .pname { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.person-row .pname small { font-weight: 500; color: var(--muted); }
+.person-row .pactions { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.person-row input[type="tel"] { width: 150px; padding: 6px 10px; font-size: 13px; }
+a.small { text-decoration: none; color: inherit; display: inline-block; }
+.small.wa { border-color: var(--primary); color: var(--primary); }
+.small.danger { border-color: var(--accent); color: var(--accent); }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.check input { width: 16px; height: 16px; accent-color: var(--primary); }
+.zone { border-color: var(--accent); }
+@media (max-width: 420px) { .tabs button { font-size: 14px; padding-inline: 4px; } .swatches { grid-template-columns: repeat(2, 1fr); } }
+
+/* Full d'instruccions (surt el primer cop i amb «Com funciona?») */
+.sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgb(0 0 0 / 0.45); display: grid; align-items: end; justify-items: center; }
+.sheet { width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; background: var(--paper); color: var(--ink); border-radius: 22px 22px 0 0; padding: 22px 22px calc(22px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; box-shadow: 0 -10px 40px rgb(0 0 0 / 0.25); }
+.sheet h2 { text-align: center; font-size: 26px; }
+.sheet .snail { width: 190px; margin: 0 auto; }
+.sheet .btn { width: 100%; padding-block: 13px; font-size: 16px; }
+@media (min-width: 600px) { .sheet-bg { align-items: center; } .sheet { border-radius: 22px; } }
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: up .25s ease-out; } @keyframes up { from { transform: translateY(24px); } } }
+.home { border: 1px dashed var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45; }
+.home h3 { font-size: 16px; }
+.home p { margin: 0; }
+.home .ico { display: inline-block; vertical-align: -3px; width: 16px; height: 16px; }
+.help-link { margin: 22px auto 0; width: max-content; display: flex; align-items: center; gap: 8px; background: transparent; border: 0; color: var(--primary); font-weight: 600; font-size: 14.5px; padding: 8px 12px; border-radius: 999px; }
+.help-link svg { width: 38px; height: auto; }
+.help-link:hover { background: var(--primary-soft); }
+
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.2); z-index: 5; }
+.loading { color: var(--muted); text-align: center; padding: 40px 0; }
+
+@media (max-width: 520px) {
+  .brand h1 { font-size: 20px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tag { transition: border-color .15s, background-color .15s; }
+}
+</style>
+<!-- Des de Google, aquí hi va la configuració. Des de GitHub Pages es demana en obrir la pàgina. -->
+<script type="application/json" id="cfgJson"><?!= config ?></script>
+<script>
+  try { window.CONFIG = JSON.parse(document.getElementById('cfgJson').textContent); } catch (e) { window.CONFIG = null; }
+  try { document.documentElement.setAttribute('data-estil', (window.CONFIG && window.CONFIG.estil) || 'avet'); } catch (e) {}
+</script>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="snail" viewBox="0 0 220 150">
+    <ellipse cx="112" cy="138" rx="98" ry="7" fill="var(--snail-shadow)"/>
+    <path d="M14 128 C 30 120 60 118 150 118 C 165 118 172 108 174 92 C 176 76 186 70 196 74 C 208 79 209 96 203 110 C 197 126 182 133 160 133 L 30 133 C 20 133 11 132 14 128 Z" fill="var(--snail-body)" stroke="var(--snail-line)" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M189 75 L181 42 M198 77 L207 46" stroke="var(--snail-line)" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="181" cy="40" r="7" fill="#fff" stroke="var(--snail-line)" stroke-width="3"/>
+    <circle cx="207" cy="44" r="7" fill="#fff" stroke="var(--snail-line)" stroke-width="3"/>
+    <circle cx="183" cy="41" r="2.8" fill="var(--snail-line)"/>
+    <circle cx="209" cy="45" r="2.8" fill="var(--snail-line)"/>
+    <path d="M188 100 q7 6 13 0" fill="none" stroke="var(--snail-line)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="183" cy="96" r="4" fill="var(--accent)" opacity=".35"/>
+    <ellipse cx="102" cy="78" rx="52" ry="48" fill="var(--primary)" stroke="var(--snail-line)" stroke-width="3.5"/>
+    <path d="M99.0 80.0 L98.8 79.7 L98.6 79.4 L98.5 79.0 L98.4 78.6 L98.4 78.2 L98.5 77.7 L98.6 77.3 L98.7 76.8 L99.0 76.4 L99.3 75.9 L99.7 75.5 L100.1 75.1 L100.6 74.8 L101.1 74.5 L101.8 74.2 L102.4 74.0 L103.1 73.9 L103.8 73.8 L104.6 73.9 L105.3 74.0 L106.1 74.1 L106.9 74.4 L107.6 74.7 L108.4 75.2 L109.0 75.7 L109.7 76.3 L110.3 76.9 L110.8 77.7 L111.2 78.5 L111.5 79.3 L111.8 80.2 L111.9 81.2 L112.0 82.1 L111.9 83.1 L111.7 84.1 L111.4 85.1 L110.9 86.1 L110.4 87.0 L109.7 87.9 L108.9 88.7 L108.0 89.5 L107.0 90.2 L105.9 90.8 L104.8 91.3 L103.5 91.7 L102.2 92.0 L100.9 92.2 L99.5 92.2 L98.1 92.1 L96.7 91.8 L95.3 91.5 L93.9 90.9 L92.6 90.3 L91.4 89.5 L90.2 88.6 L89.1 87.5 L88.2 86.4 L87.3 85.1 L86.6 83.8 L86.1 82.3 L85.7 80.8 L85.5 79.3 L85.4 77.7 L85.5 76.1 L85.8 74.5 L86.3 72.9 L87.0 71.4 L87.9 69.9 L88.9 68.5 L90.1 67.2 L91.5 66.0 L93.0 64.9 L94.6 63.9 L96.4 63.1 L98.2 62.5 L100.2 62.0 L102.2 61.7 L104.2 61.7 L106.3 61.8 L108.3 62.1 L110.4 62.6 L112.4 63.3 L114.3 64.2 L116.1 65.2 L117.9 66.5 L119.4 68.0 L120.9 69.5 L122.1 71.3 L123.2 73.2 L124.1 75.1 L124.7 77.2 L125.1 79.3 L125.3 81.5 L125.2 83.7 L124.9 85.9 L124.3 88.1 L123.5 90.3 L122.4 92.3 L121.1 94.3 L119.6 96.2 L117.8 97.9 L115.9 99.5 L113.8 100.8 L111.5 102.0 L109.0 103.0 L106.5 103.7 L103.9 104.2 L101.2 104.5 L98.4 104.5 L95.7 104.2 L93.0 103.7 L90.3 102.9 L87.7 101.8 L85.2 100.6 L82.9 99.0 L80.7 97.3 L78.7 95.3 L77.0 93.1 L75.4 90.8 L74.2 88.3 L73.2 85.7 L72.5 83.0 L72.1 80.2 L72.0 77.4 L72.2 74.6 L72.8 71.7 L73.7 69.0 L74.8 66.3 L76.3 63.7 L78.1 61.2 L80.1 58.9 L82.5 56.8 L85.0 54.9 L87.8 53.3 L90.7 51.9 L93.9 50.8 L97.1 50.0 L100.4 49.5 L103.8 49.3 L107.3 49.4 L110.7 49.9 L114.0 50.7 L117.3 51.8 L120.5 53.2 L123.5 54.9 L126.3 56.9 L128.9 59.2 L131.3 61.7 L133.3 64.5 L135.1 67.4 L136.5 70.5 L137.6 73.8 L138.3 77.1 L138.7 80.5 L138.7 84.0 L138.2 87.5 L137.4 90.9 L136.2 94.2 L134.7 97.5 L132.7 100.5" fill="none" stroke="var(--primary-soft)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+    <g fill="var(--accent)" stroke="var(--snail-line)" stroke-width="3" stroke-linejoin="round">
+      <path d="M100 32 C 84 14 66 20 72 32 C 77 42 92 38 100 32 Z"/>
+      <path d="M104 32 C 120 14 138 20 132 32 C 127 42 112 38 104 32 Z"/>
+      <path d="M98 34 L 90 52 L 98 48 L 102 54 L 104 35 Z"/>
+      <circle cx="102" cy="32" r="6"/>
+    </g>
+  </symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="mono" id="mono" aria-hidden="true"></span>
+      <svg id="giftIcon" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true" hidden>
+        <rect x="4" y="13" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="2" y="9" width="30" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M17 9v22" stroke="currentColor" stroke-width="2"/>
+        <path d="M17 9c-2-5-8-6-8-2s6 2 8 2c2 0 8 2 8-2s-6-3-8 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+      <div><h1 id="title">Amic invisible</h1><small id="hello"></small></div>
+    </div>
+    <button class="ghost" id="logout" type="button" hidden>No sóc jo</button>
+  </div>
+</header>
+<div class="notice" id="notice" hidden><div class="wrap" id="noticeText"></div></div>
+
+<main class="wrap">
+  <p class="loading" id="loading">Carregant…</p>
+
+  <form class="login" id="login" hidden>
+    <svg class="snail" viewBox="0 0 220 150" aria-hidden="true"><use href="#snail"/></svg>
+    <h2>Entra al tauler</h2>
+    <p>Escriu el codi de 6 lletres que t'han enviat. Si has obert el teu enllaç personal, entraràs sol.</p>
+    <label for="code">El teu codi
+      <input class="code-input" id="code" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234">
+    </label>
+    <button class="btn" type="submit" id="loginBtn">Entra</button>
+  </form>
+
+  <section id="guide" hidden>
+    <div class="guide-card" id="guideCard">
+      <svg class="snail" viewBox="0 0 220 150" aria-hidden="true"><use href="#snail"/></svg>
+      <div class="g-eyebrow" id="gFamily"></div>
+      <h2 id="gTitle"></h2>
+      <ol class="steps" id="gSteps"></ol>
+      <div class="g-date" id="gDate"></div>
+      <p class="g-avis" id="gAvis"></p>
+      <p class="g-motto">A poc a poc, com el cargol, però que no se us passi la data!</p>
+    </div>
+    <div class="guide-tools">
+      <h3>Missatge per al grup de WhatsApp</h3>
+      <p class="hint">Fes una captura de pantalla de la targeta d'aquí dalt i envia-la al grup amb aquest text. Després, envia a cadascú el seu enllaç per privat (des de la pestanya Participants del full).</p>
+      <label for="groupMsg">Text del missatge
+        <textarea id="groupMsg" readonly></textarea>
+      </label>
+      <div class="actions"><button class="btn" type="button" id="copyMsg">Copia el text</button></div>
+    </div>
+  </section>
+
+  <section id="app" hidden>
+    <div style="display:grid;gap:20px">
+      <div class="phase" id="phase"></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tabMine" aria-selected="true"></button>
+        <button type="button" role="tab" id="tabOthers" aria-selected="false">A qui regalo</button>
+        <button type="button" role="tab" id="tabAdmin" aria-selected="false" hidden>Ajustos</button>
+      </div>
+
+      <div id="paneMine" style="display:grid;gap:16px">
+        <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span id="mineHint"></span></p>
+        <div class="tags" id="mineView"></div>
+        <form class="add" id="themeForm">
+          <h3 id="formTitle"></h3>
+          <div id="fields" style="display:grid;gap:10px"></div>
+          <div class="actions">
+            <button class="btn" type="submit" id="saveBtn">Desa</button>
+            <button class="btn secondary" type="button" id="cancelEdit" hidden>Cancel·la</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="paneOthers" style="display:grid;gap:16px" hidden>
+        <div class="pick" id="pickBox"></div>
+        <div class="tags" id="othersList"></div>
+      </div>
+
+      <div id="paneAdmin" style="display:grid;gap:16px" hidden>
+        <p class="hint"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>Només ho veus tu i qui tingui accés als ajustos. Aquí no surt mai qui ha triat qui.</span></p>
+
+        <form class="add" id="cfgForm">
+          <h3>Data límit</h3>
+          <p class="hint">Fins aquest moment s'escriuen els temes. Després es tanquen i s'obre la tria per a tothom.</p>
+          <div class="row2">
+            <label for="cDate">Dia<input type="date" id="cDate"></label>
+            <label for="cTime">Hora<input type="time" id="cTime"></label>
+          </div>
+          <hr class="sep">
+          <h3>Textos</h3>
+          <label for="cTitol">Títol<input type="text" id="cTitol" maxlength="60"></label>
+          <label for="cFamilia">Família<input type="text" id="cFamilia" maxlength="60"></label>
+          <label for="cAvis">Avís per a tothom (dia de l'intercanvi, lloc…)<textarea id="cAvis" maxlength="300" rows="2"></textarea></label>
+          <hr class="sep">
+          <h3>Pressupost</h3>
+          <label class="check" for="cBudgetOn"><input type="checkbox" id="cBudgetOn"> Hi ha un pressupost màxim</label>
+          <label for="cBudget" id="cBudgetBox">Quantitat màxima (€)<input type="text" id="cBudget" inputmode="decimal" maxlength="8" placeholder="20"></label>
+          <p class="hint" id="cBudgetNone">Sense límit: el pressupost no surt enlloc.</p>
+          <hr class="sep">
+          <h3>Joc</h3>
+          <label for="cNum">Temes per persona<select id="cNum"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          <fieldset class="swatches" id="cEstil">
+            <legend>Colors</legend>
+            <label class="swatch"><input type="radio" name="estil" value="avet"><span class="dots"><i style="background:#1f5a4a"></i><i style="background:#b3263e"></i></span>avet</label>
+            <label class="swatch"><input type="radio" name="estil" value="nit"><span class="dots"><i style="background:#24408e"></i><i style="background:#a5660a"></i></span>nit</label>
+            <label class="swatch"><input type="radio" name="estil" value="gerd"><span class="dots"><i style="background:#8a2456"></i><i style="background:#c2410c"></i></span>gerd</label>
+            <label class="swatch"><input type="radio" name="estil" value="neu"><span class="dots"><i style="background:#2c6488"></i><i style="background:#c0392b"></i></span>neu</label>
+          </fieldset>
+          <label for="cEx">Exemples dels requadres (separats per comes)<input type="text" id="cEx" maxlength="200"></label>
+          <div class="actions"><button class="btn" type="submit" id="cfgSave">Desa els ajustos</button></div>
+        </form>
+
+        <section class="add">
+          <h3>Família</h3>
+          <p class="hint">Envia a cadascú el seu enllaç. Qui tingui marcat «Ajustos» podrà entrar en aquesta pestanya.</p>
+          <p class="hint" id="noUrl" hidden>Falta l'enllaç de l'aplicació (el que acaba en /exec) a la pestanya Configuració del full.</p>
+          <div class="people" id="peopleList"></div>
+          <form id="addPerson" style="display:grid;gap:10px">
+            <div class="row2">
+              <label for="pName">Persona nova<input type="text" id="pName" maxlength="40" placeholder="Nom"></label>
+              <label for="pPhone">Mòbil (opcional)<input type="tel" id="pPhone" maxlength="20" placeholder="600 11 22 33"></label>
+            </div>
+            <div class="actions"><button class="btn secondary" type="submit">Afegeix</button></div>
+          </form>
+        </section>
+
+        <section class="add" id="guideBox">
+          <h3>Instruccions per al grup</h3>
+          <p class="hint">La targeta del cargol i el text per enviar al grup de WhatsApp.</p>
+          <div class="actions"><a class="btn secondary" id="guideLink" target="_blank" rel="noopener" style="text-decoration:none">Obre les instruccions</a></div>
+        </section>
+
+        <form class="add zone" id="newEdition">
+          <h3>Edició nova (l'any que ve)</h3>
+          <p class="hint">Guarda els temes d'aquest any en una pestanya «Arxiu» del full, esborra totes les tries i torna a començar amb una data límit nova. La família i els enllaços es mantenen.</p>
+          <div class="row2">
+            <label for="nDate">Nova data límit<input type="date" id="nDate"></label>
+            <label for="nTime">Hora<input type="time" id="nTime" value="22:00"></label>
+          </div>
+          <div class="actions"><button class="btn secondary" type="submit" id="nBtn">Comença l'edició nova</button></div>
+        </form>
+      </div>
+    </div>
+    <button class="help-link" id="helpOpen" type="button"><svg viewBox="0 0 220 150" aria-hidden="true"><use href="#snail"/></svg>Com funciona?</button>
+  </section>
+</main>
+
+<div class="sheet-bg" id="help" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <svg class="snail" viewBox="0 0 220 150" aria-hidden="true"><use href="#snail"/></svg>
+    <h2 id="helpTitle">Com funciona</h2>
+    <ol class="steps" id="helpSteps"></ol>
+    <div class="g-date" id="helpDate"></div>
+    <p class="g-avis" id="helpAvis"></p>
+    <div class="home" id="helpHome">
+      <h3>Tingues-lo a mà</h3>
+      <p>Posa'l a la pantalla d'inici i l'obriràs com una app, amb el cargol, sense haver de buscar l'enllaç.</p>
+      <p id="homeIos"><b>iPhone:</b> obre'l amb el Safari, prem el botó de compartir
+        <svg class="ico" viewBox="0 0 16 16" aria-label="compartir"><path d="M8 1.5v8.5M5 4.5l3-3 3 3M4 7H3v7.5h10V7h-1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        i tria <b>«Afegeix a la pantalla d'inici»</b>. Si s'ha obert dins del WhatsApp, primer prem <b>«Obre al Safari»</b>.</p>
+      <p id="homeAndroid"><b>Android:</b> obre'l amb el Chrome, prem el menú <b>⋮</b> de dalt a la dreta i tria <b>«Afegeix a la pantalla d'inici»</b> (o <b>«Instal·la l'aplicació»</b>). Si s'ha obert dins del WhatsApp, primer prem <b>⋮ &gt; «Obre a Chrome»</b>.</p>
+    </div>
+    <button class="btn" id="helpOk" type="button">Entesos, som-hi!</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const KEY = 'amic-invisible-codi';
+  const KEY_S = 'amic-invisible-s';
+  // Des de Google (HtmlService) hi ha google.script.run; des de GitHub Pages es parla amb
+  // l'aplicació de Google per fetch, sense cap compte (així no hi ha errors de comptes).
+  const viaGoogle = !!(window.google && google.script && google.script.run);
+  const query = new URLSearchParams(location.search);
+  // Identificador de l'aplicació de Google. En publicar a GitHub Pages s'hi posa el de
+  // amic-invisible/app-id.txt, i així els enllaços personals poden ser curts.
+  const APP_ID = '__APP_ID__';
+  let API = '';
+  let code = '';
+  let state = null;
+  let editing = false;
+  let busy = false;
+  let deadlineTimer;
+
+  // ---------- Personalització (pestanya Configuració del full) ----------
+  const CFG = Object.assign({ titol: 'Amic invisible', familia: '', avis: '', numTemes: 2, estil: 'avet', exemples: [], guideUrl: '' }, window.CONFIG || {});
+  let N, T, familyLine, builtN = 0;
+  function derive() {
+    N = CFG.numTemes;
+    T = {
+      temes: N === 1 ? 'el tema' : 'els temes',
+      teus: N === 1 ? 'El teu tema' : 'Els teus temes',
+      meus: N === 1 ? 'El meu tema' : 'Els meus temes',
+      titol: N === 1 ? 'Quin tema proposes?' : 'Quins ' + N + ' temes proposes?',
+      canvia: N === 1 ? 'Canvia el teu tema' : 'Canvia els teus temes',
+      falta: N === 1 ? 'Escriu el tema.' : 'Escriu els ' + N + ' temes.',
+    };
+    familyLine = CFG.familia ? 'Família ' + CFG.familia : '';
+  }
+  derive();
+
+  // La configuració pot canviar mentre la pàgina és oberta (des dels ajustos).
+  function applyConfig(c) {
+    if (!c || JSON.stringify(c) === JSON.stringify(CFG)) return;
+    Object.assign(CFG, c);
+    derive();
+    personalize();
+  }
+
+  function personalize() {
+    document.documentElement.setAttribute('data-estil', CFG.estil);
+    $('title').textContent = CFG.titol;
+    document.title = CFG.titol + (CFG.familia ? ' · ' + CFG.familia : '');
+    $('hello').textContent = familyLine;
+    $('hello').hidden = !familyLine;
+    const initials = CFG.familia.split(/[\s-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase();
+    $('mono').textContent = initials;
+    $('mono').hidden = !initials;
+    $('giftIcon').hidden = !!initials;
+    $('noticeText').replaceChildren();
+    if (CFG.pressupost) $('noticeText').appendChild(el('strong', null, budgetText()));
+    if (CFG.pressupost && CFG.avis) $('noticeText').append(' · ');
+    if (CFG.avis) $('noticeText').append(CFG.avis);
+    $('notice').hidden = !CFG.avis && !CFG.pressupost;
+    $('tabMine').textContent = T.meus;
+    $('mineHint').textContent = (N === 1 ? 'Escriu un tema' : 'Escriu ' + N + ' temes') +
+      ' per al regal que t\'agradaria rebre. Qui te\'l faci ' + (N === 1 ? 'el llegirà' : 'els llegirà') +
+      ' i hi pensarà el que cregui. No sabràs qui és fins al dia de l\'intercanvi.';
+    if (!editing) $('formTitle').textContent = T.titol;
+    $('saveBtn').textContent = N === 1 ? 'Desa el tema' : 'Desa els temes';
+    if (builtN === N) return;
+    builtN = N;
+    const f = $('fields');
+    f.replaceChildren();
+    for (let i = 1; i <= N; i++) {
+      const l = el('label', null, N === 1 ? 'Tema' : 'Tema ' + i);
+      l.htmlFor = 't' + i;
+      const inp = el('input');
+      inp.id = 't' + i; inp.type = 'text'; inp.maxLength = 120; inp.required = true;
+      if (CFG.exemples[i - 1]) inp.placeholder = 'P. ex. ' + CFG.exemples[i - 1];
+      l.appendChild(inp);
+      f.appendChild(l);
+    }
+  }
+  const euros = (n) => (n % 1 ? n.toFixed(2).replace('.', ',') : String(n)) + ' €';
+  const budgetText = () => (CFG.pressupost ? 'Pressupost màxim: ' + euros(CFG.pressupost) : '');
+  // Pressupost i avís junts, per a la targeta i el full d'instruccions.
+  const infoText = () => [budgetText() && budgetText() + '.', CFG.avis].filter(Boolean).join(' ');
+  const fieldIds = () => Array.from({ length: N }, (_, i) => 't' + (i + 1));
+
+  const store = {
+    get() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } },
+    set(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} },
+  };
+
+  function api(fn, ...args) {
+    if (viaGoogle) {
+      return new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+      });
+    }
+    return fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ fn, args }),
+      credentials: 'omit',
+      redirect: 'follow',
+    })
+      .then((r) => { if (!r.ok) throw new Error('No hi ha connexió amb el tauler. Torna-ho a provar d\'aquí a una estona.'); return r.json(); })
+      .then((j) => (j.ok ? j.result : Promise.reject(new Error(j.error))));
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 4200);
+  }
+
+  function show(view) {
+    $('guide').hidden = view !== 'guide';
+    $('loading').hidden = view !== 'loading';
+    $('login').hidden = view !== 'login';
+    $('app').hidden = view !== 'app';
+    $('logout').hidden = view !== 'app';
+  }
+
+  async function call(fn, ...args) {
+    if (busy) return;
+    busy = true;
+    document.body.style.cursor = 'progress';
+    try {
+      const s = await api(fn, code, ...args);
+      apply(s);
+      return s;
+    } catch (err) {
+      const msg = String((err && err.message) || err);
+      if (msg.indexOf('codi-incorrecte') >= 0) { store.set(''); code = ''; show('login'); toast('Aquest codi no és vàlid.'); }
+      else toast(msg.replace(/^Error:\s*/, '') || 'No s\'ha pogut desar. Torna-ho a provar.');
+    } finally {
+      busy = false;
+      document.body.style.cursor = '';
+    }
+  }
+
+  function apply(s) {
+    const first = !state;
+    state = s;
+    if (s.error) toast(s.error);
+    applyConfig(s.config);
+    $('hello').textContent = (familyLine ? familyLine + ' · ' : '') + 'Hola, ' + s.name;
+    $('hello').hidden = false;
+    show('app');
+    $('tabAdmin').hidden = !s.admin;
+    $('tabAdmin').parentElement.classList.toggle('three', !!s.admin);
+    if (first) tab(s.phase === 'tria' ? 'others' : 'mine');
+    if (first && !seenHelp()) openHelp(true);
+    if (!s.admin && !$('paneAdmin').hidden) tab('mine');
+    if (s.phase === 'temes' && s.msLeft < 86400000) {
+      clearTimeout(deadlineTimer);
+      deadlineTimer = setTimeout(() => { editing = false; refresh(); }, s.msLeft + 2000);
+    }
+    render();
+    if (s.admin) renderAdmin();
+  }
+
+  // ---------- Full d'instruccions ----------
+
+  const helpKey = () => 'amic-invisible-vist-' + code;
+  function seenHelp() { try { return localStorage.getItem(helpKey()) === '1'; } catch (e) { return false; } }
+
+  // El primer cop s'ha d'acceptar amb el botó; després es pot consultar i tancar com es vulgui.
+  let mustAccept = false;
+  function openHelp(first) {
+    mustAccept = first === true;
+    const temes = N === 1 ? 'un tema' : N + ' temes';
+    const date = state && state.dataLimitText ? state.dataLimitText : CFG.dataLimitText;
+    const steps = [
+      ['Escriu ' + temes + ' ', 'per al regal que t\'agradaria rebre. Els pots canviar fins a la data límit, i ningú els veurà fins llavors.'],
+      [date ? 'Quan s\'acabi el termini, tria a qui regales. ' : 'Després, tria a qui regales. ', 'Llegeix els temes de tothom i tria una persona. Qui arribi primer, tria primer, i ningú sabrà que has estat tu.'],
+      ['Prepara el regal ', 'a partir dels seus temes, tal com tu ho entenguis. I el dia de l\'intercanvi, sorpresa!'],
+    ];
+    const ol = $('helpSteps');
+    ol.replaceChildren();
+    steps.forEach(([b, t]) => { const li = el('li'); const d = el('div'); d.append(el('b', null, b), t); li.appendChild(d); ol.appendChild(li); });
+    $('helpTitle').textContent = CFG.familia ? 'Amic invisible ' + CFG.familia : 'Com funciona';
+    $('helpDate').replaceChildren();
+    if (date) $('helpDate').append('Data límit per posar els temes', el('strong', null, date));
+    $('helpDate').hidden = !date;
+    $('helpAvis').textContent = infoText();
+    $('helpAvis').hidden = !infoText();
+    // A la pantalla d'inici: iPhone, Android o tots dos si no se sap; res si ja s'ha obert des de la icona.
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua);
+    let standalone = navigator.standalone === true;
+    try { standalone = standalone || matchMedia('(display-mode: standalone)').matches; } catch (e) {}
+    $('helpHome').hidden = standalone;
+    $('homeIos').hidden = android;
+    $('homeAndroid').hidden = ios;
+    $('help').hidden = false;
+    $('helpOk').focus();
+  }
+  function closeHelp() {
+    mustAccept = false;
+    $('help').hidden = true;
+    try { localStorage.setItem(helpKey(), '1'); } catch (e) {}
+  }
+  $('helpOk').onclick = closeHelp;
+  $('help').addEventListener('click', (e) => { if (e.target === $('help') && !mustAccept) closeHelp(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('help').hidden && !mustAccept) closeHelp(); });
+  $('helpOpen').onclick = () => openHelp(false);
+
+  // ---------- Ajustos ----------
+
+  let cfgDirty = false;
+  let confirmRemove = null;
+  let confirmEdition = false;
+  $('cfgForm').addEventListener('input', () => { cfgDirty = true; });
+
+  function renderAdmin() {
+    const a = state.admin;
+    if (!cfgDirty) {
+      $('cDate').value = a.date; $('cTime').value = a.time;
+      $('cTitol').value = a.titol; $('cFamilia').value = a.familia; $('cAvis').value = a.avis;
+      $('cBudgetOn').checked = a.pressupost > 0;
+      $('cBudget').value = a.pressupost ? String(a.pressupost).replace('.', ',') : '';
+      budgetUi();
+      $('cNum').value = String(a.numTemes); $('cEx').value = a.exemples;
+      document.querySelectorAll('#cEstil input').forEach((r) => { r.checked = r.value === a.estil; });
+    }
+    $('noUrl').hidden = a.hasUrl;
+    $('guideBox').hidden = !CFG.guideUrl;
+    if (CFG.guideUrl) $('guideLink').href = CFG.guideUrl;
+    $('nBtn').textContent = confirmEdition ? 'Segur? Es buidarà el tauler' : 'Comença l\'edició nova';
+
+    const list = $('peopleList');
+    list.replaceChildren();
+    a.people.forEach((p) => {
+      const row = el('div', 'person-row');
+      const nm = el('div', 'pname', p.name + ' ');
+      nm.appendChild(el('small', null, p.name === state.name ? '(tu) · ' : ''));
+      nm.lastChild.textContent += p.written ? 'ja té temes' : 'sense temes';
+      row.appendChild(nm);
+
+      const chk = el('label', 'check');
+      const box = el('input'); box.type = 'checkbox'; box.checked = p.admin; box.disabled = p.name === state.name;
+      box.onchange = () => call('canviaAcces', p.name, box.checked).then((s) => s && !s.error && toast(box.checked ? p.name + ' ja pot entrar als ajustos.' : p.name + ' ja no pot entrar als ajustos.'));
+      chk.append(box, 'Ajustos');
+      row.appendChild(chk);
+
+      const acts = el('div', 'pactions');
+      if (p.wa) {
+        const w = el('a', 'small wa', 'WhatsApp'); w.href = p.wa; w.target = '_blank'; w.rel = 'noopener';
+        acts.appendChild(w);
+        const c = el('button', 'small', 'Copia l\'enllaç'); c.type = 'button';
+        c.onclick = async () => {
+          try { await navigator.clipboard.writeText(p.link); toast('Enllaç de ' + p.name + ' copiat.'); }
+          catch (e) { toast(p.link); }
+        };
+        acts.appendChild(c);
+      }
+      const tel = el('input'); tel.type = 'tel'; tel.value = p.phone; tel.placeholder = 'Mòbil'; tel.maxLength = 20;
+      tel.setAttribute('aria-label', 'Mòbil de ' + p.name);
+      tel.onchange = () => call('canviaTelefon', p.name, tel.value).then((s) => s && !s.error && toast('Mòbil de ' + p.name + ' desat.'));
+      acts.appendChild(tel);
+      if (p.name !== state.name) {
+        const rm = el('button', 'small danger', confirmRemove === p.name ? 'Segur? Treu-la' : 'Treu'); rm.type = 'button';
+        rm.onclick = () => {
+          if (confirmRemove !== p.name) { confirmRemove = p.name; renderAdmin(); return; }
+          confirmRemove = null;
+          call('treuPersona', p.name).then((s) => s && !s.error && toast(p.name + ' ja no hi és.'));
+        };
+        acts.appendChild(rm);
+      }
+      row.appendChild(acts);
+      list.appendChild(row);
+    });
+  }
+
+  function budgetUi() {
+    $('cBudgetBox').hidden = !$('cBudgetOn').checked;
+    $('cBudgetNone').hidden = $('cBudgetOn').checked;
+  }
+  $('cBudgetOn').addEventListener('change', () => { budgetUi(); if ($('cBudgetOn').checked) $('cBudget').focus(); });
+
+  $('cfgForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const estil = (document.querySelector('#cEstil input:checked') || {}).value || 'avet';
+    const v = { date: $('cDate').value, time: $('cTime').value, titol: $('cTitol').value, familia: $('cFamilia').value, avis: $('cAvis').value, ambPressupost: $('cBudgetOn').checked, pressupost: $('cBudget').value, numTemes: $('cNum').value, estil, exemples: $('cEx').value };
+    // Mentre es desa, el formulari no es toca: si hi ha un error, el que has escrit es manté.
+    cfgDirty = true;
+    $('cfgSave').disabled = true;
+    const s = await call('desaAjustos', v);
+    $('cfgSave').disabled = false;
+    if (s && !s.error) { cfgDirty = false; renderAdmin(); toast('Ajustos desats. Ja els veu tothom.'); }
+  });
+
+  $('addPerson').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('pName').value.trim();
+    if (!name) { toast('Escriu el nom.'); return; }
+    const s = await call('afegeixPersona', name, $('pPhone').value);
+    if (s && !s.error) { $('addPerson').reset(); toast(name + ' ja hi és. Envia-li el seu enllaç.'); }
+  });
+
+  $('newEdition').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!$('nDate').value) { toast('Posa la data límit de la nova edició.'); return; }
+    if (!confirmEdition) { confirmEdition = true; renderAdmin(); return; }
+    confirmEdition = false;
+    const s = await call('novaEdicio', $('nDate').value, $('nTime').value);
+    if (s && !s.error) { cfgDirty = false; $('newEdition').reset(); renderAdmin(); toast('Edició nova començada. Ara envia les instruccions al grup.'); tab('mine'); }
+    else renderAdmin();
+  });
+
+  // ---------- Pintar ----------
+
+  function themeList(themes) {
+    const ul = el('ul', 'themes');
+    themes.filter(Boolean).forEach((x) => ul.appendChild(el('li', null, x)));
+    return ul;
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function countdown(ms) {
+    const m = Math.max(0, Math.floor(ms / 60000));
+    const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
+    const u = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+    if (d) return 'Falten ' + u(d, 'dia', 'dies') + (h ? ' i ' + u(h, 'hora', 'hores') : '');
+    if (h) return 'Falten ' + u(h, 'hora', 'hores') + (mi ? ' i ' + u(mi, 'minut', 'minuts') : '');
+    return 'Falten ' + u(Math.max(mi, 1), 'minut', 'minuts');
+  }
+
+  function render() {
+    const open = state.phase === 'tria';
+
+    // Fase: escriure temes (fins a la data límit) o triar (després)
+    const ph = $('phase');
+    ph.replaceChildren();
+    ph.className = 'phase ' + state.phase;
+    if (!open) {
+      ph.appendChild(el('div', 'phase-title', 'Ara és temps d\'escriure ' + T.temes));
+      ph.appendChild(el('div', 'phase-text', 'Fins al ' + state.dataLimitText + '. Llavors es tancaran i podreu triar a qui regaleu, tots alhora i amb les mateixes opcions.'));
+      ph.appendChild(el('div', 'phase-count', countdown(state.msLeft)));
+    } else {
+      ph.appendChild(el('div', 'phase-title', 'Ja es pot triar a qui regales'));
+      ph.appendChild(el('div', 'phase-text', (state.dataLimitText ? 'Els temes es van tancar el ' + state.dataLimitText + '. ' : '') + 'Qui arribi primer, tria primer.'));
+    }
+
+    // El meu tema
+    const mv = $('mineView');
+    mv.replaceChildren();
+    const form = $('themeForm');
+    if (state.mine && !editing) {
+      const t = el('article', 'tag');
+      t.appendChild(el('div', 'who', T.teus));
+      t.appendChild(themeList(state.mine));
+      if (!open) {
+        const bar = el('div', 'bar');
+        const ed = el('button', 'small', N === 1 ? 'Canvia-ho' : 'Canvia\'ls'); ed.type = 'button';
+        ed.onclick = startEdit;
+        bar.appendChild(ed);
+        t.appendChild(bar);
+      } else {
+        t.appendChild(el('div', 'note', 'Ja no es poden canviar.'));
+      }
+      mv.appendChild(t);
+    } else if (open) {
+      const t = el('article', 'tag is-empty');
+      t.appendChild(el('div', 'who', T.teus));
+      t.appendChild(el('div', 'text', 'No vas posar temes a temps. Qui et regali et farà una sorpresa total.'));
+      mv.appendChild(t);
+    }
+    form.hidden = open || (!!state.mine && !editing);
+    $('mineHint').parentElement.hidden = open;
+
+    // A qui regalo
+    const pb = $('pickBox');
+    pb.replaceChildren();
+    const list = $('othersList');
+    list.replaceChildren();
+
+    if (!open) {
+      pb.className = 'pick';
+      pb.appendChild(el('div', 'pick-name', 'Encara no es pot triar'));
+      pb.appendChild(el('p', 'hint', 'El ' + state.dataLimitText + ' s\'obrirà la tria per a tothom alhora. Mentrestant, aquí veus qui ja ha escrit ' + T.temes + '.'));
+      state.others.forEach((p) => {
+        const t = el('article', 'tag' + (p.written ? '' : ' is-empty'));
+        t.appendChild(el('div', 'who', p.name));
+        const bar = el('div', 'bar');
+        bar.appendChild(el('span', 'chip ' + (p.written ? 'done' : 'wait'), p.written ? (N === 1 ? 'Ja l\'ha escrit' : 'Ja els ha escrit') : 'Encara no'));
+        t.appendChild(bar);
+        list.appendChild(t);
+      });
+      return;
+    }
+
+    if (state.myPick) {
+      pb.className = 'pick chosen';
+      pb.appendChild(el('div', 'who', 'Regales a'));
+      pb.appendChild(el('div', 'pick-name', state.myPick.name));
+      if (state.myPick.themes) pb.appendChild(themeList(state.myPick.themes));
+      else pb.appendChild(el('div', 'note', 'No va posar temes: sorpresa total!'));
+    } else {
+      pb.className = 'pick';
+      pb.appendChild(el('div', 'pick-name', 'Tria a qui regales'));
+      pb.appendChild(el('p', 'hint', 'Llegeix els temes i tria una persona: serà a qui regales. Els altres veuran que ja està triada, però ningú sabrà que has estat tu.'));
+    }
+
+    state.others.forEach((p) => {
+      const t = el('article', 'tag' + (p.status === 'mine' ? ' is-mine' : p.status === 'taken' ? ' is-taken' : ''));
+      t.appendChild(el('div', 'who', p.name));
+      if (p.themes) t.appendChild(themeList(p.themes));
+      else t.appendChild(el('div', 'note', 'No va posar temes: sorpresa total.'));
+      const bar = el('div', 'bar');
+      bar.appendChild(el('span', 'chip ' + p.status, p.status === 'free' ? 'Lliure' : p.status === 'mine' ? 'Li regales tu' : 'Ja està triada'));
+      if (p.status === 'free') {
+        const b = el('button', 'small mark', state.myPick ? 'Canvia a aquesta' : 'La trio'); b.type = 'button';
+        b.onclick = () => call('tria', p.name).then((s) => s && !s.error && toast('Regales a ' + p.name + '. Ningú sabrà que has estat tu.'));
+        bar.appendChild(b);
+      } else if (p.status === 'mine') {
+        const b = el('button', 'small', 'Desfés'); b.type = 'button';
+        b.onclick = () => call('desfes').then((s) => s && toast('Desfet. ' + p.name + ' torna a estar lliure.'));
+        bar.appendChild(b);
+      }
+      t.appendChild(bar);
+      list.appendChild(t);
+    });
+  }
+
+  // ---------- Formulari ----------
+
+  function startEdit() {
+    editing = true;
+    fieldIds().forEach((k, i) => { $(k).value = state.mine[i] || ''; });
+    $('formTitle').textContent = T.canvia;
+    $('cancelEdit').hidden = false;
+    render();
+    $('t1').focus();
+  }
+  function stopEdit() {
+    editing = false;
+    $('themeForm').reset();
+    $('formTitle').textContent = T.titol;
+    $('cancelEdit').hidden = true;
+    if (state) render();
+  }
+  $('cancelEdit').onclick = stopEdit;
+
+  $('themeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const theme = fieldIds().map((k) => $(k).value);
+    if (theme.some((x) => !x.trim())) { toast(T.falta); return; }
+    const wasNew = !state.mine;
+    $('saveBtn').disabled = true;
+    const s = await call('desa', theme);
+    $('saveBtn').disabled = false;
+    if (s && !s.error) { toast((N === 1 ? (wasNew ? 'Tema desat' : 'Tema canviat') : (wasNew ? 'Temes desats' : 'Temes canviats')) + (wasNew ? '. Ara tria a qui regales.' : '.')); stopEdit(); }
+  });
+
+  // ---------- Pestanyes ----------
+
+  function tab(which) {
+    [['mine', 'tabMine', 'paneMine'], ['others', 'tabOthers', 'paneOthers'], ['admin', 'tabAdmin', 'paneAdmin']].forEach(([k, t, p]) => {
+      $(t).setAttribute('aria-selected', String(k === which));
+      $(p).hidden = k !== which;
+    });
+  }
+  $('tabAdmin').onclick = () => tab('admin');
+  $('tabMine').onclick = () => tab('mine');
+  $('tabOthers').onclick = () => { tab('others'); refresh(); };
+
+  // ---------- Entrar i sortir ----------
+
+  async function login(c) {
+    code = String(c || '').trim().toUpperCase();
+    if (!code) { show('login'); return; }
+    show(state ? 'app' : 'loading');
+    const s = await call('entra');
+    if (s) store.set(code);
+  }
+
+  $('login').addEventListener('submit', (e) => { e.preventDefault(); login($('code').value); });
+  $('logout').onclick = () => { store.set(''); code = ''; state = null; editing = false; $('themeForm').reset(); $('code').value = ''; $('hello').textContent = familyLine; $('hello').hidden = !familyLine; tab('mine'); show('login'); };
+
+  function refresh() { if (code && state && !busy && !editing && !cfgDirty) call('entra'); }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  setInterval(refresh, 60000);
+
+  personalize();
+
+  // ---------- Instruccions per a WhatsApp (?instruccions) ----------
+
+  function guide() {
+    const temes = N === 1 ? 'un tema' : N + ' temes';
+    const date = CFG.dataLimitText;
+    $('gFamily').textContent = familyLine;
+    $('gFamily').hidden = !familyLine;
+    $('gTitle').textContent = CFG.titol + ' amb temes';
+    const steps = [
+      ['Rebràs un enllaç per privat. ', 'És només teu: no el passis a ningú.'],
+      ['Escriu ' + temes + ' ', 'per al regal que t\'agradaria rebre. Els altres no els veuran fins al final del termini.'],
+      [date ? 'Quan s\'acabi el termini, tria a qui regales ' : 'Després, tria a qui regales ', 'llegint els temes de tothom. Qui arribi primer, tria primer, i ningú sabrà qui ha triat qui.'],
+    ];
+    const ol = $('gSteps');
+    ol.replaceChildren();
+    steps.forEach(([b, t]) => { const li = el('li'); const d = el('div'); d.append(el('b', null, b), t); li.appendChild(d); ol.appendChild(li); });
+    $('gDate').replaceChildren();
+    if (date) $('gDate').append('Data límit per posar els temes', el('strong', null, date));
+    $('gDate').hidden = !date;
+    $('gAvis').textContent = infoText();
+    $('gAvis').hidden = !infoText();
+    $('notice').hidden = true;
+    $('hello').textContent = familyLine;
+
+    const lines = [
+      '🎁 *' + CFG.titol + (CFG.familia ? ' · Família ' + CFG.familia : '') + '* 🐌',
+      '',
+      'Aquest any fem l\'amic invisible amb temes. Funciona així:',
+      '',
+      '1. Cadascú rebrà per privat el seu enllaç personal. És només vostre: no el passeu a ningú.',
+      '2. Obriu-lo i escriviu ' + temes + ' per al regal que us agradaria rebre.' + (date ? ' Teniu temps fins al *' + date + '*.' : ''),
+      '3. ' + (date ? 'Passada aquesta data, torneu a entrar i trieu' : 'Després, trieu') + ' a qui regaleu llegint els temes de tothom. Qui arribi primer, tria primer, però ningú sabrà qui ha triat qui.',
+    ];
+    if (CFG.pressupost) lines.push('', '💶 ' + budgetText() + '.');
+    if (CFG.avis) lines.push('', CFG.avis);
+    lines.push('', 'A poc a poc, com el cargol, però que no se us passi la data! 🐌');
+    $('groupMsg').value = lines.join('\n');
+    $('copyMsg').onclick = async () => {
+      try { await navigator.clipboard.writeText($('groupMsg').value); toast('Text copiat. Enganxa\'l al grup de WhatsApp.'); }
+      catch (e) { $('groupMsg').focus(); $('groupMsg').select(); toast('Selecciona\'l tot i copia\'l.'); }
+    };
+    show('guide');
+  }
+
+  // Codi de l'enllaç personal (?codi=XXXXXX) o el que es va desar l'última vegada.
+  function start(params) {
+    if ('instruccions' in params) return guide();
+    login(params.codi || store.get());
+  }
+
+  if (viaGoogle) {
+    try { google.script.url.getLocation((loc) => start((loc && loc.parameter) || {})); }
+    catch (e) { login(store.get()); }
+  } else {
+    // ?s= és l'identificador de l'aplicació de Google; es recorda per a la propera vegada.
+    let sid = (query.get('s') || (/^__/.test(APP_ID) ? '' : APP_ID)).replace(/[^\w-]/g, '');
+    try { if (sid) localStorage.setItem(KEY_S, sid); else sid = localStorage.getItem(KEY_S) || ''; } catch (e) {}
+    const params = Object.fromEntries(query.entries());
+    if (!sid) {
+      show('loading');
+      $('loading').textContent = 'Obre l\'enllaç que t\'han enviat per WhatsApp: aquesta adreça està incompleta.';
+    } else {
+      API = 'https://script.google.com/macros/s/' + sid + '/exec';
+      api('config')
+        .then((c) => { applyConfig(c); start(params); })
+        .catch(() => { show('loading'); $('loading').textContent = 'No hi ha connexió amb el tauler. Torna-ho a provar d\'aquí a una estona.'; });
+    }
+  }
+})();
+</script>
+</body>
+</html>

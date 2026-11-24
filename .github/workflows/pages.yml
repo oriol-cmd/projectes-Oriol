@@ -1,9 +1,9 @@
-name: Publica l'app a GitHub Pages
+name: Publica les apps a GitHub Pages
 
 on:
   push:
     branches: [main]
-    paths: ['app/**', '.github/workflows/pages.yml']
+    paths: ['app/**', 'amic-invisible/Index.html', 'amic-invisible/app-id.txt', 'amic-invisible/icona-*.png', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -24,8 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Xiu-xiu a l'arrel i l'amic invisible a /amic-invisible-bove-palau/
+      - name: Prepara el lloc
+        run: |
+          cp -r app/. _site/
+          # La pàgina porta l'identificador de l'aplicació de Google (app-id.txt): així els
+          # enllaços personals són curts. /amic-invisible/ es manté pels enllaços antics.
+          ID="$(tr -cd 'A-Za-z0-9_-' < amic-invisible/app-id.txt)"
+          for dir in amic-invisible amic-invisible-bove-palau; do
+            mkdir -p "_site/$dir"
+            sed "s/__APP_ID__/$ID/" amic-invisible/Index.html > "_site/$dir/index.html"
+            cp amic-invisible/icona-*.png "_site/$dir/"
+          done
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: app
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
