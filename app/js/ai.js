@@ -699,7 +699,7 @@ No és un resum: recull TOT el que s'ha dit sobre aquest punt, ben ordenat i red
 ${PRO_COMMON}
 Format (Markdown), exactament:
 ### <número>. <títol del punt>
-**Context:** un paràgraf breu (només si n'hi ha).
+**Context:** un paràgraf breu, NOMÉS si a la reunió algú explica el context o els antecedents del punt, i amb el que hi diu (mai a partir dels documents, l'ordre del dia o el títol del punt). Si a la reunió no s'explica, no posis aquesta línia.
 
 **Exposició i debat:**
 paràgrafs i llistes amb tot el que s'ha dit, en ordre lògic.
@@ -762,7 +762,7 @@ async function proMinutes(m, info, photos, photoParts, onText) {
   progress("Analitzant l'ordre del dia de la reunió…");
   let plan = draft ? draft.plan : null;
   if (!plan) try {
-    const agendaImgs = photoParts.filter((_, k) => photos[k].agenda);
+    const agendaImgs = photoParts.filter((_, k) => photos[k].agenda || m.docsRole === 'guia');
     const imgNote = agendaImgs.length ? "\nS'adjunta una foto o captura de l'ORDRE DEL DIA previst (pot ser escrit a mà): llegeix-la i fes-la servir com a ordre del dia de l'usuari." : '';
     plan = JSON.parse(strip(await gemini([{ text: `${head}${imgNote}\n\n${trans}` }, ...agendaImgs], { system: PRO_PLAN_PROMPT, task: 'pro', thinking: 4096, maxTokens: 8192, json: true })));
   } catch (e) {
@@ -796,7 +796,7 @@ async function proMinutes(m, info, photos, photoParts, onText) {
     const it = items[i];
     const from = toMs(it.inici); const to = toMs(it.final);
     // Fotos fetes durant aquest punt (o afegides després).
-    const extra = photoParts.filter((_, k) => { if (photos[k].agenda) return false; const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
+    const extra = photoParts.filter((_, k) => { if (photos[k].agenda || m.docsRole === 'guia') return false; const at = photos[k].atMs; return at == null || from == null || (at >= from - 120000 && (to == null || at <= to + 120000)); });
     // Només el tros de la reunió on es parla d'aquest punt (amb marge): molt més ràpid que llegir les 2 hores.
     const part = sliceTranscript(transcript, from, to);
     const trPart = part === transcript ? trans : `<transcripcio>\n${part}\n</transcripcio>\n(Fragment de la transcripció on es tracta aquest punt, amb uns minuts de marge abans i després.)`;
@@ -913,6 +913,9 @@ async function summarize(m, onText = null) {
   const short = m.engine === 'import' && settings.shortImports !== false && !photoParts.length && m.detail !== 'full';
   if (photoParts.length && m.engine === 'docs') {
     info.push(`S'adjunten els ${photoParts.length} documents originals (fotos d'apunts o PDF). La transcripció és el seu text: fes servir els originals per comprovar xifres, noms, esquemes i paraules dubtoses.`);
+  } else if (photoParts.length && m.docsRole === 'guia') {
+    info.push(`S'adjunten ${photoParts.length} document${photoParts.length > 1 ? 's' : ''} (fotos o PDF) que són el GUIÓ o l'ORDRE DEL DIA de la reunió: el PUNT DE PARTIDA. Fes servir la seva estructura i l'ordre dels seus punts per organitzar l'acta, i els seus noms, xifres i termes per escriure bé el que es diu.
+PERÒ el contingut de cada punt només pot ser el que ES DIU a la reunió (la transcripció): no copiïs ni resumeixis el text dels documents, i no omplis cap punt amb el que hi posa. Si un punt del document no es tracta a la reunió, escriu «No s'ha tractat a la reunió». Si a la reunió es parla d'algun tema que no és al document, afegeix-lo també.`);
   } else if (photoParts.length) {
     info.push(`S'adjunten ${photoParts.length} document${photoParts.length > 1 ? 's' : ''} (fotos, sovint escrites a mà, o PDF) mostrats o comentats a la reunió, en aquest ordre: ${photos.map((ph, i) => `${ph.pdf ? `document ${i + 1} (PDF «${ph.name || 'document'}»)` : `foto ${i + 1}`}${ph.agenda ? " (ORDRE DEL DIA o convocatòria de la reunió: fes-la servir com a ordre del dia previst)" : ph.atMs != null ? ` (feta al minut ${fmtClock(ph.atMs)} de la reunió)` : " (afegida després de la reunió)"}`).join(', ')}.
 MOLT IMPORTANT: l'acta es fa a partir del que ES DIU a la reunió (la transcripció). Les fotos són NOMÉS UNA AJUDA per entendre i escriure bé el que es diu: noms, xifres, termes, punts de l'ordre del dia, esquemes. No resumeixis el contingut de les fotos, no en copiïs el text i no hi afegeixis res que a la reunió no s'hagi dit. Si a la reunió es parla d'un document, explica el que se'n va dir.`);

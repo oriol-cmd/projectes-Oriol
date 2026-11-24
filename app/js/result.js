@@ -488,6 +488,8 @@ async function showResult(id) {
   $('.action-bar').classList.toggle('solo', !m.summary);
   $('#btn-more').textContent = m.summary ? '⋯' : '⋯  Més opcions';
   $('#group-current').textContent = m.group || 'cap';
+  $('#btn-docs-role').hidden = !(m.photos || []).length || m.engine === 'docs';
+  $('#docs-role-current').textContent = docsRoleLabel(m);
   $('#tags-current').textContent = (m.tags || []).length ? m.tags.map((t) => `#${t}`).join(' ') : 'cap';
   const digest = m.engine === 'digest';
   ['#btn-pro', '#btn-toggle-detail', '#btn-redo', '#btn-fix-open', '#btn-photo-after', '#btn-analysis'].forEach((sel) => { $(sel).hidden = digest; });
@@ -946,4 +948,19 @@ $('#btn-verify-now').onclick = async () => {
   b.hidden = false; b.className = 'banner verify-banner'; b.textContent = "🔍 Comprovant l'acta amb la gravació…";
   try { await verifyActa(m); } catch (e) { b.className = 'banner warn verify-banner'; b.textContent = `No s'ha pogut comprovar: ${friendlyError(e.message)}`; return; }
   if (viewingId === m.id) { renderResultSummary(m); renderVerifyBanner(m); }
+};
+
+// Els documents (fotos, PDF) d'una reunió: només ajuda (context) o punt de partida (guió).
+function docsRoleLabel(m) { return m.docsRole === 'guia' ? 'punt de partida (guió)' : 'només ajuda (context)'; }
+$('#btn-docs-role').onclick = async () => {
+  const m = await getMeeting(viewingId);
+  if (!m || !(m.photos || []).length) return;
+  m.docsRole = m.docsRole === 'guia' ? 'context' : 'guia';
+  await saveMeeting(m);
+  $('#docs-role-current').textContent = docsRoleLabel(m);
+  if (m.summary && confirm(m.docsRole === 'guia'
+    ? "Ara els documents seran el punt de partida: l'acta en seguirà l'estructura (els punts), però amb el que es va dir a la reunió.\n\nVols refer l'acta ara?"
+    : "Ara els documents seran només una ajuda: l'acta es farà amb el que es va dir, i els documents només serviran per escriure bé noms, xifres i termes.\n\nVols refer l'acta ara?")) {
+    closeSheets(); showView('proc'); updateProcView(m); runPipeline(m.id, { redoSummary: true });
+  }
 };

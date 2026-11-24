@@ -474,6 +474,7 @@ $('#agenda-photo-input').onchange = (e) => { pendingAgenda = [...pendingAgenda, 
 $('#agenda-photo-clear').onclick = () => { pendingAgenda = []; renderAgendaPhotos(); };
 // Desa les fotos de l'ordre del dia a la reunió que comença.
 async function attachAgendaPhotos(m) {
+  if (pendingDocs.length || pendingAgenda.length) m.docsRole = $('#docs-role').value === 'guia' ? 'guia' : 'context';
   const docs = pendingDocs;
   if (docs.length) { pendingDocs = []; renderPendingDocs(); await addPhotos(m, docs, null); }
   if (!pendingAgenda.length) return;
@@ -488,6 +489,7 @@ let pendingDocs = [];
 function renderPendingDocs() {
   $('#docs-info').textContent = pendingDocs.length ? `✓ ${pendingDocs.length === 1 ? `«${pendingDocs[0].name}»` : `${pendingDocs.length} documents`}` : '';
   $('#docs-clear').hidden = !pendingDocs.length;
+  $('#docs-role-row').hidden = !pendingDocs.length;
 }
 $('#btn-docs').onclick = () => $('#docs-input').click();
 $('#docs-input').onchange = (e) => { pendingDocs = [...pendingDocs, ...e.target.files].slice(0, 8); e.target.value = ''; renderPendingDocs(); };

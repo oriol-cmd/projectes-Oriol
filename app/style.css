@@ -663,3 +663,4 @@ mark.unverified { background: #ffe58a; color: inherit; border-bottom: 2px dashed
 .vi-text { font-weight: 600; }
 .vi-why { color: var(--warn-text); font-size: 14px; }
 .vi-fix { font-size: 14px; color: var(--muted); }
+.docs-role { margin-top: 10px; }

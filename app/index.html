@@ -180,6 +180,12 @@
             <button id="docs-clear" class="link" type="button" hidden>Treu-los</button>
           </div>
           <input id="docs-input" type="file" accept="image/*,application/pdf,.pdf" multiple hidden>
+          <label id="docs-role-row" class="field docs-role" hidden><span>Aquests documents són…</span>
+            <select id="docs-role">
+              <option value="context">Només una ajuda (per escriure bé noms, xifres i termes)</option>
+              <option value="guia">El punt de partida (guió o ordre del dia de la reunió)</option>
+            </select>
+            <small class="fineprint left">En tots dos casos, a l'acta només hi surt el que es diu a la reunió.</small></label>
         </div>
 
         <button id="btn-import" class="qa card" type="button">
@@ -832,6 +838,7 @@
         <button id="btn-analysis" class="sheet-row" type="button">📊 Anàlisi de la reunió (qui parla, temes oberts…)</button>
         <button id="btn-set-group" class="sheet-row" type="button" data-closes>🏷 Grup o projecte: <span id="group-current">cap</span></button>
         <button id="btn-set-tags" class="sheet-row" type="button" data-closes># Etiquetes: <span id="tags-current">cap</span></button>
+        <button id="btn-docs-role" class="sheet-row" type="button" hidden>📎 Documents: <span id="docs-role-current">només ajuda</span> <small>(toca per canviar)</small></button>
         <button id="btn-photo-after" class="sheet-row" type="button" data-closes>📎 Afegeix un document (foto o PDF)</button>
         <button id="btn-pro" class="sheet-row" type="button" data-closes>⭐ Refés-la com a acta professional (punt per punt)</button>
         <button id="btn-toggle-detail" class="sheet-row" type="button" data-closes>✂️ Fes-ne una versió més resumida</button>

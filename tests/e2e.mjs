@@ -48,6 +48,7 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   const user = parts.filter((x) => x.text).map((x) => x.text).join(' ');
   if (sys) log.sys.push(sys);
   for (const x of parts) { const md = x.inlineData || x.fileData; if (md) log.mimes.push(md.mimeType || md.fileUri); }
+  if (sys) (log.asks = log.asks || []).push(user.slice(0, 6000));
   let txt;
   if (log.slowSeg && /tram d'una reunió/.test(user)) await new Promise((res) => setTimeout(res, 500));
   const tros = user.match(/Aquest és el tros (\d+) de (\d+)/);
@@ -422,6 +423,23 @@ await step('Documents PDF a la reunió', async () => {
   ok(m.photos && m.photos[0].pdf && m.photos[0].name === 'pressupost.pdf', 'no es desa a la reunió');
   ok(log.mimes.slice(before).includes('application/pdf'), 'no arriba a Gemini');
   ok(await p.isVisible('#result-photos .thumb.doc'), 'no es veu al resultat');
+});
+await step('Documents com a punt de partida (guió) o només com a ajuda', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
+  await p.setInputFiles('#docs-input', { name: 'guio.pdf', mimeType: 'application/pdf', buffer: pdf });
+  ok(await p.isVisible('#docs-role'), 'no es pot triar per a què serveixen');
+  await p.selectOption('#docs-role', 'guia');
+  log.asks = [];
+  await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 60000);
+  const m = await meeting(await lastId());
+  ok(m.docsRole === 'guia', `rol ${m.docsRole}`);
+  ok(log.asks.some((t) => /PUNT DE PARTIDA/.test(t) && /només pot ser el que ES DIU/.test(t)), 'Gemini no rep el rol del document');
+  // Es pot canviar des de ⋯
+  await p.click('#btn-more'); ok(await p.isVisible('#btn-docs-role'), 'sense opció a ⋯');
+  ok(/punt de partida/.test(await p.textContent('#docs-role-current')), 'no mostra el rol');
+  await p.evaluate(() => closeSheets());
+  return 'guió → estructura; contingut només del que es diu';
 });
 await step('Vídeo de YouTube', async () => {
   await p.click('#btn-tab-home'); await waitView('home');
