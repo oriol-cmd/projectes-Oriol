@@ -54,6 +54,13 @@ await ctx.route(/generativelanguage\.googleapis\.com/, async (r) => {
   } else if (parts.some((x) => x.fileData && /youtube\.com/.test(x.fileData.fileUri || ''))) txt = 'Marta: aquest vídeo parla del pressupost.\n[final]';
   else if (user.includes("fragment curt d'una reunió")) txt = 'Això és el text en directe de prova.';
   else if (user.includes("Transcriu literalment el text d'aquests documents")) txt = "[Document 1]\nApunts: pressupost 5.000 €\n- Revisar contracte";
+  else if (log.blockSummary && sys && !sys.includes("aquesta part d'una reunió") && !sys.includes('estructura de les etiquetes') && !/consultar|Tradueix|traductor/.test(sys)) {
+    // Simula que Google ho bloqueja tot menys el resum per parts.
+    log.blocked = (log.blocked || 0) + 1;
+    const pl = JSON.stringify({ candidates: [{ finishReason: 'RECITATION' }] });
+    return r.fulfill({ status: 200, contentType: url.includes('alt=sse') ? 'text/event-stream' : 'application/json', body: url.includes('alt=sse') ? `data: ${pl}\n\n` : pl });
+  }
+  else if (sys.includes("aquesta part d'una reunió")) txt = '- Es parla del pressupost de 5.000 €.';
   else if (sys.includes('apunts o documents') && log.recitation && parts.some((x) => x.inlineData)) {
     // Simula el filtre de «recitació» de Google quan s'envien les fotos.
     log.blocked = (log.blocked || 0) + 1;
@@ -448,7 +455,7 @@ await step("Fotos d'apunts → resum", async () => {
   ok(/Revisar contracte/.test(await p.textContent('#result-transcript')), 'no es veu el text');
   return m.summary.split('\n')[0];
 });
-await step("Apunts: si Google bloqueja el resum, es fa sense les fotos", async () => {
+await step("Apunts: el resum es fa del text llegit (sense tornar a enviar les fotos)", async () => {
   await p.click('#btn-tab-home'); await waitView('home');
   log.recitation = true; log.blocked = 0;
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64');
@@ -459,8 +466,17 @@ await step("Apunts: si Google bloqueja el resum, es fa sense les fotos", async (
   } finally { log.recitation = false; }
   const m = await meeting(await lastId());
   ok(m.status === 'done' && /^# Apunts del pressupost/.test(m.summary), `estat ${m.status} ${m.error || ''}`);
-  ok(log.blocked >= 2, `només ${log.blocked} intents bloquejats`);
-  return `${log.blocked} bloquejos → resum fet sense fotos`;
+  ok(log.blocked === 0, `ha enviat les fotos al resum (${log.blocked})`);
+});
+await step("L'acta surt sempre, encara que Google ho bloquegi", async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  log.blockSummary = true; log.blocked = 0;
+  try {
+    await p.setInputFiles('#import-input', [fx('fixtures-a1.wav')]); await p.click('#btn-import-summary'); await waitView('result', 120000);
+  } finally { log.blockSummary = false; }
+  const m = await meeting(await lastId());
+  ok(m.status === 'done' && /Resum per parts/.test(m.summary) && /5\.000/.test(m.summary), `estat ${m.status} ${m.error || ''} ${m.summary.slice(0, 80)}`);
+  return `${log.blocked} bloquejos → acta per parts`;
 });
 await step('Text en directe mentre grava', async () => {
   await p.click('#btn-tab-home'); await waitView('home');
