@@ -122,7 +122,7 @@ function processa_(msg) {
     envia_(aten_(parts, u), u);
   } catch (err) {
     console.error(err);
-    avisaAdmin_('Error atenent un missatge de ' + nomDe_(u), err);
+    avisaAdmin_('Error atenent un missatge ' + de_(nomDe_(u)), err);
     envia_('⚠️ No ho he pogut fer: ' + (err && err.message ? err.message : err), u);
   }
 }
@@ -549,7 +549,7 @@ function calendarisExtra_(u) {
     const persones = (parts[1] || '').split(',').map(function (p) { return p.trim(); }).filter(Boolean);
     const cal = nom.indexOf('@') >= 0 ? CalendarApp.getCalendarById(nom) : (CalendarApp.getCalendarsByName(nom) || [])[0];
     if (!cal) {
-      avisaAdmin_('No trobo el calendari compartit «' + nom + '» de ' + nomDe_(u),
+      avisaAdmin_('No trobo el calendari compartit «' + nom + '» ' + de_(nomDe_(u)),
         "Cal que estigui compartit amb el compte del secretari amb permís «Fer canvis als esdeveniments», i que el nom de la columna H del full coincideixi.");
       return null;
     }
@@ -783,7 +783,7 @@ function perACadaUsuari_(feina) {
   usuaris_().forEach(function (u) {
     try { feina(u); } catch (err) {
       console.error(nomDe_(u) + ': ' + (err && err.message ? err.message : err));
-      avisaAdmin_('Error en els avisos automàtics de ' + nomDe_(u), err);
+      avisaAdmin_('Error en els avisos automàtics ' + de_(nomDe_(u)), err);
     }
   });
 }
