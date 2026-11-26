@@ -55,22 +55,31 @@ function stopExtraStreams() {
 }
 // Obre el micròfon. Si el dispositiu no accepta les opcions (o un altre programa
 // el té ocupat), ho torna a provar amb la configuració més simple.
+// Després d'una trucada, a vegades el mòbil no respon mai a la petició del micròfon:
+// mentre es reconnecta, si triga massa, es dona per fallada i es torna a provar.
+function askMic(c) {
+  if (!rec.recovering) return navigator.mediaDevices.getUserMedia(c);
+  let late = false;
+  const p = navigator.mediaDevices.getUserMedia(c);
+  p.then((s) => { if (late) s.getTracks().forEach((t) => t.stop()); }, () => {});
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => { late = true; rej(Object.assign(new Error('timeout'), { name: 'TimeoutError' })); }, 7000))]);
+}
 async function getMicStream() {
   const base = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
   // El micròfon triat a Ajustos (p. ex. un micròfon extern). Si ja no hi és, el de sempre.
   if (settings.micId) {
-    try { return await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: settings.micId } } }); }
+    try { return await askMic({ audio: { ...base, deviceId: { exact: settings.micId } } }); }
     catch (e) {
       if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
       toast("No trobo el micròfon que vas triar a Ajustos: faig servir el de l'ordinador. Revisa que estigui connectat.", 8000);
     }
   }
   try {
-    return await navigator.mediaDevices.getUserMedia({ audio: base });
+    return await askMic({ audio: base });
   } catch (e) {
     if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
     await sleep(300);
-    try { return await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    try { return await askMic({ audio: true }); }
     catch (e2) {
       if (e2 && (e2.name === 'NotAllowedError' || e2.name === 'SecurityError')) throw e2;
       const err = new Error(MIC_BUSY);
@@ -136,6 +145,14 @@ async function openMic() {
   try {
     if (!rec.audioCtx) rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (rec.audioCtx.state !== 'running') await withTimeout(rec.audioCtx.resume(), 1500);
+    // Després d'una trucada, a l'iPhone el motor d'àudio pot quedar «interromput» per sempre.
+    if (rec.audioCtx.state === 'interrupted') {
+      const old = rec.audioCtx;
+      old.onstatechange = null;
+      rec.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      try { old.close(); } catch { /* res */ }
+      if (rec.audioCtx.state !== 'running') await withTimeout(rec.audioCtx.resume(), 1500);
+    }
     rec.audioCtx.onstatechange = () => {
       const st = rec.audioCtx && rec.audioCtx.state;
       if (st === 'interrupted') micInterrupted();
@@ -317,8 +334,11 @@ function rotateSegment() {
 }
 
 async function recoverMic() {
-  if (!rec.meeting || rec.stopping || rec.recovering) return;
+  if (!rec.meeting || rec.stopping) return;
+  // Si un intent anterior s'ha quedat penjat, no bloqueja els següents.
+  if (rec.recovering && Date.now() - rec.recoveringSince < 15000) return;
   rec.recovering = true;
+  rec.recoveringSince = Date.now();
   try {
     const old = rec.recorder;
     if (old && old.state !== 'inactive') { rec.recorder = null; stopRecorder(old); }
@@ -332,7 +352,7 @@ async function recoverMic() {
     }
     rec.stream && rec.stream.getTracks().forEach((t) => t.stop());
     stopExtraStreams();
-    await segmentChain;
+    await withTimeout(segmentChain, 5000);
     if (!rec.meeting || rec.stopping) return;
     await openMic();
     if (!rec.meeting || rec.stopping) { rec.stream && rec.stream.getTracks().forEach((t) => t.stop()); stopExtraStreams(); return; }
@@ -357,9 +377,17 @@ function micInterrupted() {
   showResumeOverlay("S'ha interromput el micròfon (una trucada?). Quan pengis, continuarà sol; si no, toca el botó.");
   if (document.visibilityState === 'visible') setTimeout(() => { if (rec.interrupted) resumeAfterInterruption(); }, 4000);
 }
+function recordingOk() {
+  const track = rec.stream && rec.stream.getAudioTracks()[0];
+  return !!(track && track.readyState === 'live' && !track.muted && rec.recorder && rec.recorder.state === 'recording');
+}
+// En penjar una trucada, el mòbil pot trigar uns segons a tornar el micròfon:
+// es prova diverses vegades abans de demanar un toc (i el vigilant hi torna després).
+const RESUME_WAITS = [0, 1500, 2500, 4000, 6000];
 async function resumeAfterInterruption({ manual = false } = {}) {
   const it = rec.interrupted;
-  if (!it || !rec.meeting || rec.stopping || rec.recovering) return;
+  if (!it || !rec.meeting || rec.stopping) return;
+  if (!manual && (rec.retrying || rec.recovering)) return;
   if (!manual && document.visibilityState !== 'visible') return; // es reprèn en tornar a l'app
   const gap = Date.now() - it.at;
   if (gap > 8000) {
@@ -369,15 +397,33 @@ async function resumeAfterInterruption({ manual = false } = {}) {
   }
   rec.interrupted = null;
   if (manual) primeAudio();
-  await recoverMic();
-  const track = rec.stream && rec.stream.getAudioTracks()[0];
-  const ok = track && track.readyState === 'live' && !track.muted && rec.recorder && rec.recorder.state === 'recording';
+  const waits = manual ? [0, 1500] : RESUME_WAITS;
+  const run = (rec.retryRun || 0) + 1;
+  rec.retryRun = run;
+  rec.retrying = true;
+  let ok = false;
+  try {
+    for (let i = 0; i < waits.length; i++) {
+      if (waits[i]) {
+        if (!$('#resume-rec').hidden) $('#resume-why').textContent = `Tornant a engegar el micròfon… (intent ${i + 1} de ${waits.length}). Si no s'engega, toca el botó.`;
+        await sleep(waits[i]);
+      }
+      if (rec.retryRun !== run || !rec.meeting || rec.stopping || rec.paused) return;
+      if (!manual && document.visibilityState !== 'visible') break;
+      await recoverMic();
+      await sleep(400); // el micròfon nou pot sortir mut un instant
+      ok = recordingOk();
+      if (ok) break;
+    }
+  } finally { if (rec.retryRun === run) rec.retrying = false; }
+  if (!rec.meeting || rec.stopping) return;
   if (ok) {
+    rec.interrupted = null;
     hideResumeOverlay();
     $('#rec-warn').hidden = false;
     $('#rec-warn').textContent = `✓ S'ha reprès la gravació${gap > 8000 ? ` (s'han perdut uns ${fmtGap(gap)} mentre durava la interrupció)` : ''}.`;
     saveMeeting(rec.meeting);
-  } else showResumeOverlay("No s'ha pogut tornar a obrir el micròfon sol. Toca el botó per continuar.");
+  } else showResumeOverlay("No s'ha pogut tornar a engegar el micròfon sol. Toca el botó per continuar (ho continuarem provant).");
 }
 // Avís a tota la pantalla quan NO s'està gravant, amb un botó gran per continuar.
 function showResumeOverlay(why) {
@@ -398,7 +444,13 @@ $('#btn-resume-rec').onclick = async () => {
   btn.disabled = true;
   try {
     if (rec.meeting.source === 'call' && rec.paused) await togglePause(); // torna a demanar la pestanya (dins del toc)
-    else if (rec.interrupted) await resumeAfterInterruption({ manual: true });
+    else if (rec.interrupted || rec.retrying) {
+      primeAudio(); // dins del toc
+      if (!rec.interrupted) rec.interrupted = { at: Date.now(), atMs: rec.activeMs };
+      // Si ja s'està provant d'obrir el micròfon, espera que acabi (té un límit de temps).
+      for (let i = 0; i < 40 && rec.recovering; i++) await sleep(200);
+      await resumeAfterInterruption({ manual: true });
+    }
     else if (rec.paused) await togglePause();
     else { primeAudio(); await recoverMic(); }
   } finally { btn.disabled = false; }
@@ -406,7 +458,7 @@ $('#btn-resume-rec').onclick = async () => {
 };
 // Vigilant: si el micròfon queda mut o el motor d'àudio interromput sense avisar, es detecta igual.
 function watchMic() {
-  if (!rec.meeting || rec.paused || rec.stopping || rec.recovering || rec.resuming || rec.meeting.engine === 'device' || document.visibilityState !== 'visible') { rec.muteSince = 0; rec.idleSince = 0; return; }
+  if (!rec.meeting || rec.paused || rec.stopping || rec.recovering || rec.retrying || rec.resuming || rec.meeting.engine === 'device' || document.visibilityState !== 'visible') { rec.muteSince = 0; rec.idleSince = 0; return; }
   // Qualsevol cas: la gravadora fa estona que no grava (entre trams només s'atura un instant).
   if (!rec.recorder || rec.recorder.state !== 'recording') {
     rec.idleSince = rec.idleSince || Date.now();
@@ -415,8 +467,13 @@ function watchMic() {
   if (rec.meeting.source === 'call') return;
   const track = rec.stream && rec.stream.getAudioTracks()[0];
   const ctxSt = rec.audioCtx && rec.audioCtx.state;
-  const bad = !track || track.readyState === 'ended' || track.muted || ctxSt === 'interrupted';
-  if (!bad) { rec.muteSince = 0; return; }
+  const bad = !track || track.readyState === 'ended' || track.muted || (ctxSt === 'interrupted' && !(rec.recorder && rec.recorder.state === 'recording'));
+  if (!bad) {
+    rec.muteSince = 0;
+    // El micròfon grava bé però el mesurador s'ha aturat: només cal reprendre el motor d'àudio.
+    if (ctxSt === 'interrupted' || ctxSt === 'suspended') rec.audioCtx.resume().catch(() => {});
+    return;
+  }
   rec.muteSince = rec.muteSince || Date.now();
   if (Date.now() - rec.muteSince < 2500) return;
   rec.muteSince = 0;
@@ -566,7 +623,7 @@ async function startRecordingInner(cont, token) {
   $('#btn-pause').textContent = 'Pausa';
   setRecStateUi();
   $('#rec-warn').hidden = true;
-  rec.interrupted = null; rec.muteSince = 0; $('#resume-rec').hidden = true;
+  rec.interrupted = null; rec.muteSince = 0; rec.retrying = false; rec.recovering = false; rec.retryRun = 0; $('#resume-rec').hidden = true;
   $('#rec-inputs').hidden = m.source !== 'call';
   $('#in-mic').classList.toggle('off', m.source === 'call' && !rec.inMic);
   rec.inMax = { call: 0, mic: 0 }; rec.inWarned = { call: false, mic: false }; rec.inSince = rec.activeMs;
@@ -839,8 +896,10 @@ document.addEventListener('visibilitychange', async () => {
     return;
   }
   // Tornem a l'app: a l'iPhone, el temps amb el mòbil bloquejat o en una altra app no s'ha gravat.
+  let wasAway = 0;
   if (rec.hiddenAt) {
     const gap = Date.now() - rec.hiddenAt;
+    wasAway = gap;
     rec.hiddenAt = null;
     if (gap > 8000) {
       rec.meeting.gaps = [...(rec.meeting.gaps || []), { atMs: rec.activeMs, ms: gap }];
@@ -850,6 +909,13 @@ document.addEventListener('visibilitychange', async () => {
   }
   if (!rec.wakeLock || rec.wakeLock.released) await requestWakeLock();
   if (rec.interrupted && !rec.paused) { resumeAfterInterruption(); return; } // tornem d'una trucada
+  // A l'iPhone, després d'una trucada el micròfon pot semblar viu però no captar res
+  // (i no sempre avisa). Si hem estat fora una estona, es torna a obrir per seguretat.
+  if (mobileMic && !rec.paused && wasAway > 3000) {
+    rec.interrupted = { at: Date.now(), atMs: rec.activeMs };
+    resumeAfterInterruption();
+    return;
+  }
   if (rec.audioCtx && rec.audioCtx.state !== 'running') rec.audioCtx.resume().catch(() => {});
   if (rec.meeting.engine !== 'device' && !rec.paused) {
     const dead = () => {

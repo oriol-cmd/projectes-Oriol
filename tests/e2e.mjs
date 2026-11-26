@@ -579,6 +579,13 @@ await step('Trucada durant la gravació: avís gran i continua', async () => {
     await p.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gum; });
     await p.click('#btn-resume-rec');
     await p.waitForFunction(() => $('#resume-rec').hidden && rec.recorder && rec.recorder.state === 'recording', null, { timeout: 15000 });
+    // Tercera trucada: en penjar, el mòbil triga a tornar el micròfon (falla dues vegades) -> continua sol, sense tocar res
+    await p.evaluate(() => { const t = rec.stream.getAudioTracks()[0]; Object.defineProperty(t, 'muted', { get: () => true }); let n = 0; navigator.mediaDevices.getUserMedia = (c) => (++n <= 2 ? Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })) : window.__gum(c)); t.dispatchEvent(new Event('mute')); });
+    await p.waitForFunction(() => $('#resume-rec').hidden && rec.recorder && rec.recorder.state === 'recording' && !rec.stream.getAudioTracks()[0].muted, null, { timeout: 30000 });
+    // Quarta: la petició del micròfon es queda penjada una vegada -> no es bloqueja i continua sol
+    await p.evaluate(() => { const t = rec.stream.getAudioTracks()[0]; Object.defineProperty(t, 'muted', { get: () => true }); let n = 0; navigator.mediaDevices.getUserMedia = (c) => (++n === 1 ? new Promise(() => {}) : window.__gum(c)); t.dispatchEvent(new Event('mute')); });
+    await p.waitForFunction(() => $('#resume-rec').hidden && rec.recorder && rec.recorder.state === 'recording' && !rec.stream.getAudioTracks()[0].muted, null, { timeout: 40000 });
+    await p.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gum; });
   } finally { await p.click('#btn-stop'); await waitView('result', 90000); await p.evaluate(() => saveSettings({ liveSec: 10 })); }
   const m = await meeting(await lastId());
   ok(m.status === 'done', `estat ${m.status} ${m.error || ''}`);
