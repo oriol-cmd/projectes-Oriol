@@ -25,6 +25,7 @@
 
 // ── Ajustos que pots canviar ────────────────────────────────────────────────
 const TZ = 'Europe/Madrid';
+// Valors inicials de cada persona: cadascú els pot canviar per WhatsApp («envia'm el resum a les 7»).
 const AVIS_PER_DEFECTE = 30;      // Minuts abans de cada cita que t'avisa (-1 = mai)
 const HORA_RESUM_MATI = 8;        // Resum de l'agenda del dia (null = cap)
 const HORA_RESUM_VESPRE = 21;     // Tasques pendents i agenda de demà (null = cap)
@@ -81,6 +82,7 @@ function doPost(e) {
     });
   } catch (err) {
     console.error(err);
+    avisaAdmin_('Error rebent un missatge de WhatsApp', err);
   }
   return text_('ok');
 }
@@ -91,6 +93,8 @@ function processa_(msg) {
   const u = usuari_(msg.from);
   if (!u) {
     console.warn('Missatge d\'un número no donat d\'alta: ' + msg.from);
+    avisaAdmin_('Un número que no és al full ha escrit al secretari: +' + msg.from,
+      "Si és algú de l'equip, afegeix-lo al full «Secretari – Usuaris».");
     try {
       wa_({ type: 'text', text: { body: "Hola! Aquest número no està donat d'alta al secretari. Demana a qui el gestiona que t'hi afegeixi." } }, msg.from);
     } catch (err) { console.warn(err); }
@@ -106,7 +110,7 @@ function processa_(msg) {
     } else if (msg.type === 'audio') {
       parts.push({ text: '(Nota de veu adjunta: escolta-la i fes el que hi demana.)' }, media_(msg.audio.id));
     } else if (msg.type === 'image') {
-      parts.push({ text: (msg.image.caption || '') + '\n(Imatge adjunta: si hi ha dates, cites o coses per fer, apunta-les.)' }, media_(msg.image.id));
+      parts.push({ text: (msg.image.caption || '') + '\n(Imatge adjunta: si hi ha dates, cites o coses per fer, apunta-les. Si demana posar-la de foto del secretari, és foto_perfil.)' }, media_(msg.image.id));
     } else if (msg.type === 'document' && /pdf/.test(msg.document.mime_type || '')) {
       parts.push({ text: (msg.document.caption || '') + '\n(PDF adjunt: si hi ha dates, cites o coses per fer, apunta-les.)' }, media_(msg.document.id));
     } else if (msg.type === 'button') {
@@ -118,6 +122,7 @@ function processa_(msg) {
     envia_(aten_(parts, u), u);
   } catch (err) {
     console.error(err);
+    avisaAdmin_('Error atenent un missatge de ' + nomDe_(u), err);
     envia_('⚠️ No ho he pogut fer: ' + (err && err.message ? err.message : err), u);
   }
 }
@@ -146,7 +151,7 @@ const ESQUEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          tipus: { type: 'STRING', enum: ['crear_cita', 'crear_tasca', 'modificar', 'esborrar', 'fet', 'definir_grup', 'esborrar_grup'] },
+          tipus: { type: 'STRING', enum: ['crear_cita', 'crear_tasca', 'modificar', 'esborrar', 'fet', 'definir_grup', 'esborrar_grup', 'canviar_ajustos', 'foto_perfil'] },
           ref: { type: 'STRING', description: 'E1, T2… per a modificar, esborrar o fet' },
           titol: { type: 'STRING' },
           inici: { type: 'STRING', description: 'AAAA-MM-DDTHH:MM, o AAAA-MM-DD si és de tot el dia' },
@@ -160,7 +165,10 @@ const ESQUEMA = {
           repeteix_fins: { type: 'STRING', description: 'AAAA-MM-DD' },
           tota_la_serie: { type: 'BOOLEAN' },
           categoria: { type: 'STRING', description: 'Grup de la cita o tasca (li dona color), o «cap»' },
-          color: { type: 'STRING', enum: Object.keys(COLORS), description: 'Per a definir_grup' }
+          color: { type: 'STRING', enum: Object.keys(COLORS), description: 'Per a definir_grup' },
+          hora_mati: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
+          hora_vespre: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
+          nom_secretari: { type: 'STRING', description: 'Per a canviar_ajustos: com es diu el secretari' }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
         required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria'],
@@ -177,10 +185,13 @@ function aten_(parts, u) {
   const ara = new Date();
   const ctx = context_(cal, ara, grups_(u));
   const historial = JSON.parse(estat_(u, 'HISTORIAL') || '[]');
+  const imatge = (parts.filter(function (p) { return p.inlineData && /^image\//.test(p.inlineData.mimeType); })[0] || {}).inlineData;
   const grups = grups_(u);
+  const aj = ajustos_(u);
+  const esAdmin = esPropietari_(u);
 
   const sistema = [
-    'Ets el secretari personal ' + (u.nom ? 'de ' + u.nom : "de l'usuari") + ' i hi parles per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.',
+    (aj.nom ? 'Et dius ' + aj.nom + ' i ets' : 'Ets') + ' el secretari personal ' + (u.nom ? 'de ' + u.nom : "de l'usuari") + ' i hi parles per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.',
     'Ara és ' + diaLlarg_(ara) + ' a les ' + fmt_(ara, 'HH:mm') + ' (' + TZ + ').',
     '',
     'Gestiones el seu Google Calendar amb aquestes accions:',
@@ -195,7 +206,11 @@ function aten_(parts, u) {
     'Regles:',
     '- Calcula les dates relatives («demà», «dijous que ve», «d\'aquí a 15 dies») a partir d\'avui. Hores ambigües: «a les 5» de la tarda si és més lògic (17:00).',
     '- Si no diu quant dura una cita, no posis «fi» (serà 1 hora).',
-    '- avis_minuts només si demana un avís diferent del normal (' + AVIS_PER_DEFECTE + ' min abans). -1 = sense avís. Per a «avisa\'m el dia abans», 1440.',
+    '- avis_minuts només si demana un avís diferent del normal (' + aj.avis + ' min abans). -1 = sense avís. Per a «avisa\'m el dia abans», 1440.',
+    '- Ajustos d\'aquesta persona: resum del matí ' + (aj.mati === 'no' ? 'desactivat' : 'a les ' + aj.mati) + '; repàs del vespre ' + (aj.vespre === 'no' ? 'desactivat' : 'a les ' + aj.vespre) + '; avís de les cites ' + (aj.avis < 0 ? 'desactivat' : aj.avis + ' min abans') + '; el teu nom: ' + (aj.nom || '(cap, ets «el secretari»)') + '. Si els vol canviar («envia\'m el resum a les 7», «no vull el repàs del vespre», «avisa\'m sempre 1 hora abans», «a partir d\'ara et dius Marta»): canviar_ajustos amb NOMÉS els camps que canvien: hora_mati i hora_vespre ("HH:MM" o "no"), avis_minuts (minuts, -1 = cap), nom_secretari. Si pregunta els seus ajustos, digues-los.',
+    esAdmin
+      ? '- Foto del secretari: si envia una imatge i demana posar-la de foto del secretari (o de perfil), foto_perfil. Recorda-li que la foto la veu tothom.'
+      : '- Foto del secretari: és la mateixa per a tothom i només la pot canviar l\'administrador. Si la vol canviar, digues-li que ho demani a qui gestiona el secretari.',
     '- Repeticions («cada dilluns», «cada mes») amb repeticio i, si ho diu, repeteix_fins.',
     "- Si falta una dada imprescindible (p. ex. el dia d'una cita), no creïs res i pregunta-ho.",
     '- Esborra només si ho demana clarament. Si no és clar a quina cita es refereix, pregunta-ho.',
@@ -228,7 +243,7 @@ function aten_(parts, u) {
     ]);
   }
   // Si a alguna acció li falta una dada (p. ex. el dia), li demanem a Gemini que la corregeixi.
-  const problemes = problemesAccions_(res.accions, ctx.refs, grups);
+  const problemes = problemesAccions_(res.accions, ctx.refs, grups, { esAdmin: esAdmin, teImatge: !!imatge });
   if (problemes.length) {
     registre_('Accions incompletes, ho torno a demanar: ' + JSON.stringify(res.accions) + ' → ' + problemes.join('; '));
     res = gemini_(sistema, [
@@ -243,13 +258,14 @@ function aten_(parts, u) {
   const ordre = function (a) { return /_grup$/.test(a.tipus) ? 0 : 1; };
   (res.accions || []).slice().sort(function (a, b) { return ordre(a) - ordre(b); }).forEach(function (a) {
     try {
-      executa_(a, cal, ctx.refs, u, grups);
+      executa_(a, cal, ctx.refs, u, grups, imatge);
     } catch (err) {
       errors.push('⚠️ No he pogut fer «' + (a.titol || a.ref || a.tipus) + '»: ' + (err && err.message ? err.message : err));
     }
   });
   if (diuQueHoHaFet(res)) errors.push("⚠️ Compte: no he pogut apuntar res al calendari. Torna-m'ho a dir, si us plau.");
   // Si alguna cosa ha fallat, no comencem dient «Apuntat».
+  if (errors.length) avisaAdmin_('No s\'ha pogut fer el que demanava ' + nomDe_(u), errors.join('\n') + '\n\nMissatge: ' + (res.peticio || ''));
   const fet = (res.accions || []).length > errors.length;
   const resposta = (errors.length && !fet ? errors : [res.resposta || 'Fet.'].concat(errors)).join('\n\n');
 
@@ -259,7 +275,8 @@ function aten_(parts, u) {
 }
 
 /** Comprova que les accions tenen les dades necessàries abans de fer-les. */
-function problemesAccions_(accions, refs, grups) {
+function problemesAccions_(accions, refs, grups, opcions) {
+  opcions = opcions || {};
   const problemes = [];
   const nousGrups = (accions || []).filter(function (a) { return a.tipus === 'definir_grup'; }).map(function (a) { return nomGrup_(a.titol); });
   (accions || []).forEach(function (a, i) {
@@ -268,7 +285,14 @@ function problemesAccions_(accions, refs, grups) {
     if (cat && cat !== 'cap' && !(grups || {})[cat] && nousGrups.indexOf(cat) < 0) {
       problemes.push(nom + ' fa servir el grup «' + a.categoria + '», que no existeix (grups: ' + Object.keys(grups || {}).join(', ') + '). Fes servir un d\'aquests, «cap», o crea\'l amb definir_grup si l\'usuari ho demana');
     }
-    if (a.tipus === 'definir_grup') {
+    if (a.tipus === 'canviar_ajustos') {
+      ['hora_mati', 'hora_vespre'].forEach(function (k) {
+        if (a[k] && !/^(no|\d{1,2}(:\d{2})?)$/i.test(String(a[k]).trim())) problemes.push(nom + ' té «' + k + '» no vàlid: ' + a[k] + ' (cal "HH:MM" o "no")');
+      });
+    } else if (a.tipus === 'foto_perfil') {
+      if (!opcions.esAdmin) problemes.push(nom + ': només l\'administrador pot canviar la foto del secretari. No facis l\'acció i explica-l\'hi');
+      else if (!opcions.teImatge) problemes.push(nom + ': no hi ha cap imatge en aquest missatge. Demana-li que enviï la foto amb el text «posa-la de foto»');
+    } else if (a.tipus === 'definir_grup') {
       if (!nomGrup_(a.titol)) problemes.push(nom + ' no té el nom del grup a «titol»');
       if (!COLORS[String(a.color || '').toLowerCase()]) problemes.push(nom + ' no té un «color» vàlid (' + Object.keys(COLORS).join(', ') + ')');
     } else if (a.tipus === 'esborrar_grup') {
@@ -313,8 +337,23 @@ function context_(cal, ara, grups) {
   return { refs: refs, agenda: agenda, tasques: tasques };
 }
 
-function executa_(a, cal, refs, u, grups) {
+function executa_(a, cal, refs, u, grups, imatge) {
   grups = grups || grups_(u);
+  if (a.tipus === 'canviar_ajustos') {
+    const aj = ajustos_(u);
+    if (a.hora_mati) aj.mati = hora_(a.hora_mati);
+    if (a.hora_vespre) aj.vespre = hora_(a.hora_vespre);
+    if (a.avis_minuts != null && a.avis_minuts !== '') aj.avis = Number(a.avis_minuts);
+    if (a.nom_secretari) aj.nom = String(a.nom_secretari).trim().slice(0, 40);
+    desaEstat_(u, 'AJUSTOS', JSON.stringify(aj));
+    return;
+  }
+  if (a.tipus === 'foto_perfil') {
+    if (!esPropietari_(u)) throw new Error("només l'administrador pot canviar la foto del secretari");
+    if (!imatge) throw new Error('no hi ha cap imatge en aquest missatge');
+    canviaFotoPerfil_(imatge.data, imatge.mimeType);
+    return;
+  }
   if (a.tipus === 'definir_grup') {
     const nom = nomGrup_(a.titol);
     const color = String(a.color || '').toLowerCase();
@@ -358,7 +397,7 @@ function executa_(a, cal, refs, u, grups) {
       const fi = a.fi && !esDia_(a.fi) ? data_(a.fi) : new Date(ini.getTime() + 3600e3);
       ev = rec ? cal.createEventSeries(a.titol, ini, fi, rec, opcions) : cal.createEvent(a.titol, ini, fi, opcions);
     }
-    if (a.avis_minuts != null && a.avis_minuts !== AVIS_PER_DEFECTE) ev.setTag('avis', String(a.avis_minuts));
+    if (a.avis_minuts != null && a.avis_minuts !== ajustos_(u).avis) ev.setTag('avis', String(a.avis_minuts));
     posaColor_(ev, a.categoria, grups);
     return;
   }
@@ -483,13 +522,32 @@ function gemini_(sistema, contents) {
 /** Fa una feina per a cada persona del full, sense que l'error d'una aturi les altres. */
 function perACadaUsuari_(feina) {
   usuaris_().forEach(function (u) {
-    try { feina(u); } catch (err) { console.error((u.nom || u.numero) + ': ' + (err && err.message ? err.message : err)); }
+    try { feina(u); } catch (err) {
+      console.error(nomDe_(u) + ': ' + (err && err.message ? err.message : err));
+      avisaAdmin_('Error en els avisos automàtics de ' + nomDe_(u), err);
+    }
   });
 }
 
-/** S'executa cada 5 minuts: avisos de cites i recordatoris de tasques. */
+/** S'executa cada 5 minuts: avisos de cites, recordatoris de tasques i resums del matí i del vespre. */
 function revisaRecordatoris() {
   perACadaUsuari_(revisaRecordatorisDe_);
+  perACadaUsuari_(revisaResumsDe_);
+}
+
+/** Envia el resum del matí i el repàs del vespre a l'hora que ha triat cada persona (un cop al dia). */
+function revisaResumsDe_(u) {
+  const aj = ajustos_(u);
+  const ara = new Date();
+  const avui = fmt_(ara, 'yyyy-MM-dd');
+  [['mati', resumMatiDe_], ['vespre', resumVespreDe_]].forEach(function (r) {
+    if (!aj[r[0]] || aj[r[0]] === 'no') return;
+    const moment = data_(avui + 'T' + aj[r[0]]).getTime();
+    if (ara.getTime() < moment - 150000 || ara.getTime() > moment + 3600e3) return;
+    if (estat_(u, 'RESUM_' + r[0]) === avui) return;
+    desaEstat_(u, 'RESUM_' + r[0], avui);
+    r[1](u);
+  });
 }
 
 function revisaRecordatorisDe_(u) {
@@ -504,7 +562,7 @@ function revisaRecordatorisDe_(u) {
   cal.getEvents(ara, new Date(ara.getTime() + 8 * 864e5)).forEach(function (ev) {
     if (ev.isAllDayEvent() || ev.getTitle().indexOf(FETA) === 0) return;
     const tag = ev.getTag('avis');
-    const minuts = tag == null || tag === '' ? AVIS_PER_DEFECTE : Number(tag);
+    const minuts = tag == null || tag === '' ? ajustos_(u).avis : Number(tag);
     if (!(minuts >= 0)) return;
     const ini = ev.getStartTime();
     if (ini.getTime() - minuts * 60000 > llindar || ini.getTime() < ara.getTime() - 5 * 60000) return;
@@ -534,34 +592,34 @@ function revisaRecordatorisDe_(u) {
   if (avisos.length) envia_(avisos.join('\n\n'), u);
 }
 
-/** Cada matí: l'agenda del dia i les tasques pendents. */
-function resumDelMati() {
-  perACadaUsuari_(function (u) {
-    const cal = calendari_(u);
-    const ara = new Date();
-    const avui = iniciDia_(ara);
-    const cites = llistaCites_(cal, avui);
-    const tasques = tasquesPendents_(cal, avui);
-    const linies = ['☀️ Bon dia' + (u.nom ? ', ' + u.nom : '') + '! Avui és ' + diaLlarg_(ara) + '.'];
-    linies.push(cites.length ? '\n📅 *Agenda*\n' + cites.join('\n') : '\n📅 Avui no tens cap cita.');
-    if (tasques.length) linies.push('\n☐ *Per fer*\n' + tasques.join('\n'));
-    envia_(linies.join('\n'), u);
-  });
+/** Ho criden els activadors antics de les 8 i les 21 h: ara cada persona té la seva hora. */
+function resumDelMati() { perACadaUsuari_(revisaResumsDe_); }
+function resumDelVespre() { perACadaUsuari_(revisaResumsDe_); }
+
+/** El resum del matí: l'agenda del dia i les tasques pendents. */
+function resumMatiDe_(u) {
+  const cal = calendari_(u);
+  const ara = new Date();
+  const avui = iniciDia_(ara);
+  const cites = llistaCites_(cal, avui);
+  const tasques = tasquesPendents_(cal, avui);
+  const linies = ['☀️ Bon dia' + (u.nom ? ', ' + u.nom : '') + '! Avui és ' + diaLlarg_(ara) + '.'];
+  linies.push(cites.length ? '\n📅 *Agenda*\n' + cites.join('\n') : '\n📅 Avui no tens cap cita.');
+  if (tasques.length) linies.push('\n☐ *Per fer*\n' + tasques.join('\n'));
+  envia_(linies.join('\n'), u);
 }
 
-/** Cada vespre: què ha quedat pendent i què hi ha demà. */
-function resumDelVespre() {
-  perACadaUsuari_(function (u) {
-    const cal = calendari_(u);
-    const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 3600e3);
-    const cites = llistaCites_(cal, iniciDia_(dema));
-    const tasques = tasquesPendents_(cal, iniciDia_(new Date()));
-    if (!cites.length && !tasques.length) return;
-    const linies = ['🌙 Repàs del dia'];
-    if (tasques.length) linies.push('\n☐ *Encara pendent*\n' + tasques.join('\n') + "\n(Digue'm «fet» quan acabis alguna cosa, o a quin dia la passo.)");
-    if (cites.length) linies.push('\n📅 *Demà, ' + diaLlarg_(dema) + '*\n' + cites.join('\n'));
-    envia_(linies.join('\n'), u);
-  });
+/** El repàs del vespre: què ha quedat pendent i què hi ha demà. */
+function resumVespreDe_(u) {
+  const cal = calendari_(u);
+  const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 3600e3);
+  const cites = llistaCites_(cal, iniciDia_(dema));
+  const tasques = tasquesPendents_(cal, iniciDia_(new Date()));
+  if (!cites.length && !tasques.length) return;
+  const linies = ['🌙 Repàs del dia'];
+  if (tasques.length) linies.push('\n☐ *Encara pendent*\n' + tasques.join('\n') + "\n(Digue'm «fet» quan acabis alguna cosa, o a quin dia la passo.)");
+  if (cites.length) linies.push('\n📅 *Demà, ' + diaLlarg_(dema) + '*\n' + cites.join('\n'));
+  envia_(linies.join('\n'), u);
 }
 
 function llistaCites_(cal, dia) {
@@ -587,7 +645,7 @@ function tasquesPendents_(cal, finsA) {
  * Envia un missatge. WhatsApp només deixa escriure lliurement fins a 24 h després del teu
  * darrer missatge; fora d'aquesta finestra cal una plantilla aprovada. Si tot falla, per correu.
  */
-function envia_(text, u) {
+function envia_(text, u, silenciós) {
   const obert = Date.now() - Number(estat_(u, 'DARRER_MISSATGE') || 0) < 23.5 * 3600e3;
   let error = '';
   if (obert) {
@@ -601,6 +659,8 @@ function envia_(text, u) {
     } catch (err) { error = err.message; }
   }
   console.error('No s\'ha pogut enviar per WhatsApp: ' + error);
+  if (silenciós) return;
+  avisaAdmin_("No s'ha pogut enviar un WhatsApp a " + nomDe_(u) + " (li ha arribat per correu)", error);
   try {
     MailApp.sendEmail(u.correu || Session.getEffectiveUser().getEmail(), NOM + (u.nom ? ' (' + u.nom + ')' : '') + ': ' + text.split('\n')[0].replace(/\*/g, '').slice(0, 80),
       text.replace(/\*/g, '') + "\n\n(T'ho envio per correu perquè WhatsApp ha fallat: " + error + ')');
@@ -653,9 +713,8 @@ function configura() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (['revisaRecordatoris', 'resumDelMati', 'resumDelVespre'].indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
   });
+  // Un sol activador cada 5 minuts: avisos i també els resums, a l'hora que ha triat cada persona.
   ScriptApp.newTrigger('revisaRecordatoris').timeBased().everyMinutes(5).create();
-  if (HORA_RESUM_MATI != null) ScriptApp.newTrigger('resumDelMati').timeBased().atHour(HORA_RESUM_MATI).nearMinute(0).everyDays(1).inTimezone(TZ).create();
-  if (HORA_RESUM_VESPRE != null) ScriptApp.newTrigger('resumDelVespre').timeBased().atHour(HORA_RESUM_VESPRE).nearMinute(0).everyDays(1).inTimezone(TZ).create();
   envia_("👋 Hola! Soc el teu secretari. Escriu-me o envia'm una nota de veu amb el que t'he d'apuntar, per exemple:\n" +
     '• «Dentista dijous a les 10»\n• «Recorda\'m a les 6 que truqui a la gestoria»\n• «Què tinc demà?»\n• «Passa el dentista a divendres»', propietari_());
   console.log('Fet. Si no t\'ha arribat el WhatsApp, mira el correu i el registre d\'execucions.');
@@ -744,6 +803,99 @@ function provaPersona() {
   }
   MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Diagnòstic del secretari', REGISTRE.join('\n\n'));
   console.log("Diagnòstic enviat per correu.");
+}
+
+/** Prova l'avís d'errors: t'ha d'arribar un correu i un WhatsApp. */
+function provaAvisErrors() {
+  avisaAdmin_('Prova de l\'avís d\'errors', "Això és una prova: si t'arriba, els avisos funcionen. (" + fmt_(new Date(), 'HH:mm:ss') + ')');
+}
+
+/** Envia ara mateix el resum del matí a tu, per veure com queda. */
+function provaResum() {
+  resumMatiDe_(propietari_());
+}
+
+// ── Avisos a l'administrador ────────────────────────────────────────────────
+
+/**
+ * Quan alguna cosa falla, t'avisa per correu i per WhatsApp. El mateix error només s'avisa un cop
+ * cada 6 hores, perquè no t'omplin de missatges.
+ */
+function avisaAdmin_(titol, detall) {
+  try {
+    const text = String(detall && detall.message ? detall.message : detall || '');
+    const clau = 'alerta_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, titol + '|' + text.slice(0, 120))).slice(0, 22);
+    const cache = CacheService.getScriptCache();
+    if (cache.get(clau)) return;
+    cache.put(clau, '1', 6 * 3600);
+    const pista = pista_(titol + ' ' + text);
+    const cos = titol + '\n\n' + text + (pista ? '\n\n💡 ' + pista : '') + '\n\n(' + fmt_(new Date(), 'dd/MM HH:mm') + ')';
+    MailApp.sendEmail(prop_('ADMIN_EMAIL', true) || Session.getEffectiveUser().getEmail(), '⚠️ ' + NOM + ': ' + titol.slice(0, 100), cos);
+    envia_('⚠️ *Avís del secretari*\n' + cos, propietari_(), true);
+  } catch (err) {
+    console.error("No s'ha pogut avisar l'administrador: " + err);
+  }
+}
+
+/** Una pista de com arreglar els errors més habituals. */
+function pista_(text) {
+  if (/131030|allowed list|not in allowed/i.test(text)) return "Amb el número de prova, aquest mòbil ha d'estar a la llista de destinataris de Meta (Paso 1. Pruébalo > Destinatario > Administrar lista).";
+  if (/132001|template name does not exist|plantilla/i.test(text)) return "La plantilla «recordatori» no existeix o encara no està aprovada (WhatsApp Manager > Plantillas).";
+  if (/131047|re-engagement|24 hours/i.test(text)) return "Fa més de 24 h que aquesta persona no escriu al secretari i la plantilla no ha funcionat.";
+  if (/\b190\b|\b401\b|access token|OAuthException/i.test(text)) return 'El token de WhatsApp (WA_TOKEN) no és vàlid o ha caducat: genera\'n un de nou a l\'usuari del sistema de Meta.';
+  if (/Gemini/i.test(text) && /429|quota|RESOURCE_EXHAUSTED/i.test(text)) return "S'ha acabat la quota gratuïta de Gemini d'avui. Torna a funcionar demà, o activa la facturació a AI Studio.";
+  if (/Gemini/i.test(text)) return 'Gemini no respon. Sol ser temporal; si es repeteix, comprova la clau GEMINI_KEY.';
+  if (/calendari|calendar/i.test(text)) return "Comprova que aquesta persona t'hagi compartit el calendari amb permís «Fer canvis als esdeveniments» i executa comprovaUsuaris.";
+  return '';
+}
+
+// ── Ajustos de cada persona i foto ──────────────────────────────────────────
+
+function hora_(s) {
+  s = String(s || '').trim().toLowerCase();
+  if (s === 'no') return 'no';
+  const m = s.match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!m || +m[1] > 23 || +(m[2] || 0) > 59) throw new Error('hora no vàlida: ' + s);
+  return ('0' + m[1]).slice(-2) + ':' + (m[2] || '00');
+}
+
+/** Els ajustos d'una persona: hora del resum del matí i del vespre ("HH:MM" o "no"), avís per defecte i nom del secretari. */
+function ajustos_(u) {
+  const inicials = {
+    mati: HORA_RESUM_MATI == null ? 'no' : hora_(HORA_RESUM_MATI),
+    vespre: HORA_RESUM_VESPRE == null ? 'no' : hora_(HORA_RESUM_VESPRE),
+    avis: AVIS_PER_DEFECTE,
+    nom: ''
+  };
+  const desat = u && estat_(u, 'AJUSTOS');
+  return Object.assign(inicials, desat ? JSON.parse(desat) : {});
+}
+
+function esPropietari_(u) { return !!u && u.numero === digits_(prop_('MY_NUMBER')); }
+function nomDe_(u) { return u ? (u.nom || '+' + u.numero) : '?'; }
+
+/** Canvia la foto de perfil del número del secretari (la veu tothom). */
+function canviaFotoPerfil_(dades, tipus) {
+  const token = prop_('WA_TOKEN');
+  const bytes = Utilities.base64Decode(dades);
+  const app = JSON.parse(UrlFetchApp.fetch(GRAPH + 'debug_token?input_token=' + encodeURIComponent(token), { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }).getContentText());
+  const appId = app.data && app.data.app_id;
+  if (!appId) throw new Error("no trobo l'app de Meta del token");
+  // 1) Pujada en dos passos que demana Meta, 2) foto nova al perfil.
+  let r = UrlFetchApp.fetch(GRAPH + appId + '/uploads?file_length=' + bytes.length + '&file_type=' + encodeURIComponent(tipus), { method: 'post', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+  const sessio = JSON.parse(r.getContentText()).id;
+  if (!sessio) throw new Error('Meta no deixa pujar la foto: ' + r.getContentText().slice(0, 200));
+  r = UrlFetchApp.fetch(GRAPH + sessio, { method: 'post', headers: { Authorization: 'OAuth ' + token, file_offset: '0' }, payload: Utilities.newBlob(bytes, tipus), muteHttpExceptions: true });
+  const handle = JSON.parse(r.getContentText()).h;
+  if (!handle) throw new Error('Meta no ha acceptat la foto: ' + r.getContentText().slice(0, 200));
+  r = UrlFetchApp.fetch(GRAPH + prop_('WA_PHONE_ID') + '/whatsapp_business_profile', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + token },
+    muteHttpExceptions: true,
+    payload: JSON.stringify({ messaging_product: 'whatsapp', profile_picture_handle: handle })
+  });
+  if (r.getResponseCode() >= 300) throw new Error('Meta no ha canviat la foto: ' + r.getContentText().slice(0, 200));
 }
 
 // ── Persones ────────────────────────────────────────────────────────────────

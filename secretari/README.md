@@ -164,6 +164,17 @@ A dalt de `Secretari.gs`:
 | `HORA_RESUM_VESPRE` | `21` | Hora del repàs del vespre (`null` = cap) |
 | `DIES_AGENDA` | `30` | Quants dies endavant té en compte en respondre |
 
+**Ajustos de cada persona (per WhatsApp):** cadascú tria els seus, sense tocar res de l'script:
+- «Envia'm el resum a les 7» · «No vull el repàs del vespre» · «El repàs, a les 22:30»
+- «Avisa'm sempre 1 hora abans de les cites» · «No cal que m'avisis de les cites»
+- «A partir d'ara et dius Marta» (el secretari es presenta amb aquest nom) · «Quins ajustos tinc?»
+
+Al principi tothom té el resum a les 8, el repàs a les 21 h i l'avís 30 min abans (`HORA_RESUM_MATI`, `HORA_RESUM_VESPRE` i `AVIS_PER_DEFECTE`, a dalt de `Secretari.gs`).
+
+**Foto del secretari:** a WhatsApp la foto és del número, així que la veu tothom. La pots canviar tu (el número de `MY_NUMBER`) enviant-li una foto amb el text «posa-la de foto del secretari». Ha de ser quadrada i d'almenys 192×192 píxels.
+
+**Avisos d'errors:** si alguna cosa falla (Gemini no respon, un calendari no es pot obrir, un WhatsApp no arriba, algú que no és al full escriu al secretari…), t'arriba un correu i un WhatsApp amb què ha passat i una pista de com arreglar-ho. El mateix error només s'avisa un cop cada 6 hores. Per enviar-los a un altre correu, afegeix la propietat `ADMIN_EMAIL`. Per provar-ho, executa **`provaAvisErrors`**.
+
 **Grups i colors:** cada persona pot tenir fins a **11 grups**, un per cada color de Google Calendar (vermell, rosa, taronja, groc, verd clar, verd, turquesa, blau, lavanda, lila i gris). Al principi tothom té **Esportec** (blau) i **Personal** (verd). Tot es fa per WhatsApp:
 - «Crea el grup Mar Aventura en taronja» · «Posa Esportec en vermell» (les cites que ja en són també canvien) · «Esborra el grup Mar Aventura» · «Quins grups tinc?»
 - «Sortida en kayak dissabte a les 10, Mar Aventura» → la pinta de taronja. Si és evident (una reunió d'equip, el metge…), el grup l'endevina sol.
