@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <title>Top La Molina 26-27</title>
-<!-- Tipografia: Akzidenz-Grotesk si està instal·lada; si no, Archivo (grotesca similar) -->
-<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&display=swap" rel="stylesheet">
+<!-- Tipografia: Akzidenz-Grotesk BQ Extended (fitxers a fonts/, no inclosos al repositori) -->
 <style>
+  @font-face{font-family:"Akzidenz Ext";src:url("fonts/AkzidenzGrotesk-Extended.otf") format("opentype");font-weight:400}
+  @font-face{font-family:"Akzidenz Ext";src:url("fonts/AkzidenzGrotesk-MediumExtended.otf") format("opentype");font-weight:500 600}
+  @font-face{font-family:"Akzidenz Ext";src:url("fonts/AkzidenzGrotesk-BoldExtended.otf") format("opentype");font-weight:700 900}
   @page { size: A3 portrait; margin: 0; }
   :root{
     --black:#000; --blue:#3db4e7; --blue-dark:#1f8fc4; --white:#fff; --muted:#5f6670;
-    --font:"Akzidenz-Grotesk Pro","Akzidenz-Grotesk BQ","Akzidenz-Grotesk","AkzidenzGrotesk",Archivo,"Helvetica Neue",Arial,sans-serif;
+    --font:"Akzidenz Ext","Akzidenz-Grotesk BQ","Helvetica Neue",Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:#fff;color:#000;font-family:var(--font);-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -111,7 +113,7 @@
         <div class="what">6 a 14 anys · 9:30 h – 12:30 h · grups per nivells</div>
       </div>
       <div>
-        <div class="p"><span class="from">des de</span><span class="n x" style="font-size:56pt">46,75 €</span></div>
+        <div class="p"><span class="from">des de</span><span class="n x" style="font-size:50pt">46,75 €</span></div>
         <div class="foot">per sessió amb el pack de 15 sessions · 1 sessió: 55 €</div>
       </div>
     </div>

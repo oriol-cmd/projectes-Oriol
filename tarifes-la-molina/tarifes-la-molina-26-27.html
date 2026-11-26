@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <title>Tarifes La Molina 26-27</title>
-<!-- Tipografia: Akzidenz-Grotesk si està instal·lada; si no, Archivo (grotesca similar) -->
-<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&display=swap" rel="stylesheet">
+<!-- Tipografia: Akzidenz-Grotesk BQ Extended (fitxers a fonts/, no inclosos al repositori) -->
 <style>
+  @font-face{font-family:"Akzidenz Ext";src:url("fonts/AkzidenzGrotesk-Extended.otf") format("opentype");font-weight:400}
+  @font-face{font-family:"Akzidenz Ext";src:url("fonts/AkzidenzGrotesk-MediumExtended.otf") format("opentype");font-weight:500 600}
+  @font-face{font-family:"Akzidenz Ext";src:url("fonts/AkzidenzGrotesk-BoldExtended.otf") format("opentype");font-weight:700 900}
   @page { size: A3 portrait; margin: 0; }
   :root{
     --black:#000; --blue:#3db4e7; --blue-soft:#e1f1f8; --ink:#111; --muted:#5f6670; --line:#dfe4e8;
-    --font:"Akzidenz-Grotesk Pro","Akzidenz-Grotesk BQ","Akzidenz-Grotesk","AkzidenzGrotesk",Archivo,"Helvetica Neue",Arial,sans-serif;
+    --font:"Akzidenz Ext","Akzidenz-Grotesk BQ","Helvetica Neue",Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:#fff;color:var(--ink);font-family:var(--font);font-stretch:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -17,12 +19,12 @@
 
   /* Capçalera */
   header{padding:13mm 16mm 0;display:flex;justify-content:space-between;align-items:flex-start}
-  header img{height:34mm}
+  header img{height:28mm}
   .where{text-align:right;padding-top:4mm}
   .where .loc{font-weight:900;font-style:italic;font-stretch:125%;font-size:30pt;text-transform:uppercase;letter-spacing:-.01em;line-height:1}
   .where .season{font-size:13pt;font-weight:500;color:var(--muted);margin-top:2mm}
   .title{padding:6mm 16mm 0}
-  h1{font-weight:900;font-style:italic;font-stretch:125%;font-size:60pt;line-height:.92;text-transform:uppercase;letter-spacing:-.02em}
+  h1{font-weight:900;font-style:italic;font-stretch:125%;font-size:54pt;line-height:.92;text-transform:uppercase;letter-spacing:-.02em}
   h1 span{color:var(--blue)}
   .ridge{display:block;width:100%;height:16mm;margin-top:3mm}
 
@@ -30,18 +32,18 @@
   section h2{font-weight:900;font-style:italic;font-stretch:125%;font-size:20pt;white-space:nowrap;text-transform:uppercase;letter-spacing:-.01em;border-bottom:3px solid var(--black);padding-bottom:1.5mm;margin-bottom:3mm;display:flex;justify-content:space-between;align-items:baseline}
   section h2 small{font-weight:500;font-style:normal;font-stretch:100%;font-size:10pt;text-transform:none;color:var(--muted);letter-spacing:0}
   h3{font-weight:700;font-size:10.5pt;text-transform:uppercase;letter-spacing:.12em;color:var(--blue);margin:4mm 0 1.5mm}
-  table{width:100%;border-collapse:collapse;font-size:11pt}
-  th{font-weight:700;font-size:9pt;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:1.6mm 1.5mm;border-bottom:1.5px solid var(--black);white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:9.6pt}
+  th{font-weight:700;font-size:7.6pt;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:1.6mm 1.5mm;border-bottom:1.5px solid var(--black);white-space:nowrap}
   th:first-child,td:first-child{text-align:left}
-  td{padding:1.9mm 1.5mm;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td{padding:1.6mm 1.2mm;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   td:first-child{white-space:normal}
-  td .d{display:block;font-size:8.5pt;color:var(--muted);font-weight:400}
+  td .d{display:block;font-size:7.5pt;color:var(--muted);font-weight:400}
   tr.hl td{background:var(--blue-soft);font-weight:700}
   .wide{grid-column:1/-1}
   .price-tag{display:flex;gap:5mm;align-items:center;background:var(--black);color:#fff;padding:3.5mm 5mm;margin-top:3mm}
   .price-tag b{font-weight:900;font-style:italic;font-stretch:125%;font-size:26pt;color:var(--blue);white-space:nowrap}
   .price-tag p{font-size:10pt;line-height:1.35}
-  .note{font-size:9pt;color:var(--muted);margin-top:2mm;line-height:1.4}
+  .note{font-size:8.3pt;color:var(--muted);margin-top:2mm;line-height:1.4}
   .tbd{color:#d9480f;font-weight:700}
 
   footer{background:var(--black);color:#fff;padding:7mm 16mm;display:flex;justify-content:space-between;align-items:center;margin-top:8mm;border-top:3mm solid var(--blue)}
