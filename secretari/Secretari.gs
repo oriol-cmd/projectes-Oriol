@@ -168,7 +168,8 @@ const ESQUEMA = {
           color: { type: 'STRING', enum: Object.keys(COLORS), description: 'Per a definir_grup' },
           hora_mati: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
           hora_vespre: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
-          nom_secretari: { type: 'STRING', description: 'Per a canviar_ajustos: com es diu el secretari' }
+          nom_secretari: { type: 'STRING', description: 'Per a canviar_ajustos: com es diu el secretari' },
+          genere_secretari: { type: 'STRING', enum: ['noi', 'noia'], description: 'Per a canviar_ajustos: si el secretari és un noi o una noia' }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
         required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria'],
@@ -191,7 +192,7 @@ function aten_(parts, u) {
   const esAdmin = esPropietari_(u);
 
   const sistema = [
-    (aj.nom ? 'Et dius ' + aj.nom + ' i ets' : 'Ets') + ' el secretari personal ' + (u.nom ? 'de ' + u.nom : "de l'usuari") + ' i hi parles per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.',
+    persona_(aj) + ' ' + de_(u.nom || 'usuari') + ' i hi parles per WhatsApp. Respon en la seva llengua (normalment català), amb missatges curts i clars. Pots fer servir *negreta* i emojis amb mesura.' + personaGenere_(aj),
     'Ara és ' + diaLlarg_(ara) + ' a les ' + fmt_(ara, 'HH:mm') + ' (' + TZ + ').',
     '',
     'Gestiones el seu Google Calendar amb aquestes accions:',
@@ -207,7 +208,7 @@ function aten_(parts, u) {
     '- Calcula les dates relatives («demà», «dijous que ve», «d\'aquí a 15 dies») a partir d\'avui. Hores ambigües: «a les 5» de la tarda si és més lògic (17:00).',
     '- Si no diu quant dura una cita, no posis «fi» (serà 1 hora).',
     '- avis_minuts només si demana un avís diferent del normal (' + aj.avis + ' min abans). -1 = sense avís. Per a «avisa\'m el dia abans», 1440.',
-    '- Ajustos d\'aquesta persona: resum del matí ' + (aj.mati === 'no' ? 'desactivat' : 'a les ' + aj.mati) + '; repàs del vespre ' + (aj.vespre === 'no' ? 'desactivat' : 'a les ' + aj.vespre) + '; avís de les cites ' + (aj.avis < 0 ? 'desactivat' : aj.avis + ' min abans') + '; el teu nom: ' + (aj.nom || '(cap, ets «el secretari»)') + '. Si els vol canviar («envia\'m el resum a les 7», «no vull el repàs del vespre», «avisa\'m sempre 1 hora abans», «a partir d\'ara et dius Marta»): canviar_ajustos amb NOMÉS els camps que canvien: hora_mati i hora_vespre ("HH:MM" o "no"), avis_minuts (minuts, -1 = cap), nom_secretari. Si pregunta els seus ajustos, digues-los.',
+    '- Ajustos d\'aquesta persona: resum del matí ' + (aj.mati === 'no' ? 'desactivat' : 'a les ' + aj.mati) + '; repàs del vespre ' + (aj.vespre === 'no' ? 'desactivat' : 'a les ' + aj.vespre) + '; avís de les cites ' + (aj.avis < 0 ? 'desactivat' : aj.avis + ' min abans') + '; el teu nom: ' + (aj.nom || '(cap)') + '; ets ' + (aj.genere === 'noia' ? 'una noia' : aj.genere === 'noi' ? 'un noi' : 'el secretari, sense gènere definit') + '. Si els vol canviar («envia\'m el resum a les 7», «no vull el repàs del vespre», «avisa\'m sempre 1 hora abans», «a partir d\'ara et dius Marta», «vull que siguis un noi»): canviar_ajustos amb NOMÉS els camps que canvien: hora_mati i hora_vespre ("HH:MM" o "no"), avis_minuts (minuts, -1 = cap), nom_secretari, genere_secretari (noi o noia). Si pregunta els seus ajustos, digues-los.',
     esAdmin
       ? '- Foto del secretari: si envia una imatge i demana posar-la de foto del secretari (o de perfil), foto_perfil. Recorda-li que la foto la veu tothom.'
       : '- Foto del secretari: és la mateixa per a tothom i només la pot canviar l\'administrador. Si la vol canviar, digues-li que ho demani a qui gestiona el secretari.',
@@ -345,6 +346,7 @@ function executa_(a, cal, refs, u, grups, imatge) {
     if (a.hora_vespre) aj.vespre = hora_(a.hora_vespre);
     if (a.avis_minuts != null && a.avis_minuts !== '') aj.avis = Number(a.avis_minuts);
     if (a.nom_secretari) aj.nom = String(a.nom_secretari).trim().slice(0, 40);
+    if (a.genere_secretari) aj.genere = genere_(a.genere_secretari);
     desaEstat_(u, 'AJUSTOS', JSON.stringify(aj));
     return;
   }
@@ -865,10 +867,34 @@ function ajustos_(u) {
     mati: HORA_RESUM_MATI == null ? 'no' : hora_(HORA_RESUM_MATI),
     vespre: HORA_RESUM_VESPRE == null ? 'no' : hora_(HORA_RESUM_VESPRE),
     avis: AVIS_PER_DEFECTE,
-    nom: ''
+    // El nom i si és noi o noia es poden posar al full (columnes F i G) i la persona els pot canviar per WhatsApp.
+    nom: (u && u.secretari) || '',
+    genere: genere_(u && u.genereSecretari)
   };
   const desat = u && estat_(u, 'AJUSTOS');
   return Object.assign(inicials, desat ? JSON.parse(desat) : {});
+}
+
+/** «noi», «noia» o '' a partir del que hi hagi escrit (noi/home/masculí, noia/dona/femení…). */
+function genere_(s) {
+  s = String(s || '').trim().toLowerCase();
+  if (/^(noia|dona|femen|f$|ella|secretària)/.test(s)) return 'noia';
+  if (/^(noi|home|mascul|m$|ell|secretari)/.test(s)) return 'noi';
+  return '';
+}
+
+/** Com es presenta el secretari: el seu nom i si és noi o noia. */
+function persona_(aj) {
+  return (aj.nom ? 'Et dius ' + aj.nom + ' i ets ' : 'Ets ') + (aj.genere === 'noia' ? 'la secretària personal' : 'el secretari personal');
+}
+
+/** «de Maria» / «d'Ignasi». */
+function de_(nom) { return (/^[aeiouàèéíïòóúüh]/i.test(nom) ? "d'" : 'de ') + nom; }
+
+function personaGenere_(aj) {
+  if (aj.genere === 'noia') return ' Ets una noia: parla de tu mateixa en femení («estic contenta», «soc la teva secretària»).';
+  if (aj.genere === 'noi') return ' Ets un noi: parla de tu mateix en masculí («estic content», «soc el teu secretari»).';
+  return '';
 }
 
 function esPropietari_(u) { return !!u && u.numero === digits_(prop_('MY_NUMBER')); }
@@ -910,14 +936,24 @@ function fullUsuaris_() {
   pestanya.setName('Persones');
   pestanya.getRange(1, 1, 1, 5).setValues([['Nom', 'Mòbil', 'Calendari', 'Correu', 'Actiu']]).setFontWeight('bold');
   pestanya.getRange(2, 1, 1, 5).setValues([['Jo', '+' + digits_(prop_('MY_NUMBER')), prop_('CALENDAR_ID', true) || Session.getEffectiveUser().getEmail(), Session.getEffectiveUser().getEmail(), 'Sí']]);
+  columnesSecretari_(pestanya);
   pestanya.getRange('B1').setNote('Amb el prefix del país: +34 600 11 12 22');
   pestanya.getRange('C1').setNote("El correu de Google de la persona (ha de compartir-te el seu calendari amb permís per «Fer canvis als esdeveniments»). Si ho deixes buit, se li crea un calendari nou al teu compte.");
   pestanya.getRange('D1').setNote('(Opcional) On li arriben els avisos si WhatsApp falla.');
   pestanya.getRange('E1').setNote('«No» per donar-la de baixa sense esborrar la fila.');
   pestanya.setFrozenRows(1);
-  pestanya.autoResizeColumns(1, 5);
+  pestanya.autoResizeColumns(1, 7);
   props.setProperty('USERS_SHEET_ID', full.getId());
   return full;
+}
+
+/** Afegeix al full les columnes F i G (nom del secretari i si és noi o noia), si encara no hi són. */
+function columnesSecretari_(pestanya) {
+  const cap = pestanya.getRange(1, 6, 1, 2);
+  if (String(cap.getValues()[0][0]).trim()) return;
+  cap.setValues([['Nom del secretari', 'Noi/Noia']]).setFontWeight('bold');
+  pestanya.getRange('F1').setNote("(Opcional) Com es diu el secretari per a aquesta persona, p. ex. «Marta». La persona el pot canviar per WhatsApp.");
+  pestanya.getRange('G1').setNote("(Opcional) «noi» o «noia»: si el secretari li parla com un noi o com una noia. La persona ho pot canviar per WhatsApp.");
 }
 
 /** Les persones donades d'alta. Sense full, només tu (MY_NUMBER). */
@@ -932,7 +968,7 @@ function usuaris_() {
       const f = files[i];
       const numero = numeroMobil_(f[1]);
       if (!numero || /^no$/i.test(String(f[4]).trim())) continue;
-      llista.push({ nom: String(f[0]).trim(), numero: numero, calId: String(f[2]).trim(), correu: String(f[3]).trim(), fila: i + 1 });
+      llista.push({ nom: String(f[0]).trim(), numero: numero, calId: String(f[2]).trim(), correu: String(f[3]).trim(), secretari: String(f[5] || '').trim(), genereSecretari: String(f[6] || '').trim(), fila: i + 1 });
     }
   }
   if (!llista.length) llista = [{ nom: '', numero: digits_(prop_('MY_NUMBER')), calId: prop_('CALENDAR_ID', true) || '', correu: '' }];
@@ -951,6 +987,7 @@ function propietari_() {
 
 /** Comprova que el secretari pot obrir el calendari de cada persona del full. Mira el registre. */
 function comprovaUsuaris() {
+  if (prop_('USERS_SHEET_ID', true)) columnesSecretari_(fullUsuaris_().getSheets()[0]);
   CacheService.getScriptCache().remove('usuaris');
   usuaris_().forEach(function (u) {
     try {

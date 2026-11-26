@@ -171,6 +171,8 @@ A dalt de `Secretari.gs`:
 
 Al principi tothom té el resum a les 8, el repàs a les 21 h i l'avís 30 min abans (`HORA_RESUM_MATI`, `HORA_RESUM_VESPRE` i `AVIS_PER_DEFECTE`, a dalt de `Secretari.gs`).
 
+**Nom i gènere del secretari per a cada persona:** al full hi ha dues columnes opcionals, **F «Nom del secretari»** i **G «Noi/Noia»**: p. ex. a l'Ignasi hi poses «Marta | noia» i a la Maria «Pau | noi», i el secretari es presenta així i parla de si mateix en femení o masculí. (Les columnes s'afegeixen soles en executar `comprovaUsuaris`.) Cada persona ho pot canviar per WhatsApp: «vull que siguis un noi i et diguis Pau».
+
 **Foto del secretari:** a WhatsApp la foto és del número, així que la veu tothom. La pots canviar tu (el número de `MY_NUMBER`) enviant-li una foto amb el text «posa-la de foto del secretari». Ha de ser quadrada i d'almenys 192×192 píxels.
 
 **Avisos d'errors:** si alguna cosa falla (Gemini no respon, un calendari no es pot obrir, un WhatsApp no arriba, algú que no és al full escriu al secretari…), t'arriba un correu i un WhatsApp amb què ha passat i una pista de com arreglar-ho. El mateix error només s'avisa un cop cada 6 hores. Per enviar-los a un altre correu, afegeix la propietat `ADMIN_EMAIL`. Per provar-ho, executa **`provaAvisErrors`**.
