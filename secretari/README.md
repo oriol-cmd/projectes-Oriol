@@ -177,6 +177,8 @@ Al principi tothom té el resum a les 8, el repàs a les 21 h i l'avís 30 min a
 
 **Avisos d'errors:** si alguna cosa falla (Gemini no respon, un calendari no es pot obrir, un WhatsApp no arriba, algú que no és al full escriu al secretari…), t'arriba un correu i un WhatsApp amb què ha passat i una pista de com arreglar-ho. El mateix error només s'avisa un cop cada 6 hores. Per enviar-los a un altre correu, afegeix la propietat `ADMIN_EMAIL`. Per provar-ho, executa **`provaAvisErrors`**.
 
+**Cites compartides:** si anomenes algú de l'equip com a participant d'una cita («reunió amb l'Ignasi dijous a les 10», «apunta-ho també a la Maria»), s'apunta també al seu calendari i li arriba un WhatsApp. Si després la mous o en canvies el lloc, també canvia per a ell, amb avís. Si l'anul·la qui l'ha creat, desapareix per a tothom; si l'esborra un altre, només de la seva agenda (i se n'avisa qui l'ha creat). Només es comparteix quan anomenes la persona, i les tasques no es comparteixen mai. Si al full t'has posat «Jo», l'equip et troba pel nom del correu (oriol@… → Oriol).
+
 **Grups i colors:** cada persona pot tenir fins a **11 grups**, un per cada color de Google Calendar (vermell, rosa, taronja, groc, verd clar, verd, turquesa, blau, lavanda, lila i gris). Al principi tothom té **Esportec** (blau) i **Personal** (verd). Tot es fa per WhatsApp:
 - «Crea el grup Mar Aventura en taronja» · «Posa Esportec en vermell» (les cites que ja en són també canvien) · «Esborra el grup Mar Aventura» · «Quins grups tinc?»
 - «Sortida en kayak dissabte a les 10, Mar Aventura» → la pinta de taronja. Si és evident (una reunió d'equip, el metge…), el grup l'endevina sol.

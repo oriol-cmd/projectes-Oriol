@@ -169,7 +169,8 @@ const ESQUEMA = {
           hora_mati: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
           hora_vespre: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
           nom_secretari: { type: 'STRING', description: 'Per a canviar_ajustos: com es diu el secretari' },
-          genere_secretari: { type: 'STRING', enum: ['noi', 'noia'], description: 'Per a canviar_ajustos: si el secretari és un noi o una noia' }
+          genere_secretari: { type: 'STRING', enum: ['noi', 'noia'], description: 'Per a canviar_ajustos: si el secretari és un noi o una noia' },
+          amb: { type: 'ARRAY', items: { type: 'STRING' }, description: "Noms de persones de l'equip amb qui es comparteix la cita" }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
         required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria'],
@@ -200,6 +201,7 @@ function aten_(parts, u) {
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
     '- Grups: cada cita o tasca pot tenir un grup, que li dona color al calendari. Grups d\'aquesta persona (nom → color): ' + llistaGrups_(grups) + '. Posa «categoria» = nom del grup quan l\'usuari ho digui («és d\'Esportec», «és personal») o quan sigui evident (p. ex. feina, clients, reunions d\'equip → esportec; metge, família, amics → personal). Si no és clar, «cap». Per canviar el grup d\'una cita existent, modificar amb la nova categoria.',
+    "- Equip (persones amb qui pot compartir cites): " + (equip_(u).map(nomEquip_).join(', ') || '(ningú)') + ". Compartir una CITA amb algú de l'equip (posar el seu nom a «amb») NOMÉS quan l'usuari l'anomena expressament com a participant de la cita («reunió amb l'Ignasi», «apunta-ho també a l'Ignasi»): s'apuntarà també al seu calendari i se li enviarà un avís. No ho dedueixis mai pel context, i les tasques («trucar a l'Ignasi», «parlar amb la Maria») no es comparteixen mai: «amb» buit. Si no és clar si la vol compartir, pregunta-ho. Només noms d'aquesta llista. Per afegir algú a una cita que ja existeix: modificar amb «amb». Si la modifiques o l'esborres, també canvia per a les altres persones.",
     '- Per crear un grup o canviar-ne el color («crea el grup Mar Aventura en taronja», «posa Esportec en vermell»): definir_grup amb titol = nom del grup i color. Per esborrar-lo: esborrar_grup amb titol. Colors possibles: ' + Object.keys(COLORS).join(', ') + '. Cada grup té un color diferent, així que com a màxim hi pot haver ' + Object.keys(COLORS).length + ' grups. Si demana un color que ja és d\'un altre grup, o ja no en queden de lliures, digues-li quins colors queden lliures. Si demana els grups que té, digues-los amb el color.',
     '- A cada acció omple SEMPRE tipus, ref, titol, inici, fi, recorda_a i categoria (cadena buida "" si no cal, «cap» a categoria). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
     "- Recordatoris: «recorda'm X a les 17h», «avisa'm demà a les 9 que…», «el dia 20 recorda'm que el 25 he de pagar» → crear_tasca amb recorda_a = el dia i l'hora exactes de l'avís (AAAA-MM-DDTHH:MM) i inici = el dia de la tasca. Per a una cita amb hora, l'avís previ va a avis_minuts (p. ex. «avisa'm una hora abans» → 60).",
@@ -244,7 +246,7 @@ function aten_(parts, u) {
     ]);
   }
   // Si a alguna acció li falta una dada (p. ex. el dia), li demanem a Gemini que la corregeixi.
-  const problemes = problemesAccions_(res.accions, ctx.refs, grups, { esAdmin: esAdmin, teImatge: !!imatge });
+  const problemes = problemesAccions_(res.accions, ctx.refs, grups, { esAdmin: esAdmin, teImatge: !!imatge, u: u });
   if (problemes.length) {
     registre_('Accions incompletes, ho torno a demanar: ' + JSON.stringify(res.accions) + ' → ' + problemes.join('; '));
     res = gemini_(sistema, [
@@ -257,9 +259,11 @@ function aten_(parts, u) {
   const errors = [];
   // Primer els canvis de grups, perquè una cita nova ja pugui fer servir un grup creat en el mateix missatge.
   const ordre = function (a) { return /_grup$/.test(a.tipus) ? 0 : 1; };
+  const infos = [];
   (res.accions || []).slice().sort(function (a, b) { return ordre(a) - ordre(b); }).forEach(function (a) {
     try {
-      executa_(a, cal, ctx.refs, u, grups, imatge);
+      const info = executa_(a, cal, ctx.refs, u, grups, imatge);
+      if (info) infos.push(info);
     } catch (err) {
       errors.push('⚠️ No he pogut fer «' + (a.titol || a.ref || a.tipus) + '»: ' + (err && err.message ? err.message : err));
     }
@@ -268,7 +272,7 @@ function aten_(parts, u) {
   // Si alguna cosa ha fallat, no comencem dient «Apuntat».
   if (errors.length) avisaAdmin_('No s\'ha pogut fer el que demanava ' + nomDe_(u), errors.join('\n') + '\n\nMissatge: ' + (res.peticio || ''));
   const fet = (res.accions || []).length > errors.length;
-  const resposta = (errors.length && !fet ? errors : [res.resposta || 'Fet.'].concat(errors)).join('\n\n');
+  const resposta = (errors.length && !fet ? errors : [res.resposta || 'Fet.'].concat(infos, errors)).join('\n\n');
 
   historial.push({ u: String(res.peticio || '').slice(0, 300), r: resposta.slice(0, 500) });
   desaEstat_(u, 'HISTORIAL', JSON.stringify(historial.slice(-MAX_HISTORIAL)));
@@ -286,6 +290,10 @@ function problemesAccions_(accions, refs, grups, opcions) {
     if (cat && cat !== 'cap' && !(grups || {})[cat] && nousGrups.indexOf(cat) < 0) {
       problemes.push(nom + ' fa servir el grup «' + a.categoria + '», que no existeix (grups: ' + Object.keys(grups || {}).join(', ') + '). Fes servir un d\'aquests, «cap», o crea\'l amb definir_grup si l\'usuari ho demana');
     }
+    if ((a.amb || []).length && a.tipus !== 'crear_cita' && a.tipus !== 'modificar') problemes.push(nom + ': només les cites es poden compartir; deixa «amb» buit');
+    (a.amb || []).forEach(function (n) {
+      if (!membre_(n, opcions.u)) problemes.push(nom + ': «' + n + '» no és de l\'equip (equip: ' + equip_(opcions.u).map(nomEquip_).join(', ') + ')');
+    });
     if (a.tipus === 'canviar_ajustos') {
       ['hora_mati', 'hora_vespre'].forEach(function (k) {
         if (a[k] && !/^(no|\d{1,2}(:\d{2})?)$/i.test(String(a[k]).trim())) problemes.push(nom + ' té «' + k + '» no vàlid: ' + a[k] + ' (cal "HH:MM" o "no")');
@@ -333,7 +341,8 @@ function context_(cal, ara, grups) {
     const r = 'E' + (agenda.length + 1);
     refs[r] = ev;
     const cat = categoria_(ev, grups);
-    agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (cat ? ' | ' + cat : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
+    const amb = ev.getTag('amb');
+    agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (cat ? ' | ' + cat : '') + (amb ? ' | compartida amb ' + amb : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
   });
   return { refs: refs, agenda: agenda, tasques: tasques };
 }
@@ -401,7 +410,7 @@ function executa_(a, cal, refs, u, grups, imatge) {
     }
     if (a.avis_minuts != null && a.avis_minuts !== ajustos_(u).avis) ev.setTag('avis', String(a.avis_minuts));
     posaColor_(ev, a.categoria, grups);
-    return;
+    return (a.amb || []).length ? compartir_(ev, a.amb, u) : '';
   }
 
   if (a.tipus === 'crear_tasca') {
@@ -417,31 +426,132 @@ function executa_(a, cal, refs, u, grups, imatge) {
   if (!ev) throw new Error("no trobo aquesta cita o tasca a l'agenda");
 
   if (a.tipus === 'esborrar') {
+    const copies = trobaCopies_(ev, u);
+    const titol = ev.getTitle(), quan = quan_(ev);
+    const creador = ev.getTag('creador');
     if (a.tota_la_serie && ev.isRecurringEvent()) ev.getEventSeries().deleteEventSeries();
     else ev.deleteEvent();
+    if (!copies.length) return '';
+    if (creador && creador !== u.numero) {
+      // No l'ha creada ella: només la treu de la seva agenda i n'avisa qui la va crear.
+      copies.filter(function (c) { return c.m.numero === creador; }).forEach(function (c) {
+        envia_('ℹ️ *' + nomEquip_(u) + "* ha tret de la seva agenda la cita compartida *" + titol + '* (' + quan + ').', c.m);
+      });
+      return '';
+    }
+    copies.forEach(function (c) {
+      c.ev.deleteEvent();
+      envia_('❌ *' + nomEquip_(u) + '* ha anul·lat la cita compartida *' + titol + '* (' + quan + ").", c.m);
+    });
+    return "👥 També l'he treta de l'agenda " + de_(llistaNoms_(copies.map(function (c) { return nomEquip_(c.m); }))) + ' i ' + (copies.length > 1 ? 'els' : 'li') + ' he enviat un avís.';
   } else if (a.tipus === 'fet') {
     ev.setTitle(FETA + ev.getTitle().replace(TASCA, ''));
   } else if (a.tipus === 'modificar') {
-    const esTasca = ev.getTitle().indexOf(TASCA) === 0;
-    if (a.titol) ev.setTitle((esTasca ? TASCA : '') + a.titol);
-    if (a.inici) {
-      if (ev.isAllDayEvent()) {
-        ev.setAllDayDate(data_(a.inici.slice(0, 10)));
-      } else {
-        // Si només diu el dia, mantenim l'hora.
-        const ini = data_(esDia_(a.inici) ? a.inici + 'T' + fmt_(ev.getStartTime(), 'HH:mm') : a.inici);
-        const fi = a.fi && !esDia_(a.fi) ? data_(a.fi) : new Date(ini.getTime() + (ev.getEndTime() - ev.getStartTime()));
-        ev.setTime(ini, fi);
-      }
-    } else if (a.fi && !ev.isAllDayEvent() && !esDia_(a.fi)) {
-      ev.setTime(ev.getStartTime(), data_(a.fi));
-    }
-    if (a.lloc) ev.setLocation(a.lloc);
+    const copies = trobaCopies_(ev, u);
+    modificaComu_(ev, a);
     posaColor_(ev, a.categoria, grups);
-    if (a.notes) ev.setDescription(a.notes);
     if (a.avis_minuts != null) ev.setTag('avis', String(a.avis_minuts));
     if (a.recorda_a) ev.setTag('recorda_a', data_(a.recorda_a) && a.recorda_a.slice(0, 16));
+    const infos = [];
+    // Si és compartida i canvia el títol, l'hora, el lloc o les notes, també per a les altres persones.
+    if (copies.length && (a.titol || a.inici || a.fi || a.lloc || a.notes)) {
+      copies.forEach(function (c) {
+        modificaComu_(c.ev, a);
+        envia_('✏️ *' + nomEquip_(u) + '* ha canviat la cita compartida: *' + c.ev.getTitle() + '*, ara ' + quan_(c.ev) + (c.ev.getLocation() ? ' 📍 ' + c.ev.getLocation() : '') + '.', c.m);
+      });
+      infos.push("👥 També l'he canviada a l'agenda " + de_(llistaNoms_(copies.map(function (c) { return nomEquip_(c.m); }))) + ' i ' + (copies.length > 1 ? 'els' : 'li') + ' he enviat un avís.');
+    }
+    if ((a.amb || []).length) infos.push(compartir_(ev, a.amb, u));
+    return infos.filter(Boolean).join('\n');
   }
+}
+
+/** Canvis d'una cita que també s'apliquen a les còpies compartides: títol, dia i hora, lloc i notes. */
+function modificaComu_(ev, a) {
+  const esTasca = ev.getTitle().indexOf(TASCA) === 0;
+  if (a.titol) ev.setTitle((esTasca ? TASCA : '') + a.titol);
+  if (a.inici) {
+    if (ev.isAllDayEvent()) {
+      ev.setAllDayDate(data_(a.inici.slice(0, 10)));
+    } else {
+      // Si només diu el dia, mantenim l'hora.
+      const ini = data_(esDia_(a.inici) ? a.inici + 'T' + fmt_(ev.getStartTime(), 'HH:mm') : a.inici);
+      const fi = a.fi && !esDia_(a.fi) ? data_(a.fi) : new Date(ini.getTime() + (ev.getEndTime() - ev.getStartTime()));
+      ev.setTime(ini, fi);
+    }
+  } else if (a.fi && !ev.isAllDayEvent() && !esDia_(a.fi)) {
+    ev.setTime(ev.getStartTime(), data_(a.fi));
+  }
+  if (a.lloc) ev.setLocation(a.lloc);
+  if (a.notes) ev.setDescription(a.notes);
+}
+
+// ── Cites compartides amb l'equip ───────────────────────────────────────────
+
+/** Les altres persones del full. */
+function equip_(u) {
+  return usuaris_().filter(function (m) { return !u || m.numero !== u.numero; });
+}
+
+/** El nom d'una persona per a l'equip (si al full posa «Jo», el treu del correu: oriol@… → Oriol). */
+function nomEquip_(m) {
+  if (m.nom && !/^jo$/i.test(m.nom.trim())) return m.nom;
+  const c = String(m.correu || '').split('@')[0];
+  return c ? c.charAt(0).toUpperCase() + c.slice(1) : '+' + m.numero;
+}
+
+function membre_(nom, u) {
+  const n = String(nom || '').trim().toLowerCase().replace(/^(l'|la |el |en |na )/, '');
+  return equip_(u).filter(function (m) {
+    const nm = nomEquip_(m).toLowerCase();
+    return nm === n || nm.split(' ')[0] === n.split(' ')[0];
+  })[0] || null;
+}
+
+function llistaNoms_(noms) {
+  return noms.length > 1 ? noms.slice(0, -1).join(', ') + ' i ' + noms[noms.length - 1] : noms[0];
+}
+
+/** Copia una cita al calendari d'altres persones de l'equip i les avisa. Totes les còpies porten la mateixa marca. */
+function compartir_(ev, noms, u) {
+  const id = ev.getTag('compartida') || Utilities.getUuid();
+  ev.setTag('compartida', id);
+  if (!ev.getTag('creador')) ev.setTag('creador', u.numero);
+  const ja = String(ev.getTag('amb') || '').split(',').filter(Boolean);
+  const nous = [];
+  noms.forEach(function (n) {
+    const m = membre_(n, u);
+    if (!m) throw new Error('no trobo «' + n + "» a l'equip");
+    if (ja.indexOf(nomEquip_(m)) >= 0 || nous.indexOf(nomEquip_(m)) >= 0) return;
+    const op = { location: ev.getLocation(), description: [ev.getDescription(), 'Apuntada per ' + nomEquip_(u) + ' (' + NOM + ')'].filter(Boolean).join('\n') };
+    const cal = calendari_(m);
+    const copia = ev.isAllDayEvent()
+      ? cal.createAllDayEvent(ev.getTitle(), ev.getAllDayStartDate(), ev.getAllDayEndDate(), op)
+      : cal.createEvent(ev.getTitle(), ev.getStartTime(), ev.getEndTime(), op);
+    copia.setTag('compartida', id);
+    copia.setTag('creador', ev.getTag('creador'));
+    copia.setTag('amb', nomEquip_(u));
+    envia_('📅 *' + nomEquip_(u) + "* t'ha apuntat a l'agenda: *" + ev.getTitle() + '*, ' + quan_(copia) + (ev.getLocation() ? ' 📍 ' + ev.getLocation() : '') + '.', m);
+    nous.push(nomEquip_(m));
+  });
+  ev.setTag('amb', ja.concat(nous).join(','));
+  return nous.length ? "👥 També ho he apuntat a l'agenda " + de_(llistaNoms_(nous)) + ' i ' + (nous.length > 1 ? 'els' : 'li') + ' he enviat un avís.' : '';
+}
+
+/** Les còpies d'una cita compartida que hi ha als calendaris de les altres persones. */
+function trobaCopies_(ev, u) {
+  const id = ev.getTag('compartida');
+  if (!id) return [];
+  const ini = ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime();
+  const copies = [];
+  equip_(u).forEach(function (m) {
+    try {
+      calendari_(m).getEvents(new Date(ini.getTime() - 864e5), new Date(ini.getTime() + 2 * 864e5)).forEach(function (e) {
+        if (e.getTag('compartida') === id) copies.push({ m: m, ev: e });
+      });
+    } catch (err) { console.warn('No puc mirar el calendari de ' + nomDe_(m) + ': ' + err); }
+  });
+  return copies;
 }
 
 /** Els grups d'una persona (nom → color). Al principi, els de GRUPS_PER_DEFECTE. */
