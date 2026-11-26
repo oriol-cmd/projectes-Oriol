@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd8a8"/><stop offset="1" stop-color="#ff9f68"/></linearGradient>
+  </defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <!-- cos -->
+  <path d="M150 640 C160 500 230 450 320 450 C410 450 480 500 490 640 Z" fill="#1f3b5c"/>
+  <path d="M285 452 L320 520 L355 452 Z" fill="#ffffff"/>
+  <path d="M308 470 L320 540 L332 470 Z" fill="#e8553e"/>
+  <!-- coll -->
+  <rect x="292" y="400" width="56" height="60" rx="20" fill="#f1b892"/>
+  <!-- cap -->
+  <ellipse cx="320" cy="300" rx="112" ry="122" fill="#f6c6a3"/>
+  <!-- cabells -->
+  <path d="M206 300 C200 190 270 160 330 165 C410 170 445 220 436 300 C430 250 400 215 350 220 C300 226 260 210 236 240 C222 258 214 280 206 300 Z" fill="#4a2c20"/>
+  <!-- orelles -->
+  <ellipse cx="208" cy="310" rx="16" ry="24" fill="#f1b892"/>
+  <ellipse cx="432" cy="310" rx="16" ry="24" fill="#f1b892"/>
+  <!-- auriculars -->
+  <path d="M196 300 C196 180 444 180 444 300" fill="none" stroke="#1f3b5c" stroke-width="14" stroke-linecap="round"/>
+  <rect x="180" y="285" width="30" height="58" rx="14" fill="#1f3b5c"/>
+  <rect x="430" y="285" width="30" height="58" rx="14" fill="#1f3b5c"/>
+  <path d="M196 340 C200 385 240 400 285 395" fill="none" stroke="#1f3b5c" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="290" cy="394" r="10" fill="#e8553e"/>
+  <!-- ulls -->
+  <ellipse cx="280" cy="305" rx="11" ry="14" fill="#2b1a14"/>
+  <ellipse cx="360" cy="305" rx="11" ry="14" fill="#2b1a14"/>
+  <circle cx="284" cy="300" r="4" fill="#fff"/><circle cx="364" cy="300" r="4" fill="#fff"/>
+  <path d="M262 278 Q280 268 298 276" fill="none" stroke="#4a2c20" stroke-width="6" stroke-linecap="round"/>
+  <path d="M342 276 Q360 268 378 278" fill="none" stroke="#4a2c20" stroke-width="6" stroke-linecap="round"/>
+  <!-- galtes i somriure -->
+  <ellipse cx="258" cy="338" rx="16" ry="9" fill="#f29c86" opacity=".6"/>
+  <ellipse cx="382" cy="338" rx="16" ry="9" fill="#f29c86" opacity=".6"/>
+  <path d="M290 350 Q320 378 350 350" fill="none" stroke="#9b3b2b" stroke-width="7" stroke-linecap="round"/>
+  <!-- llibreta -->
+  <g transform="rotate(-8 450 520)">
+    <rect x="395" y="470" width="120" height="140" rx="12" fill="#ffffff" stroke="#1f3b5c" stroke-width="6"/>
+    <rect x="395" y="470" width="120" height="32" rx="12" fill="#e8553e"/>
+    <line x1="415" y1="530" x2="495" y2="530" stroke="#9fb3c8" stroke-width="6" stroke-linecap="round"/>
+    <line x1="415" y1="555" x2="480" y2="555" stroke="#9fb3c8" stroke-width="6" stroke-linecap="round"/>
+    <path d="M418 582 l12 12 l22 -24" fill="none" stroke="#2e9e5b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

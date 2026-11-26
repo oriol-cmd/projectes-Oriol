@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9be7e0"/><stop offset="1" stop-color="#3fb6c8"/></linearGradient>
+  </defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <!-- antena -->
+  <line x1="320" y1="120" x2="320" y2="170" stroke="#2c3e50" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="320" cy="112" r="18" fill="#ff6b5a"/>
+  <!-- cap -->
+  <rect x="190" y="165" width="260" height="200" rx="60" fill="#f7f9fb" stroke="#2c3e50" stroke-width="10"/>
+  <rect x="222" y="205" width="196" height="118" rx="40" fill="#2c3e50"/>
+  <ellipse cx="280" cy="262" rx="20" ry="24" fill="#7ff0e4"/>
+  <ellipse cx="360" cy="262" rx="20" ry="24" fill="#7ff0e4"/>
+  <path d="M296 298 Q320 314 344 298" fill="none" stroke="#7ff0e4" stroke-width="7" stroke-linecap="round"/>
+  <rect x="168" y="235" width="26" height="62" rx="12" fill="#ff6b5a"/>
+  <rect x="446" y="235" width="26" height="62" rx="12" fill="#ff6b5a"/>
+  <!-- cos -->
+  <rect x="215" y="380" width="210" height="200" rx="44" fill="#f7f9fb" stroke="#2c3e50" stroke-width="10"/>
+  <path d="M290 380 L320 410 L350 380" fill="#ff6b5a" stroke="#2c3e50" stroke-width="6" stroke-linejoin="round"/>
+  <!-- calendari al pit -->
+  <rect x="262" y="425" width="116" height="108" rx="14" fill="#ffffff" stroke="#2c3e50" stroke-width="7"/>
+  <rect x="262" y="425" width="116" height="30" rx="12" fill="#ff6b5a" stroke="#2c3e50" stroke-width="7"/>
+  <line x1="290" y1="414" x2="290" y2="438" stroke="#2c3e50" stroke-width="7" stroke-linecap="round"/>
+  <line x1="350" y1="414" x2="350" y2="438" stroke="#2c3e50" stroke-width="7" stroke-linecap="round"/>
+  <path d="M292 490 l18 18 l38 -40" fill="none" stroke="#25a35a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- braç saludant -->
+  <path d="M425 430 C470 410 488 370 480 330" fill="none" stroke="#2c3e50" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="480" cy="318" r="24" fill="#f7f9fb" stroke="#2c3e50" stroke-width="9"/>
+  <path d="M215 440 C180 470 175 510 190 540" fill="none" stroke="#2c3e50" stroke-width="22" stroke-linecap="round"/>
+</svg>
