@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<title>Top La Molina 26-27</title>
+<!-- Tipografia: Akzidenz-Grotesk si està instal·lada; si no, Archivo (grotesca similar) -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&display=swap" rel="stylesheet">
+<style>
+  @page { size: A3 portrait; margin: 0; }
+  :root{
+    --black:#000; --blue:#3db4e7; --blue-dark:#1f8fc4; --white:#fff; --muted:#5f6670;
+    --font:"Akzidenz-Grotesk Pro","Akzidenz-Grotesk BQ","Akzidenz-Grotesk","AkzidenzGrotesk",Archivo,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff;color:#000;font-family:var(--font);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{width:297mm;height:420mm;display:flex;flex-direction:column;overflow:hidden}
+  .x{font-weight:900;font-style:italic;font-stretch:125%;text-transform:uppercase;letter-spacing:-.02em}
+
+  header{padding:9mm 14mm 6mm;display:flex;justify-content:space-between;align-items:center}
+  header img{height:22mm}
+  header .where{text-align:right}
+  header .where .loc{font-size:28pt;line-height:1}
+  header .where .season{font-size:12pt;font-weight:600;color:var(--muted);margin-top:1.5mm;letter-spacing:.08em}
+
+  .hero{background:var(--black);color:#fff;padding:9mm 14mm 0;position:relative}
+  .hero .kicker{font-size:15pt;font-weight:700;letter-spacing:.3em;color:var(--blue);text-transform:uppercase}
+  .hero h1{font-size:72pt;line-height:.86;margin-top:2mm}
+  .hero h1 .price{color:var(--blue);display:block;font-size:118pt;line-height:.92;white-space:nowrap}
+  .hero h1 .price small{font-size:40pt;color:#fff;letter-spacing:0;margin-left:3mm}
+  .hero .sub{font-size:13pt;font-weight:500;color:#cfd6dc;margin-top:1mm;padding-bottom:3mm}
+  .hero svg.ridge{display:block;width:calc(100% + 28mm);margin-left:-14mm;height:12mm}
+
+  .grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,minmax(0,1fr));gap:4mm;padding:4mm 14mm 0}
+  .tile{position:relative;padding:6mm 8mm;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+  .tile.b{background:var(--blue);color:#000}
+  .tile.k{background:var(--black);color:#fff}
+  .tile.w{background:#fff;color:#000;border:2.5px solid #000}
+  .tile .tag{display:inline-block;font-size:9.5pt;font-weight:800;letter-spacing:.18em;text-transform:uppercase;padding:1.3mm 2.6mm;background:#000;color:var(--blue);align-self:flex-start}
+  .tile.k .tag{background:var(--blue);color:#000}
+  .tile h2{font-size:21pt;line-height:.95;margin-top:3mm}
+  .tile .what{font-size:11pt;font-weight:500;margin-top:1.5mm;opacity:.8}
+  .tile .p{display:flex;align-items:baseline;gap:2.5mm;white-space:nowrap}
+  .tile .p .from{font-size:12pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .tile .p .n{font-size:66pt;line-height:.85}
+  .tile .p .unit{font-size:15pt;font-weight:700}
+  .tile.k .p .n{color:var(--blue)}
+  .tile .foot{font-size:10.5pt;font-weight:500;margin-top:2mm;line-height:1.35}
+  .tile svg.ic{position:absolute;right:7mm;top:7mm;width:24mm;height:24mm}
+
+  footer{display:flex;align-items:center;gap:8mm;padding:6mm 14mm;margin-top:4mm;background:var(--black);color:#fff;border-top:3mm solid var(--blue)}
+  footer .qr{background:#fff;padding:2.5mm;width:30mm;height:30mm}
+  footer .qr img{width:100%;height:100%;display:block}
+  footer .cta{font-size:30pt;line-height:.95}
+  footer .cta span{color:var(--blue)}
+  footer .info{margin-left:auto;text-align:right;font-size:11pt;color:#cfd6dc;line-height:1.55}
+  footer .info b{color:#fff;font-size:15pt}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <img src="logo-esportec.png" alt="Esportec Outdoor Sport">
+    <div class="where">
+      <div class="loc x">La Molina</div>
+      <div class="season">TEMPORADA 26/27</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="kicker">Lloguer · Classes · Cursets</div>
+    <h1 class="x">A la neu<span class="price">17 €<small>/dia</small></span></h1>
+    <div class="sub">Equip complet infantil d'esquí: esquís, botes i bastons</div>
+    <svg class="ridge" viewBox="0 0 1000 60" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points="0,40 520,40 590,8 604,18 636,0 706,40 760,40 792,58 824,40 1000,40" fill="none" stroke="#3db4e7" stroke-width="4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    </svg>
+  </section>
+
+  <div class="grid">
+    <!-- 1 -->
+    <div class="tile b">
+      <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"><path d="M10 42 L30 6"/><path d="M18 44 L38 8"/><path d="M8 40 l6 3"/><path d="M16 42 l6 3"/></svg>
+      <div>
+        <span class="tag">Top lloguer</span>
+        <h2 class="x">Equip complet<br>adult</h2>
+        <div class="what">Esquís + botes + bastons · gamma mitjana</div>
+      </div>
+      <div>
+        <div class="p"><span class="n x">25 €</span><span class="unit">/ dia</span></div>
+        <div class="foot">4 dies per 76 € · Gamma alta / freeride: 40 € / dia</div>
+      </div>
+    </div>
+    <!-- 2 -->
+    <div class="tile k">
+      <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="#3db4e7" stroke-width="3" stroke-linecap="round"><rect x="17" y="3" width="14" height="42" rx="7" transform="rotate(30 24 24)"/><path d="M17 18 l9 5"/><path d="M13 27 l9 5"/></svg>
+      <div>
+        <span class="tag">Top snow</span>
+        <h2 class="x">Equip complet<br>snowboard</h2>
+        <div class="what">Taula + botes</div>
+      </div>
+      <div>
+        <div class="p"><span class="n x">35 €</span><span class="unit">/ dia</span></div>
+        <div class="foot">2 dies per 60 € · 4 dies per 110 €</div>
+      </div>
+    </div>
+    <!-- 3 -->
+    <div class="tile k">
+      <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="#3db4e7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="12" r="5"/><circle cx="33" cy="12" r="5"/><path d="M9 44 V28 a7 7 0 0 1 14 0 V44"/><path d="M26 44 V28 a7 7 0 0 1 14 0 V44"/></svg>
+      <div>
+        <span class="tag">Top infants</span>
+        <h2 class="x">Cursets<br>d'esquí</h2>
+        <div class="what">6 a 14 anys · 9:30 h – 12:30 h · grups per nivells</div>
+      </div>
+      <div>
+        <div class="p"><span class="from">des de</span><span class="n x" style="font-size:56pt">46,75 €</span></div>
+        <div class="foot">per sessió amb el pack de 15 sessions · 1 sessió: 55 €</div>
+      </div>
+    </div>
+    <!-- 4 -->
+    <div class="tile b">
+      <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="10" r="6"/><path d="M24 16 V32"/><path d="M14 24 H34"/><path d="M24 32 L16 44"/><path d="M24 32 L32 44"/></svg>
+      <div>
+        <span class="tag">Top classes</span>
+        <h2 class="x">Classe<br>particular</h2>
+        <div class="what">2 hores · esquí o snowboard · 6 a 99 anys</div>
+      </div>
+      <div>
+        <div class="p"><span class="from">des de</span><span class="n x">110 €</span></div>
+        <div class="foot">Fins a 4 persones del mateix nivell, des de 176 € la classe (44 € per persona)</div>
+      </div>
+    </div>
+    <!-- 5 -->
+    <div class="tile w">
+      <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="#3db4e7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 30 a16 16 0 0 1 32 0 Z"/><path d="M8 30 H40 v4 H8 Z"/><path d="M24 14 V30"/></svg>
+      <div>
+        <span class="tag">Petits esquiadors</span>
+        <h2 class="x">De 3 a 5<br>anys</h2>
+        <div class="what">Classe individual de 2 hores, en qualsevol horari</div>
+      </div>
+      <div>
+        <div class="p"><span class="n x">110 €</span></div>
+        <div class="foot">Esquí o snowboard. Casc per 3,50 € / dia</div>
+      </div>
+    </div>
+    <!-- 6 -->
+    <div class="tile w">
+      <svg class="ic" viewBox="0 0 48 48" fill="none" stroke="#3db4e7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 40 L18 18 L24 26 L32 12 L44 40 Z"/><path d="M28 18 l4 4 l4 -4"/></svg>
+      <div>
+        <span class="tag">Muntanya</span>
+        <h2 class="x">Esquí de<br>muntanya</h2>
+        <div class="what">Esquís de muntanya · equip DVA + pala + sonda</div>
+      </div>
+      <div>
+        <div class="p"><span class="n x">27 €</span><span class="unit">/ dia</span></div>
+        <div class="foot">Equip de seguretat: 25 € / dia · Raquetes: 13 € / dia</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="qr"><img src="qr-escolaesqui.svg" alt="QR escolaesqui.cat"></div>
+    <div class="cta x">Reserva a<br><span>escolaesqui.cat</span></div>
+    <div class="info"><b>658 188 936</b><br>hola@escolaesqui.cat<br>Preus per persona · IVA inclòs</div>
+  </footer>
+</div>
+</body>
+</html>
