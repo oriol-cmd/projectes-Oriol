@@ -204,7 +204,7 @@ function aten_(parts, u) {
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
     '- Grups: cada cita o tasca pot tenir un grup, que li dona color al calendari. Grups d\'aquesta persona (nom → color): ' + llistaGrups_(grups) + '. Posa «categoria» = nom del grup quan l\'usuari ho digui («és d\'Esportec», «és personal») o quan sigui evident (p. ex. feina, clients, reunions d\'equip → esportec; metge, família, amics → personal). Si no és clar, «cap». Per canviar el grup d\'una cita existent, modificar amb la nova categoria.',
-    "- Calendaris compartits d'aquesta persona: " + llistaCalendarisExtra_(cal) + ". Si una cita o tasca és amb alguna de les persones d'un calendari compartit («sopar amb la Laura») o diu el nom del calendari («posa-ho a Família»), posa el nom del calendari a «calendari»: s'apuntarà allà i la veuran tots dos (no cal convidar-la). Si no, «calendari» buit. MOLT IMPORTANT: si un nom pot ser alhora algú de l'equip i algú d'un calendari compartit (p. ex. «Maria»), NO facis cap acció i pregunta a quina persona es refereix, tret que digui el cognom, un parentiu que consti al full («la meva dona») o que el context ho deixi del tot clar. A l'AGENDA, les cites d'aquests calendaris porten «calendari X».",
+    "- Calendaris compartits d'aquesta persona: " + llistaCalendarisExtra_(cal) + ". Si una cita o tasca és amb alguna de les persones d'un calendari compartit («sopar amb la Laura») o diu el nom del calendari («posa-ho a Família»), posa el nom del calendari a «calendari»: s'apuntarà allà i la veuran tots dos (no cal convidar-la). Si no, «calendari» buit. MOLT IMPORTANT: si un nom coincideix amb una persona d'un calendari compartit (p. ex. «Maria»), és aquesta persona (va al calendari compartit, «amb» buit), encara que algú de l'equip es digui igual de nom; per compartir-la amb la persona de l'equip, l'usuari ha de dir el nom complet tal com surt a la llista de l'equip (p. ex. «Maria Grillo»). Si tot i així no és clar, pregunta. A l'AGENDA, les cites d'aquests calendaris porten «calendari X».",
     "- Contactes de fora de l'equip (nom → correu): " + llistaContactes_(contactes_(u)) + ". Per desar-ne un («la meva dona és la Laura, laura@gmail.com», «el correu del Pere és…»): definir_contacte amb titol = nom i correu. Per treure'l: esborrar_contacte. Per convidar algú de fora de l'equip a una CITA, posa el seu nom (dels contactes) o el seu correu a «convidats» NOMÉS quan l'usuari l'anomeni expressament com a participant («sopar amb la Laura»): li arribarà una invitació de Google Calendar per correu i la cita li sortirà al seu calendari (si la mous o l'anul·les, a ella també). Si anomena algú que no és de l'equip ni dels contactes, pregunta-li el correu abans de convidar-lo. Les tasques no tenen convidats.",
     "- Equip (persones amb qui pot compartir cites): " + (equip_(u).map(nomEquip_).join(', ') || '(ningú)') + ". Compartir una CITA amb algú de l'equip (posar el seu nom a «amb») NOMÉS quan l'usuari l'anomena expressament com a participant de la cita («reunió amb l'Ignasi», «apunta-ho també a l'Ignasi»): s'apuntarà també al seu calendari i se li enviarà un avís. No ho dedueixis mai pel context, i les tasques («trucar a l'Ignasi», «parlar amb la Maria») no es comparteixen mai: «amb» buit. Si no és clar si la vol compartir, pregunta-ho. Només noms d'aquesta llista. Per afegir algú a una cita que ja existeix: modificar amb «amb». Si la modifiques o l'esborres, també canvia per a les altres persones.",
     '- Per crear un grup o canviar-ne el color («crea el grup Mar Aventura en taronja», «posa Esportec en vermell»): definir_grup amb titol = nom del grup i color. Per esborrar-lo: esborrar_grup amb titol. Colors possibles: ' + Object.keys(COLORS).join(', ') + '. Cada grup té un color diferent, així que com a màxim hi pot haver ' + Object.keys(COLORS).length + ' grups. Si demana un color que ja és d\'un altre grup, o ja no en queden de lliures, digues-li quins colors queden lliures. Si demana els grups que té, digues-los amb el color.',
@@ -647,12 +647,22 @@ function nomEquip_(m) {
 
 function membre_(nom, u) {
   const n = String(nom || '').trim().toLowerCase().replace(/^(l'|la |el |en |na )/, '');
+  // Si aquest nom és el d'una persona dels seus calendaris compartits («Maria» = la seva dona),
+  // no és ningú de l'equip: per a la companya cal el nom complet («Maria Grillo»).
+  if (n.indexOf(' ') < 0 && personesCalendaris_(u).indexOf(n) >= 0) return null;
   return equip_(u).filter(function (m) {
     const nm = nomEquip_(m).toLowerCase();
     // Amb un sol nom («Maria») val el primer nom; amb nom i cognom («Maria Vall») ha de coincidir tot,
     // perquè no es confongui amb una altra persona que es digui igual.
     return nm === n || (n.indexOf(' ') < 0 && nm.split(' ')[0] === n);
   })[0] || null;
+}
+
+/** Les persones de la columna H d'algú, en minúscules (sense buscar els calendaris). */
+function personesCalendaris_(u) {
+  return String((u && u.calendarisExtra) || '').split(';').map(function (tros) {
+    return (tros.split(':')[1] || '').split(',');
+  }).reduce(function (a, b) { return a.concat(b); }, []).map(function (p) { return p.trim().toLowerCase(); }).filter(Boolean);
 }
 
 function llistaNoms_(noms) {
