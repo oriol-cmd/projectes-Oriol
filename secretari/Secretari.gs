@@ -151,7 +151,7 @@ const ESQUEMA = {
       items: {
         type: 'OBJECT',
         properties: {
-          tipus: { type: 'STRING', enum: ['crear_cita', 'crear_tasca', 'modificar', 'esborrar', 'fet', 'definir_grup', 'esborrar_grup', 'canviar_ajustos', 'foto_perfil'] },
+          tipus: { type: 'STRING', enum: ['crear_cita', 'crear_tasca', 'modificar', 'esborrar', 'fet', 'definir_grup', 'esborrar_grup', 'canviar_ajustos', 'foto_perfil', 'definir_contacte', 'esborrar_contacte'] },
           ref: { type: 'STRING', description: 'E1, T2… per a modificar, esborrar o fet' },
           titol: { type: 'STRING' },
           inici: { type: 'STRING', description: 'AAAA-MM-DDTHH:MM, o AAAA-MM-DD si és de tot el dia' },
@@ -170,7 +170,10 @@ const ESQUEMA = {
           hora_vespre: { type: 'STRING', description: 'Per a canviar_ajustos: "HH:MM" o "no"' },
           nom_secretari: { type: 'STRING', description: 'Per a canviar_ajustos: com es diu el secretari' },
           genere_secretari: { type: 'STRING', enum: ['noi', 'noia'], description: 'Per a canviar_ajustos: si el secretari és un noi o una noia' },
-          amb: { type: 'ARRAY', items: { type: 'STRING' }, description: "Noms de persones de l'equip amb qui es comparteix la cita" }
+          amb: { type: 'ARRAY', items: { type: 'STRING' }, description: "Noms de persones de l'equip amb qui es comparteix la cita" },
+          convidats: { type: 'ARRAY', items: { type: 'STRING' }, description: "Persones de fora de l'equip convidades a la cita: nom d'un contacte o correu" },
+          correu: { type: 'STRING', description: 'Per a definir_contacte: el correu del contacte' },
+          calendari: { type: 'STRING', description: 'Per a crear_cita o crear_tasca: nom del calendari compartit on va (buit = el seu calendari)' }
         },
         // Gemini de vegades s'oblida dels camps opcionals (p. ex. el dia): aquests sempre hi han de ser.
         required: ['tipus', 'ref', 'titol', 'inici', 'fi', 'recorda_a', 'categoria'],
@@ -183,7 +186,7 @@ const ESQUEMA = {
 };
 
 function aten_(parts, u) {
-  const cal = calendari_(u);
+  const cal = agenda_(u);
   const ara = new Date();
   const ctx = context_(cal, ara, grups_(u));
   const historial = JSON.parse(estat_(u, 'HISTORIAL') || '[]');
@@ -201,6 +204,8 @@ function aten_(parts, u) {
     "- crear_tasca: coses per fer sense hora fixa («he de trucar a…», «comprar…»). «inici» = el dia que toca (si no ho diu, avui). Si vol que l'hi recordis a una hora («recorda'm a les 5 que…»), posa recorda_a.",
     '- modificar, esborrar, fet (tasca acabada): indica la ref (E1, T2…) de les llistes de sota.',
     '- Grups: cada cita o tasca pot tenir un grup, que li dona color al calendari. Grups d\'aquesta persona (nom → color): ' + llistaGrups_(grups) + '. Posa «categoria» = nom del grup quan l\'usuari ho digui («és d\'Esportec», «és personal») o quan sigui evident (p. ex. feina, clients, reunions d\'equip → esportec; metge, família, amics → personal). Si no és clar, «cap». Per canviar el grup d\'una cita existent, modificar amb la nova categoria.',
+    "- Calendaris compartits d'aquesta persona: " + llistaCalendarisExtra_(cal) + ". Si una cita o tasca és amb alguna de les persones d'un calendari compartit («sopar amb la Laura») o diu el nom del calendari («posa-ho a Família»), posa el nom del calendari a «calendari»: s'apuntarà allà i la veuran tots dos (no cal convidar-la). Si no, «calendari» buit. A l'AGENDA, les cites d'aquests calendaris porten «calendari X».",
+    "- Contactes de fora de l'equip (nom → correu): " + llistaContactes_(contactes_(u)) + ". Per desar-ne un («la meva dona és la Laura, laura@gmail.com», «el correu del Pere és…»): definir_contacte amb titol = nom i correu. Per treure'l: esborrar_contacte. Per convidar algú de fora de l'equip a una CITA, posa el seu nom (dels contactes) o el seu correu a «convidats» NOMÉS quan l'usuari l'anomeni expressament com a participant («sopar amb la Laura»): li arribarà una invitació de Google Calendar per correu i la cita li sortirà al seu calendari (si la mous o l'anul·les, a ella també). Si anomena algú que no és de l'equip ni dels contactes, pregunta-li el correu abans de convidar-lo. Les tasques no tenen convidats.",
     "- Equip (persones amb qui pot compartir cites): " + (equip_(u).map(nomEquip_).join(', ') || '(ningú)') + ". Compartir una CITA amb algú de l'equip (posar el seu nom a «amb») NOMÉS quan l'usuari l'anomena expressament com a participant de la cita («reunió amb l'Ignasi», «apunta-ho també a l'Ignasi»): s'apuntarà també al seu calendari i se li enviarà un avís. No ho dedueixis mai pel context, i les tasques («trucar a l'Ignasi», «parlar amb la Maria») no es comparteixen mai: «amb» buit. Si no és clar si la vol compartir, pregunta-ho. Només noms d'aquesta llista. Per afegir algú a una cita que ja existeix: modificar amb «amb». Si la modifiques o l'esborres, també canvia per a les altres persones.",
     '- Per crear un grup o canviar-ne el color («crea el grup Mar Aventura en taronja», «posa Esportec en vermell»): definir_grup amb titol = nom del grup i color. Per esborrar-lo: esborrar_grup amb titol. Colors possibles: ' + Object.keys(COLORS).join(', ') + '. Cada grup té un color diferent, així que com a màxim hi pot haver ' + Object.keys(COLORS).length + ' grups. Si demana un color que ja és d\'un altre grup, o ja no en queden de lliures, digues-li quins colors queden lliures. Si demana els grups que té, digues-los amb el color.',
     '- A cada acció omple SEMPRE tipus, ref, titol, inici, fi, recorda_a i categoria (cadena buida "" si no cal, «cap» a categoria). Per a crear_cita, «inici» amb el dia (i l\'hora) és obligatori.',
@@ -246,7 +251,7 @@ function aten_(parts, u) {
     ]);
   }
   // Si a alguna acció li falta una dada (p. ex. el dia), li demanem a Gemini que la corregeixi.
-  const problemes = problemesAccions_(res.accions, ctx.refs, grups, { esAdmin: esAdmin, teImatge: !!imatge, u: u });
+  const problemes = problemesAccions_(res.accions, ctx.refs, grups, { esAdmin: esAdmin, teImatge: !!imatge, u: u, extres: cal.extres });
   if (problemes.length) {
     registre_('Accions incompletes, ho torno a demanar: ' + JSON.stringify(res.accions) + ' → ' + problemes.join('; '));
     res = gemini_(sistema, [
@@ -258,7 +263,7 @@ function aten_(parts, u) {
   registre_((u.nom || u.numero) + ' → ' + (res.peticio || '') + ' | accions: ' + JSON.stringify(res.accions || []));
   const errors = [];
   // Primer els canvis de grups, perquè una cita nova ja pugui fer servir un grup creat en el mateix missatge.
-  const ordre = function (a) { return /_grup$/.test(a.tipus) ? 0 : 1; };
+  const ordre = function (a) { return /_(grup|contacte)$/.test(a.tipus) ? 0 : 1; };
   const infos = [];
   (res.accions || []).slice().sort(function (a, b) { return ordre(a) - ordre(b); }).forEach(function (a) {
     try {
@@ -291,6 +296,13 @@ function problemesAccions_(accions, refs, grups, opcions) {
       problemes.push(nom + ' fa servir el grup «' + a.categoria + '», que no existeix (grups: ' + Object.keys(grups || {}).join(', ') + '). Fes servir un d\'aquests, «cap», o crea\'l amb definir_grup si l\'usuari ho demana');
     }
     if ((a.amb || []).length && a.tipus !== 'crear_cita' && a.tipus !== 'modificar') problemes.push(nom + ': només les cites es poden compartir; deixa «amb» buit');
+    if ((a.convidats || []).length && a.tipus !== 'crear_cita' && a.tipus !== 'modificar') problemes.push(nom + ': només les cites poden tenir convidats; deixa «convidats» buit');
+    const nousContactes = (accions || []).filter(function (x) { return x.tipus === 'definir_contacte'; }).map(function (x) { return nomGrup_(x.titol); });
+    (a.convidats || []).forEach(function (c) {
+      if (!esCorreu_(c) && !contactes_(opcions.u)[nomGrup_(c)] && nousContactes.indexOf(nomGrup_(c)) < 0) problemes.push(nom + ': no tinc el correu de «' + c + '». No el convidis: pregunta-li el correu a «resposta» i deixa les accions buides');
+    });
+    if (a.calendari && !(opcions.extres || []).some(function (x) { return x.alias === nomGrup_(a.calendari); })) problemes.push(nom + ': no hi ha cap calendari compartit «' + a.calendari + '» (n\'hi ha: ' + ((opcions.extres || []).map(function (x) { return x.alias; }).join(', ') || 'cap') + '). Deixa «calendari» buit');
+    if (a.tipus === 'definir_contacte' && (!nomGrup_(a.titol) || !esCorreu_(a.correu))) problemes.push(nom + ': per desar un contacte cal el nom a «titol» i un correu vàlid a «correu»');
     (a.amb || []).forEach(function (n) {
       if (!membre_(n, opcions.u)) problemes.push(nom + ': «' + n + '» no és de l\'equip (equip: ' + equip_(opcions.u).map(nomEquip_).join(', ') + ')');
     });
@@ -314,7 +326,7 @@ function problemesAccions_(accions, refs, grups, opcions) {
       if (!a.titol) problemes.push(nom + ' no té «titol»');
       if (a.recorda_a && esDia_(a.recorda_a)) problemes.push(nom + ' té «recorda_a» sense hora: ' + a.recorda_a + ' (cal AAAA-MM-DDTHH:MM)');
       else if (a.recorda_a) { try { data_(a.recorda_a); } catch (err) { problemes.push(nom + ' té un «recorda_a» no vàlid: ' + a.recorda_a + ' (format AAAA-MM-DDTHH:MM)'); } }
-    } else if (!refs[a.ref]) {
+    } else if (['modificar', 'esborrar', 'fet'].indexOf(a.tipus) >= 0 && !refs[a.ref]) {
       problemes.push(nom + ' té una «ref» que no és a les llistes: «' + (a.ref || '') + '»');
     }
   });
@@ -334,7 +346,8 @@ function context_(cal, ara, grups) {
       const r = 'T' + (tasques.length + 1);
       refs[r] = ev;
       const recorda = ev.getTag('recorda_a');
-      tasques.push(r + ' | ' + titol.slice(TASCA.length) + ' | per al ' + diaCurt_(ev.getAllDayStartDate()) + (recorda ? ' | recordatori ' + recorda.replace('T', ' ') : ''));
+      const extraT = calendariDe_(ev, cal);
+      tasques.push(r + ' | ' + titol.slice(TASCA.length) + (extraT ? ' | calendari ' + extraT : '') + ' | per al ' + diaCurt_(ev.getAllDayStartDate()) + (recorda ? ' | recordatori ' + recorda.replace('T', ' ') : ''));
       return;
     }
     if (ev.getEndTime() <= avui) return;
@@ -342,13 +355,28 @@ function context_(cal, ara, grups) {
     refs[r] = ev;
     const cat = categoria_(ev, grups);
     const amb = ev.getTag('amb');
-    agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (cat ? ' | ' + cat : '') + (amb ? ' | compartida amb ' + amb : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
+    const extra = calendariDe_(ev, cal);
+    agenda.push(r + ' | ' + quan_(ev) + ' | ' + titol + (extra ? ' | calendari ' + extra : '') + (ev.getLocation() ? ' | ' + ev.getLocation() : '') + (cat ? ' | ' + cat : '') + (amb ? ' | compartida amb ' + amb : '') + (ev.isRecurringEvent() ? ' | (es repeteix)' : ''));
   });
   return { refs: refs, agenda: agenda, tasques: tasques };
 }
 
 function executa_(a, cal, refs, u, grups, imatge) {
   grups = grups || grups_(u);
+  if (a.tipus === 'definir_contacte') {
+    if (!nomGrup_(a.titol) || !esCorreu_(a.correu)) throw new Error('falta el nom o un correu vàlid');
+    const cs = contactes_(u);
+    cs[nomGrup_(a.titol)] = String(a.correu).trim().toLowerCase();
+    desaEstat_(u, 'CONTACTES', JSON.stringify(cs));
+    return;
+  }
+  if (a.tipus === 'esborrar_contacte') {
+    const cs = contactes_(u);
+    if (!cs[nomGrup_(a.titol)]) throw new Error('no tinc cap contacte «' + a.titol + '»');
+    delete cs[nomGrup_(a.titol)];
+    desaEstat_(u, 'CONTACTES', JSON.stringify(cs));
+    return;
+  }
   if (a.tipus === 'canviar_ajustos') {
     const aj = ajustos_(u);
     if (a.hora_mati) aj.mati = hora_(a.hora_mati);
@@ -394,8 +422,21 @@ function executa_(a, cal, refs, u, grups, imatge) {
   if (a.lloc) opcions.location = a.lloc;
   if (a.notes) opcions.description = a.notes;
 
+  // Cites i tasques que van a un calendari compartit (p. ex. «Família»).
+  if (a.calendari && (a.tipus === 'crear_cita' || a.tipus === 'crear_tasca')) {
+    const extra = (cal.extres || []).filter(function (x) { return x.alias === nomGrup_(a.calendari); })[0];
+    if (!extra) throw new Error('no hi ha cap calendari compartit «' + a.calendari + '»');
+    cal = extra.cal;
+  }
+
   if (a.tipus === 'crear_cita') {
     if (!a.titol || !a.inici) throw new Error('falta el títol o el dia');
+    // Convidats de fora de l'equip: Google Calendar els envia la invitació per correu.
+    const convidats = correusConvidats_(a.convidats, u);
+    if (convidats.length) {
+      opcions.guests = convidats.map(function (c) { return c.correu; }).join(',');
+      opcions.sendInvites = true;
+    }
     const rec = recurrencia_(a);
     let ev;
     if (a.tot_el_dia || esDia_(a.inici)) {
@@ -410,7 +451,7 @@ function executa_(a, cal, refs, u, grups, imatge) {
     }
     if (a.avis_minuts != null && a.avis_minuts !== ajustos_(u).avis) ev.setTag('avis', String(a.avis_minuts));
     posaColor_(ev, a.categoria, grups);
-    return (a.amb || []).length ? compartir_(ev, a.amb, u) : '';
+    return [(a.amb || []).length ? compartir_(ev, a.amb, u) : '', textConvidats_(convidats)].filter(Boolean).join('\n');
   }
 
   if (a.tipus === 'crear_tasca') {
@@ -462,6 +503,12 @@ function executa_(a, cal, refs, u, grups, imatge) {
       infos.push("👥 També l'he canviada a l'agenda " + de_(llistaNoms_(copies.map(function (c) { return nomEquip_(c.m); }))) + ' i ' + (copies.length > 1 ? 'els' : 'li') + ' he enviat un avís.');
     }
     if ((a.amb || []).length) infos.push(compartir_(ev, a.amb, u));
+    const convidats = correusConvidats_(a.convidats, u);
+    const nousConvidats = convidats.filter(function (c) {
+      try { return !ev.getGuestByEmail(c.correu); } catch (err) { return true; }
+    });
+    nousConvidats.forEach(function (c) { ev.addGuest(c.correu); });
+    infos.push(textConvidats_(nousConvidats));
     return infos.filter(Boolean).join('\n');
   }
 }
@@ -484,6 +531,104 @@ function modificaComu_(ev, a) {
   }
   if (a.lloc) ev.setLocation(a.lloc);
   if (a.notes) ev.setDescription(a.notes);
+}
+
+// ── Calendaris compartits addicionals (columna H del full) ──────────────────
+
+/**
+ * Els calendaris addicionals d'una persona, segons la columna H del full: «Família: Laura, Pol; Club: Anna».
+ * Cada un es busca pel nom (o per l'ID si porta @) entre els calendaris del compte del secretari.
+ */
+function calendarisExtra_(u) {
+  const text = String((u && u.calendarisExtra) || '').trim();
+  if (!text) return [];
+  return text.split(';').map(function (tros) {
+    const parts = tros.split(':');
+    const nom = parts[0].trim();
+    if (!nom) return null;
+    const persones = (parts[1] || '').split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+    const cal = nom.indexOf('@') >= 0 ? CalendarApp.getCalendarById(nom) : (CalendarApp.getCalendarsByName(nom) || [])[0];
+    if (!cal) {
+      avisaAdmin_('No trobo el calendari compartit «' + nom + '» de ' + nomDe_(u),
+        "Cal que estigui compartit amb el compte del secretari amb permís «Fer canvis als esdeveniments», i que el nom de la columna H del full coincideixi.");
+      return null;
+    }
+    return { alias: nomGrup_(cal.getName()), cal: cal, persones: persones };
+  }).filter(Boolean);
+}
+
+/**
+ * El calendari de la persona i els seus calendaris compartits, junts: es llegeixen tots (agenda, avisos,
+ * resums) i les cites noves van al principal si no es diu el contrari.
+ */
+function agenda_(u) {
+  const principal = calendari_(u);
+  const extres = calendarisExtra_(u);
+  if (!extres.length) return principal;
+  const tots = [principal].concat(extres.map(function (x) { return x.cal; }));
+  const junts = function (llistes) {
+    return [].concat.apply([], llistes).sort(function (a, b) { return a.getStartTime() - b.getStartTime(); });
+  };
+  const delega = function (metode) { return function () { return principal[metode].apply(principal, arguments); }; };
+  return {
+    principal: principal,
+    extres: extres,
+    getName: delega('getName'),
+    getId: delega('getId'),
+    createEvent: delega('createEvent'),
+    createAllDayEvent: delega('createAllDayEvent'),
+    createEventSeries: delega('createEventSeries'),
+    createAllDayEventSeries: delega('createAllDayEventSeries'),
+    getEvents: function (a, b) { return junts(tots.map(function (c) { return c.getEvents(a, b); })); },
+    getEventsForDay: function (d) { return junts(tots.map(function (c) { return c.getEventsForDay(d); })); }
+  };
+}
+
+/** Si una cita és d'un calendari compartit, el seu nom (per mostrar-lo a l'agenda). */
+function calendariDe_(ev, cal) {
+  if (!cal || !cal.extres) return '';
+  let id = '';
+  try { id = ev.getOriginalCalendarId(); } catch (err) { return ''; }
+  const x = cal.extres.filter(function (e) { return e.cal.getId() === id; })[0];
+  return x ? x.cal.getName() : '';
+}
+
+function llistaCalendarisExtra_(cal) {
+  const extres = (cal && cal.extres) || [];
+  return extres.length ? extres.map(function (x) { return x.cal.getName() + (x.persones.length ? ' (amb ' + x.persones.join(', ') + ')' : ''); }).join('; ') : '(cap)';
+}
+
+// ── Contactes de fora de l'equip (convidats a les cites) ────────────────────
+
+function esCorreu_(s) { return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(String(s || '').trim()); }
+
+/** Els contactes d'una persona (nom → correu), per convidar-los a cites. */
+function contactes_(u) {
+  const desat = u && estat_(u, 'CONTACTES');
+  return desat ? JSON.parse(desat) : {};
+}
+
+function llistaContactes_(cs) {
+  const noms = Object.keys(cs);
+  return noms.length ? noms.map(function (k) { return k + ' → ' + cs[k]; }).join(', ') : '(cap)';
+}
+
+/** Converteix els convidats (noms de contactes o correus) en { nom, correu }. */
+function correusConvidats_(convidats, u) {
+  const cs = contactes_(u);
+  return (convidats || []).map(function (c) {
+    c = String(c || '').trim();
+    if (esCorreu_(c)) return { nom: c, correu: c.toLowerCase() };
+    const correu = cs[nomGrup_(c)];
+    if (!correu) throw new Error('no tinc el correu de «' + c + '»');
+    return { nom: c.charAt(0).toUpperCase() + c.slice(1), correu: correu };
+  });
+}
+
+function textConvidats_(convidats) {
+  if (!convidats.length) return '';
+  const plural = convidats.length > 1;
+  return '✉️ He convidat ' + llistaNoms_(convidats.map(function (c) { return c.nom; })) + ': ' + (plural ? 'els' : 'li') + " arribarà la invitació per correu i la cita " + (plural ? 'els' : 'li') + ' sortirà al seu Google Calendar.';
 }
 
 // ── Cites compartides amb l'equip ───────────────────────────────────────────
@@ -663,7 +808,7 @@ function revisaResumsDe_(u) {
 }
 
 function revisaRecordatorisDe_(u) {
-  const cal = calendari_(u);
+  const cal = agenda_(u);
   const ara = new Date();
   const enviats = JSON.parse(estat_(u, 'ENVIATS') || '{}');
   const avisos = [];
@@ -710,7 +855,7 @@ function resumDelVespre() { perACadaUsuari_(revisaResumsDe_); }
 
 /** El resum del matí: l'agenda del dia i les tasques pendents. */
 function resumMatiDe_(u) {
-  const cal = calendari_(u);
+  const cal = agenda_(u);
   const ara = new Date();
   const avui = iniciDia_(ara);
   const cites = llistaCites_(cal, avui);
@@ -723,7 +868,7 @@ function resumMatiDe_(u) {
 
 /** El repàs del vespre: què ha quedat pendent i què hi ha demà. */
 function resumVespreDe_(u) {
-  const cal = calendari_(u);
+  const cal = agenda_(u);
   const dema = new Date(iniciDia_(new Date()).getTime() + 864e5 + 3600e3);
   const cites = llistaCites_(cal, iniciDia_(dema));
   const tasques = tasquesPendents_(cal, iniciDia_(new Date()));
@@ -1052,13 +1197,18 @@ function fullUsuaris_() {
   pestanya.getRange('D1').setNote('(Opcional) On li arriben els avisos si WhatsApp falla.');
   pestanya.getRange('E1').setNote('«No» per donar-la de baixa sense esborrar la fila.');
   pestanya.setFrozenRows(1);
-  pestanya.autoResizeColumns(1, 7);
+  pestanya.autoResizeColumns(1, 8);
   props.setProperty('USERS_SHEET_ID', full.getId());
   return full;
 }
 
 /** Afegeix al full les columnes F i G (nom del secretari i si és noi o noia), si encara no hi són. */
 function columnesSecretari_(pestanya) {
+  const h = pestanya.getRange('H1');
+  if (!String(h.getValue()).trim()) {
+    h.setValue('Calendaris compartits').setFontWeight('bold');
+    h.setNote("(Opcional) Altres calendaris on el secretari apunta i llegeix, i amb qui són. P. ex. «Família: Laura» o «Família: Laura, Pol; Club: Anna». Cal que aquell calendari estigui compartit amb el compte del secretari amb permís «Fer canvis als esdeveniments». Pots posar-hi el nom o l'ID del calendari.");
+  }
   const cap = pestanya.getRange(1, 6, 1, 2);
   if (String(cap.getValues()[0][0]).trim()) return;
   cap.setValues([['Nom del secretari', 'Noi/Noia']]).setFontWeight('bold');
@@ -1078,7 +1228,7 @@ function usuaris_() {
       const f = files[i];
       const numero = numeroMobil_(f[1]);
       if (!numero || /^no$/i.test(String(f[4]).trim())) continue;
-      llista.push({ nom: String(f[0]).trim(), numero: numero, calId: String(f[2]).trim(), correu: String(f[3]).trim(), secretari: String(f[5] || '').trim(), genereSecretari: String(f[6] || '').trim(), fila: i + 1 });
+      llista.push({ nom: String(f[0]).trim(), numero: numero, calId: String(f[2]).trim(), correu: String(f[3]).trim(), secretari: String(f[5] || '').trim(), genereSecretari: String(f[6] || '').trim(), calendarisExtra: String(f[7] || '').trim(), fila: i + 1 });
     }
   }
   if (!llista.length) llista = [{ nom: '', numero: digits_(prop_('MY_NUMBER')), calId: prop_('CALENDAR_ID', true) || '', correu: '' }];
@@ -1101,7 +1251,8 @@ function comprovaUsuaris() {
   CacheService.getScriptCache().remove('usuaris');
   usuaris_().forEach(function (u) {
     try {
-      console.log('✅ ' + (u.nom || u.numero) + ' (+' + u.numero + '): calendari «' + calendari_(u).getName() + '»');
+      console.log('✅ ' + (u.nom || u.numero) + ' (+' + u.numero + '): calendari «' + calendari_(u).getName() + '»' +
+        (agenda_(u).extres || []).map(function (x) { return ' + «' + x.cal.getName() + '» (amb ' + (x.persones.join(', ') || '—') + ')'; }).join(''));
     } catch (err) {
       console.error('❌ ' + (u.nom || u.numero) + ' (+' + u.numero + '): ' + err.message);
     }
