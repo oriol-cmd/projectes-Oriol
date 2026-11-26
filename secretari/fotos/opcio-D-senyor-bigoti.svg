@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640">
+  <!-- Senyor secretari amb bigoti, corbatí i rellotge de butxaca -->
+  <defs><radialGradient id="bg" cx=".5" cy=".45" r=".7"><stop offset="0" stop-color="#ffd9e6"/><stop offset="1" stop-color="#ff8fb1"/></radialGradient></defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <!-- cos (americana) -->
+  <path d="M140 640 C150 515 225 465 320 465 C415 465 490 515 500 640 Z" fill="#3d405b"/>
+  <path d="M276 468 L320 560 L364 468 Z" fill="#ffffff"/>
+  <path d="M286 492 l-26 -16 v34 z M354 492 l26 -16 v34 z" fill="#e63946"/><circle cx="320" cy="492" r="12" fill="#c1121f"/>
+  <!-- cadena del rellotge -->
+  <path d="M260 560 Q300 600 350 570" fill="none" stroke="#f4c542" stroke-width="5" stroke-dasharray="8 6"/>
+  <g transform="translate(350 560)"><circle cx="18" cy="18" r="22" fill="#f4c542" stroke="#b8860b" stroke-width="4"/><circle cx="18" cy="18" r="14" fill="#fffbe6"/><path d="M18 8 v10 l7 5" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round"/></g>
+  <!-- coll -->
+  <rect x="292" y="410" width="56" height="60" rx="22" fill="#f1c7a6"/>
+  <!-- cap calb amb cabells laterals -->
+  <ellipse cx="320" cy="312" rx="114" ry="124" fill="#f6d2b4"/>
+  <path d="M208 300 C204 250 216 226 236 214 C226 250 228 280 238 304 Z" fill="#e0e0e0"/>
+  <path d="M432 300 C436 250 424 226 404 214 C414 250 412 280 402 304 Z" fill="#e0e0e0"/>
+  <ellipse cx="290" cy="215" rx="34" ry="14" fill="#ffffff" opacity=".45"/>
+  <ellipse cx="206" cy="322" rx="16" ry="24" fill="#f1c7a6"/><ellipse cx="434" cy="322" rx="16" ry="24" fill="#f1c7a6"/>
+  <!-- celles poblades -->
+  <path d="M250 270 Q278 252 302 270" fill="none" stroke="#d9d9d9" stroke-width="14" stroke-linecap="round"/>
+  <path d="M338 270 Q362 252 390 270" fill="none" stroke="#d9d9d9" stroke-width="14" stroke-linecap="round"/>
+  <!-- monocle + ulls -->
+  <ellipse cx="278" cy="302" rx="10" ry="13" fill="#2b1a14"/><circle cx="282" cy="297" r="4" fill="#fff"/>
+  <circle cx="362" cy="302" r="30" fill="#ffffff" fill-opacity=".3" stroke="#f4c542" stroke-width="7"/>
+  <ellipse cx="362" cy="302" rx="10" ry="13" fill="#2b1a14"/><circle cx="366" cy="297" r="4" fill="#fff"/>
+  <path d="M390 316 Q420 380 400 440" fill="none" stroke="#f4c542" stroke-width="3"/>
+  <!-- nas -->
+  <ellipse cx="320" cy="340" rx="22" ry="18" fill="#f0a98a"/>
+  <!-- bigoti espectacular -->
+  <path d="M320 360 C300 344 270 346 254 362 C240 376 222 372 214 356 C214 384 246 398 274 384 C294 374 308 368 320 372 C332 368 346 374 366 384 C394 398 426 384 426 356 C418 372 400 376 386 362 C370 346 340 344 320 360 Z" fill="#d9d9d9" stroke="#bdbdbd" stroke-width="3"/>
+  <!-- somriure -->
+  <path d="M296 394 Q320 414 344 394" fill="none" stroke="#9b3b2b" stroke-width="6" stroke-linecap="round"/>
+  <ellipse cx="248" cy="352" rx="14" ry="8" fill="#f29c86" opacity=".5"/><ellipse cx="392" cy="352" rx="14" ry="8" fill="#f29c86" opacity=".5"/>
+</svg>
