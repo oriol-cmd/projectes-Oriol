@@ -3,51 +3,69 @@
 <head>
 <meta charset="utf-8">
 <title>Tarifes La Molina 26-27</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Tipografia: Akzidenz-Grotesk si està instal·lada; si no, Archivo (grotesca similar) -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&display=swap" rel="stylesheet">
 <style>
   @page { size: A3 portrait; margin: 0; }
   :root{
-    --navy:#0d2a4a; --ice:#e8f1f8; --blue:#1f6fb2; --accent:#e4572e; --ink:#1b2430; --muted:#5b6878; --line:#d5e1ec;
+    --black:#000; --blue:#3db4e7; --blue-soft:#e1f1f8; --ink:#111; --muted:#5f6670; --line:#dfe4e8;
+    --font:"Akzidenz-Grotesk Pro","Akzidenz-Grotesk BQ","Akzidenz-Grotesk","AkzidenzGrotesk",Archivo,"Helvetica Neue",Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:#fff;color:var(--ink);font-family:Inter,system-ui,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{background:#fff;color:var(--ink);font-family:var(--font);font-stretch:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .page{width:297mm;height:420mm;display:flex;flex-direction:column;overflow:hidden}
-  header{background:var(--navy);color:#fff;padding:16mm 16mm 12mm;position:relative}
-  header svg.mtn{position:absolute;right:0;bottom:0;width:150mm;opacity:.18}
-  .brand{font:700 13pt Inter;letter-spacing:.18em;text-transform:uppercase;color:#9fc6e8}
-  h1{font:800 58pt/0.95 "Barlow Condensed";text-transform:uppercase;margin-top:4mm}
-  h1 span{color:#ffb199}
-  .season{margin-top:3mm;font:600 16pt Inter;color:#cfe2f3}
-  main{flex:1;padding:9mm 16mm 0;display:grid;grid-template-columns:1fr 1fr;gap:8mm 10mm;align-content:start}
-  section h2{font:800 25pt "Barlow Condensed";text-transform:uppercase;color:var(--navy);border-bottom:3px solid var(--accent);padding-bottom:1.5mm;margin-bottom:3mm;display:flex;justify-content:space-between;align-items:baseline}
-  section h2 small{font:600 10pt Inter;text-transform:none;color:var(--muted)}
-  h3{font:700 11pt Inter;text-transform:uppercase;letter-spacing:.08em;color:var(--blue);margin:4mm 0 1.5mm}
+
+  /* Capçalera */
+  header{padding:13mm 16mm 0;display:flex;justify-content:space-between;align-items:flex-start}
+  header img{height:34mm}
+  .where{text-align:right;padding-top:4mm}
+  .where .loc{font-weight:900;font-style:italic;font-stretch:125%;font-size:30pt;text-transform:uppercase;letter-spacing:-.01em;line-height:1}
+  .where .season{font-size:13pt;font-weight:500;color:var(--muted);margin-top:2mm}
+  .title{padding:6mm 16mm 0}
+  h1{font-weight:900;font-style:italic;font-stretch:125%;font-size:60pt;line-height:.92;text-transform:uppercase;letter-spacing:-.02em}
+  h1 span{color:var(--blue)}
+  .ridge{display:block;width:100%;height:16mm;margin-top:3mm}
+
+  main{flex:1;padding:2mm 16mm 0;display:grid;grid-template-columns:1fr 1fr;gap:8mm 10mm;align-content:start}
+  section h2{font-weight:900;font-style:italic;font-stretch:125%;font-size:20pt;white-space:nowrap;text-transform:uppercase;letter-spacing:-.01em;border-bottom:3px solid var(--black);padding-bottom:1.5mm;margin-bottom:3mm;display:flex;justify-content:space-between;align-items:baseline}
+  section h2 small{font-weight:500;font-style:normal;font-stretch:100%;font-size:10pt;text-transform:none;color:var(--muted);letter-spacing:0}
+  h3{font-weight:700;font-size:10.5pt;text-transform:uppercase;letter-spacing:.12em;color:var(--blue);margin:4mm 0 1.5mm}
   table{width:100%;border-collapse:collapse;font-size:11pt}
-  th{font:700 9.5pt Inter;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:right;padding:1.6mm 1.5mm;border-bottom:1.5px solid var(--navy);white-space:nowrap}
+  th{font-weight:700;font-size:9pt;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:1.6mm 1.5mm;border-bottom:1.5px solid var(--black);white-space:nowrap}
   th:first-child,td:first-child{text-align:left}
   td{padding:1.9mm 1.5mm;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   td:first-child{white-space:normal}
   td .d{display:block;font-size:8.5pt;color:var(--muted);font-weight:400}
-  tr.hl td{background:var(--ice);font-weight:700}
+  tr.hl td{background:var(--blue-soft);font-weight:700}
   .wide{grid-column:1/-1}
-  .price-tag{display:flex;gap:5mm;align-items:center;background:var(--ice);border-radius:3mm;padding:3.5mm 5mm;margin-top:3mm}
-  .price-tag b{font:800 26pt "Barlow Condensed";color:var(--accent);white-space:nowrap}
+  .price-tag{display:flex;gap:5mm;align-items:center;background:var(--black);color:#fff;padding:3.5mm 5mm;margin-top:3mm}
+  .price-tag b{font-weight:900;font-style:italic;font-stretch:125%;font-size:26pt;color:var(--blue);white-space:nowrap}
   .price-tag p{font-size:10pt;line-height:1.35}
   .note{font-size:9pt;color:var(--muted);margin-top:2mm;line-height:1.4}
-  .tbd{color:var(--accent);font-weight:700}
-  footer{background:var(--navy);color:#fff;padding:7mm 16mm;display:flex;justify-content:space-between;align-items:center;margin-top:8mm}
-  footer .big{font:800 22pt "Barlow Condensed";letter-spacing:.02em}
-  footer .small{font-size:10pt;color:#cfe2f3;text-align:right;line-height:1.5}
+  .tbd{color:#d9480f;font-weight:700}
+
+  footer{background:var(--black);color:#fff;padding:7mm 16mm;display:flex;justify-content:space-between;align-items:center;margin-top:8mm;border-top:3mm solid var(--blue)}
+  footer .big{font-weight:900;font-style:italic;font-stretch:125%;font-size:20pt;text-transform:uppercase}
+  footer .big span{color:var(--blue)}
+  footer .small{font-size:10pt;color:#cfd6dc;text-align:right;line-height:1.5}
 </style>
 </head>
 <body>
 <div class="page">
   <header>
-    <svg class="mtn" viewBox="0 0 300 120" aria-hidden="true"><path d="M0 120 L70 40 L105 75 L160 10 L215 70 L245 45 L300 100 L300 120Z" fill="#fff"/></svg>
-    <div class="brand">Esportec · Escola d'Esquí · La Molina</div>
-    <h1>Tarifes <span>lloguer</span><br>i classes</h1>
-    <div class="season">Temporada 2026 – 2027 · Esquí i Snowboard</div>
+    <img src="logo-esportec.png" alt="Esportec Outdoor Sport">
+    <div class="where">
+      <div class="loc">La Molina</div>
+      <div class="season">Temporada 2026 – 2027</div>
+    </div>
   </header>
+  <div class="title">
+    <h1>Tarifes <span>lloguer</span><br>i classes</h1>
+  </div>
+  <!-- línia de muntanya inspirada en el logotip -->
+  <svg class="ridge" viewBox="0 0 1000 60" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="0,40 560,40 620,10 632,18 660,2 720,40 770,40 800,56 830,40 1000,40" fill="none" stroke="#3db4e7" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  </svg>
 
   <main>
     <!-- LLOGUER -->
@@ -123,7 +141,7 @@
   </main>
 
   <footer>
-    <div class="big">Reserva a escolaesqui.cat</div>
+    <div class="big">Reserva a <span>escolaesqui.cat</span></div>
     <div class="small">658 188 936 · hola@escolaesqui.cat<br>Preus vàlids per a la temporada 2026-2027</div>
   </footer>
 </div>
