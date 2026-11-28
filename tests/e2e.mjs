@@ -334,6 +334,7 @@ await step('Biblioteca de plantilles i tipus Automàtic', async () => {
   await p.click('#btn-gallery'); await p.waitForSelector('#gallery-sheet:not([hidden])');
   const n = await p.$$eval('#gallery-list button', (l) => l.length);
   ok(await p.isVisible('#gallery-list button:has-text("Taula rodona")'), 'falta la plantilla Taula rodona');
+  ok(await p.isVisible('#gallery-list button:has-text("Estudi científic")'), 'falta la plantilla Estudi científic');
   await p.click('#gallery-list button:has-text("Junta de veïns")'); await p.waitForTimeout(300);
   ok(await p.isDisabled('#gallery-list button:has-text("Junta de veïns")'), 'no queda afegida');
   await p.evaluate(() => closeSheets());

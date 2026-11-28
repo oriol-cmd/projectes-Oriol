@@ -128,6 +128,10 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v89
+
+- Nova plantilla **Estudi científic** a la biblioteca: resum (abstract), introducció i context, objectius, mètode, resultats, discussió, limitacions, conclusions, línies futures i fonts esmentades. Com sempre, només amb el que s'ha dit (els apartats sense contingut surten com «Cap.»).
+
 ## Novetats de la v88: veu més propera i taula rodona
 
 - **Micròfon amb veu natural** (de sèrie): ja no s'aplica el filtre de soroll del mòbil/ordinador, que feia que les veus de lluny sonessin apagades i es transcriguessin pitjor. Es manté el control de volum per a les veus fluixes. A Ajustos › Micròfon › «So del micròfon» es pot tornar a activar el filtre («Lloc sorollós o altaveu»).
