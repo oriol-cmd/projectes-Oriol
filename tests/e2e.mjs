@@ -595,6 +595,18 @@ await step('Trucada durant la gravació: avís gran i continua', async () => {
   ok(m.status === 'done', `estat ${m.status} ${m.error || ''}`);
   return `${m.segments.length} trams`;
 });
+await step('Veu natural que no capta res: es torna a obrir amb el filtre', async () => {
+  await p.click('#btn-tab-home'); await waitView('home');
+  await p.evaluate(() => { saveSettings({ source: 'mic', micMode: 'natural' }); renderSourceSwitch();
+    window.__gum2 = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    // Com a alguns iPhone: sense el filtre d'eco el micròfon dona silenci
+    navigator.mediaDevices.getUserMedia = (c) => { if (c && c.audio && c.audio.echoCancellation === false) { const ac = new AudioContext(); return Promise.resolve(ac.createMediaStreamDestination().stream); } return window.__gum2(c); }; });
+  await p.click('#btn-record'); await waitView('rec', 10000);
+  try {
+    await p.waitForFunction(() => rec.forceProcessing && rec.recorder && rec.recorder.state === 'recording' && rec.inMax && rec.inMax.mic > 0.002, null, { timeout: 25000 });
+  } finally { await p.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gum2; }); await p.click('#btn-stop'); await waitView('result', 90000); }
+  return 'reobert amb filtre';
+});
 await step('Importar una gravació llarga (trossos alhora)', async () => {
   // 13 minuts de so a 8 kHz
   const rate = 8000, secs = 13 * 60, n = rate * secs;

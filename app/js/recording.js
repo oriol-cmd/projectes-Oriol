@@ -68,9 +68,13 @@ async function getMicStream() {
   // «Veu natural»: sense el filtre de soroll ni el d'eco del sistema, que tracten les veus
   // de lluny com a soroll i les deixen apagades. El control de volum sí, per a les veus fluixes.
   // A les videotrucades es manté el filtre d'eco (el so de la trucada surt per l'altaveu).
+  // A l'iPhone, sense el filtre d'eco el micròfon pot quedar mut: allà sempre es manté.
+  // I si en algun aparell la «veu natural» no capta res, es torna a obrir amb el filtre.
   const noisy = settings.micMode === 'noisy';
   const call = !!(rec.meeting && rec.meeting.source === 'call');
-  const base = { echoCancellation: noisy || call, noiseSuppression: noisy, autoGainControl: true, channelCount: 1 };
+  const natural = !noisy && !call && !IS_IOS && !rec.forceProcessing;
+  rec.micNatural = natural;
+  const base = { echoCancellation: !natural, noiseSuppression: !natural, autoGainControl: true, channelCount: 1 };
   // El micròfon triat a Ajustos (p. ex. un micròfon extern). Si ja no hi és, el de sempre.
   if (settings.micId) {
     try { return await askMic({ audio: { ...base, deviceId: { exact: settings.micId } } }); }
@@ -475,6 +479,8 @@ function watchMic() {
   const bad = !track || track.readyState === 'ended' || track.muted || (ctxSt === 'interrupted' && !(rec.recorder && rec.recorder.state === 'recording'));
   if (!bad) {
     rec.muteSince = 0;
+    // Ja torna a gravar (s'ha reprès per un altre camí): treu l'avís.
+    if (rec.interrupted && recordingOk()) { rec.interrupted = null; hideResumeOverlay(); }
     // El micròfon grava bé però el mesurador s'ha aturat: només cal reprendre el motor d'àudio.
     if (ctxSt === 'interrupted' || ctxSt === 'suspended') rec.audioCtx.resume().catch(() => {});
     return;
@@ -584,6 +590,7 @@ async function startRecordingInner(cont, token) {
       rec.mime = pickMime();
       if (rec.mime === null) throw new Error('Aquest navegador no pot gravar àudio');
       rec.meeting = m; // openMic necessita saber la font (micròfon o videotrucada)
+      rec.forceProcessing = false;
       await openMic();
       if (cancelled()) { rec.stream && rec.stream.getTracks().forEach((t) => t.stop()); stopExtraStreams(); return; }
     }
@@ -704,6 +711,14 @@ function updateInputs() {
   }
   // Al cap d'una estona, si una entrada no ha rebut mai so, s'avisa (un sol cop).
   const since = rec.activeMs - (rec.inSince || 0);
+  // «Veu natural» que no capta res de res: es torna a obrir el micròfon amb el filtre del sistema.
+  if (!call && rec.micNatural && !rec.forceProcessing && since > 6000 && rec.inMax.mic < 0.0015
+      && rec.audioCtx && rec.audioCtx.state === 'running' && !rec.recovering && !rec.retrying && !rec.interrupted) {
+    rec.forceProcessing = true;
+    toast('El micròfon no captava res: el torno a obrir amb el filtre del sistema.', 6000);
+    recoverMic();
+    return;
+  }
   if (since < 25000) return;
   const warn = [];
   if (call && !rec.inWarned.call && rec.inMax.call < 0.02) {

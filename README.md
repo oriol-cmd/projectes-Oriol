@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v90: micròfon de l'iPhone
+
+- **Corregit:** a la v88 l'iPhone podia gravar en silenci (la línia de volum no es movia). A l'iPhone es torna a fer servir sempre el filtre del sistema; la «veu natural» queda per a l'ordinador.
+- Si en algun aparell la «veu natural» no capta res de res durant els primers segons, Xiu-xiu torna a obrir el micròfon sol amb el filtre del sistema.
+- Si la gravació es reprèn per un altre camí, l'avís gran «No s'està gravant» desapareix sol.
+
 ## Novetats de la v89
 
 - Nova plantilla **Estudi científic** a la biblioteca: resum (abstract), introducció i context, objectius, mètode, resultats, discussió, limitacions, conclusions, línies futures i fonts esmentades. Com sempre, només amb el que s'ha dit (els apartats sense contingut surten com «Cap.»).
