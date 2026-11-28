@@ -14,6 +14,7 @@ function fillSettings() {
   $('#set-extra').value = settings.extra;
   $('#set-vocab').value = settings.vocab || '';
   $('#set-boost').checked = settings.boost !== false;
+  $('#set-micmode').value = settings.micMode === 'noisy' ? 'noisy' : 'natural';
   $('#set-precise').checked = settings.precise === true;
   $('#set-short-imports').checked = settings.shortImports !== false;
   $('#set-quick').checked = !!settings.quickStart;
@@ -44,6 +45,7 @@ function readSettingsForm() {
     extra: $('#set-extra').value.trim(),
     vocab: $('#set-vocab').value.trim(),
     boost: $('#set-boost').checked,
+    micMode: $('#set-micmode').value,
     precise: $('#set-precise').checked,
     shortImports: $('#set-short-imports').checked,
     quickStart: $('#set-quick').checked,
@@ -267,6 +269,7 @@ const BUILTIN_TEMPLATES = [
   { name: 'Visita a client', structure: "Client i assistents\nNecessitats i problemes del client\nPropostes presentades\nPreus, terminis i condicions parlades\nObjeccions\nAcords\nPropers passos (qui fa què i quan)" },
   { name: 'Pluja d\'idees', structure: "Repte o pregunta de partida\nIdees proposades (agrupades per temes, amb qui les proposa)\nIdees preferides i per què\nDubtes i riscos\nPropers passos" },
   { name: 'Seguiment setmanal d\'equip', structure: "Assistents\nEstat de cada persona o àrea (fet, en curs, bloquejos)\nPrioritats de la setmana\nDecisions\nTasques" },
+  { name: 'Taula rodona', structure: "Tema i moderador/a\nParticipants (nom i entitat o càrrec, tal com es presenten)\nPreguntes o blocs plantejats per la moderació\nIntervencions de cada participant (idees principals de cadascú, en l'ordre en què parlen)\nPunts en comú\nDiscrepàncies i debat entre participants\nPreguntes del públic i respostes\nIdees clau i conclusions (només les que s'han dit)" },
   { name: 'Formació o classe', structure: "Tema i ponent\nConceptes explicats (ordenats i didàctics)\nExemples i casos\nPreguntes i respostes\nIdees clau per recordar\nDeures o propers passos" },
   { name: 'Retrospectiva de projecte', structure: "Què ha anat bé\nQuè ha anat malament\nQuè hem après\nAccions de millora\nTasques" },
   { name: 'Visita mèdica o professional', structure: "Motiu de la consulta\nExplicacions del professional\nProves o tractaments proposats\nIndicacions i pautes (dosi, horaris)\nDubtes a consultar\nPropera visita" },
@@ -750,6 +753,7 @@ setInterval(() => { if (document.visibilityState === 'visible' && signedIn() && 
 
 // Botons de la pantalla d'ajustos
 $('#set-engine').onchange = syncEngineFields;
+$('#set-micmode').onchange = (e) => { saveSettings({ micMode: e.target.value }); toast(e.target.value === 'noisy' ? 'Micròfon: redueix el soroll i l\'eco' : 'Micròfon: veu natural'); };
 $('#btn-save-settings').onclick = async () => {
   const next = readSettingsForm();
   // Abans d'activar l'esborrat de reunions antigues, diu quantes se n'esborrarien ara.

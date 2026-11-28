@@ -128,6 +128,12 @@ Si l'acta té **[dubtes de comprensió]**, a dalt del resultat surt un avís amb
 - **Privadesa i espai** (Ajustos): quant de temps es guarda l'àudio (de sèrie 7 dies) i si s'esborren les reunions antigues. Si el mòbil va just d'espai, s'esborra primer l'àudio més antic.
 - **Mòbil i ordinador sincronitzats amb Google:** segueix la [guia pas a pas](docs/guia-vincular-google.md).
 
+## Novetats de la v88: veu més propera i taula rodona
+
+- **Micròfon amb veu natural** (de sèrie): ja no s'aplica el filtre de soroll del mòbil/ordinador, que feia que les veus de lluny sonessin apagades i es transcriguessin pitjor. Es manté el control de volum per a les veus fluixes. A Ajustos › Micròfon › «So del micròfon» es pot tornar a activar el filtre («Lloc sorollós o altaveu»).
+- A les videotrucades es manté el filtre d'eco, perquè el so de la trucada surt per l'altaveu.
+- Nova plantilla **Taula rodona** a la biblioteca (moderació, participants, intervencions de cadascú, punts en comú, discrepàncies, preguntes del públic i idees clau).
+
 ## Novetats de la v87: després d'una trucada, torna a gravar sol
 
 - En penjar una trucada, el micròfon **es torna a engegar sol**: si el mòbil encara no el deixa anar, ho prova diverses vegades durant uns segons (i després ho continua provant) abans de demanar el botó gran.

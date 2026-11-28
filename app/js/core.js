@@ -1,6 +1,6 @@
 /* Xiu-xiu · Base: configuració, utilitats, Markdown, base de dades i textos d'error. */
 'use strict';
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,7 @@ const DEFAULTS = {
   extra: '',
   vocab: '',
   boost: true,
+  micMode: 'natural', // 'natural' = veu tal com és (sala) · 'noisy' = redueix soroll i eco
   precise: false,
   shortImports: true,
   detail: 'full', // 'full' = acta detallada (tot el que s'ha parlat) · 'short' = resum

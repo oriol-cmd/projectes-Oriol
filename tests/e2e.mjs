@@ -333,6 +333,7 @@ await step('Biblioteca de plantilles i tipus Automàtic', async () => {
   await p.click('#btn-settings'); await waitView('settings');
   await p.click('#btn-gallery'); await p.waitForSelector('#gallery-sheet:not([hidden])');
   const n = await p.$$eval('#gallery-list button', (l) => l.length);
+  ok(await p.isVisible('#gallery-list button:has-text("Taula rodona")'), 'falta la plantilla Taula rodona');
   await p.click('#gallery-list button:has-text("Junta de veïns")'); await p.waitForTimeout(300);
   ok(await p.isDisabled('#gallery-list button:has-text("Junta de veïns")'), 'no queda afegida');
   await p.evaluate(() => closeSheets());
@@ -541,6 +542,8 @@ await step('Triar i provar el micròfon', async () => {
   await p.evaluate(() => { saveSettings({ source: 'mic' }); renderSourceSwitch(); });
   await p.click('#btn-record'); await waitView('rec', 10000);
   const used = await p.evaluate(() => rec.stream.getAudioTracks()[0].getSettings().deviceId);
+  const ns = await p.evaluate(() => rec.stream.getAudioTracks()[0].getSettings().noiseSuppression);
+  ok(ns !== true, 'veu natural: el filtre de soroll del sistema hauria d\'estar apagat');
   await p.click('#btn-stop'); await waitView('result', 90000);
   ok(used === dev[0], `grava amb ${used}`);
   await p.evaluate(() => saveSettings({ micId: '', micLabel: '' }));

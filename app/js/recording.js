@@ -65,7 +65,12 @@ function askMic(c) {
   return Promise.race([p, new Promise((_, rej) => setTimeout(() => { late = true; rej(Object.assign(new Error('timeout'), { name: 'TimeoutError' })); }, 7000))]);
 }
 async function getMicStream() {
-  const base = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
+  // «Veu natural»: sense el filtre de soroll ni el d'eco del sistema, que tracten les veus
+  // de lluny com a soroll i les deixen apagades. El control de volum sí, per a les veus fluixes.
+  // A les videotrucades es manté el filtre d'eco (el so de la trucada surt per l'altaveu).
+  const noisy = settings.micMode === 'noisy';
+  const call = !!(rec.meeting && rec.meeting.source === 'call');
+  const base = { echoCancellation: noisy || call, noiseSuppression: noisy, autoGainControl: true, channelCount: 1 };
   // El micròfon triat a Ajustos (p. ex. un micròfon extern). Si ja no hi és, el de sempre.
   if (settings.micId) {
     try { return await askMic({ audio: { ...base, deviceId: { exact: settings.micId } } }); }
